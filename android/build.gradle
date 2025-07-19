@@ -1,0 +1,30 @@
+buildscript {
+    repositories {
+        google()  // Google repository for Firebase and other services
+        mavenCentral() // Central repository for other dependencies
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.0'  // Ensure the version matches your Flutter setup
+        classpath 'com.google.gms:google-services:4.4.0'  // Firebase services plugin
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.10'  // Kotlin Gradle plugin
+    }
+}
+
+allprojects {
+    repositories {
+        google()  // Google repository for Firebase and other services
+        mavenCentral()  // Central repository for other dependencies
+    }
+}
+
+rootProject.buildDir = "../build"  // Root build directory location
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"  // Each subproject gets its own build directory
+}
+subprojects {
+    project.evaluationDependsOn(":app")  // Ensures all subprojects are evaluated
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir  // Clean build task
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "707436643898",
+    "project_id": "dolo-99e53",
+    "storage_bucket": "dolo-99e53.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:707436643898:android:b4c069b9588018b34f5703",
+        "android_client_info": {
+          "package_name": "com.example.dolo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB03IXvWqh-CLCgynIGafIakq2k43YOx5Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
