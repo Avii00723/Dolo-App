@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); // ensure your firebase_options.dart is configured
   runApp(const MyApp());
 }
 
@@ -34,41 +38,44 @@ class OrderListScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Route information section
+              // Route Header
               _buildRouteHeader(),
               const SizedBox(height: 24),
 
-              // Available drivers list
+              // Available drivers list from Firestore
               Expanded(
-                child: ListView(
-                  children: [
-                    _buildDriverCard(
-                      name: "Alok M.",
-                      time: "7:00 AM",
-                      origin: "Aurangabad",
-                      destination: "Ahmednagar",
-                      vehicleType: "Small truck",
-                      spaceLeft: "40%",
-                    ),
-                    const SizedBox(height: 10),
-                    _buildDriverCard(
-                      name: "Alok M.",
-                      time: "7:00 AM",
-                      origin: "Aurangabad",
-                      destination: "Ahmednagar",
-                      vehicleType: "Small truck",
-                      spaceLeft: "40%",
-                    ),
-                    const SizedBox(height: 10),
-                    _buildDriverCard(
-                      name: "Alok M.",
-                      time: "7:00 AM",
-                      origin: "Aurangabad",
-                      destination: "Ahmednagar",
-                      vehicleType: "Small truck",
-                      spaceLeft: "40%",
-                    ),
-                  ],
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('trips')
+                      .orderBy('time') // optional ordering
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(child: Text("No trips available"));
+                    }
+
+                    final trips = snapshot.data!.docs;
+
+                    return ListView.separated(
+                      itemCount: trips.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final trip = trips[index].data() as Map<String, dynamic>;
+
+                        return _buildDriverCard(
+                          name: trip['name'] ?? 'Unknown',
+                          time: trip['time'] ?? '',
+                          origin: trip['origin'] ?? '',
+                          destination: trip['destination'] ?? '',
+                          vehicleType: trip['vehicleType'] ?? '',
+                          spaceLeft: trip['spaceLeft'] ?? '',
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             ],
@@ -89,16 +96,12 @@ class OrderListScreen extends StatelessWidget {
               TextSpan(
                 text: "From ",
                 style: TextStyle(
-                  color: Colors.blue[800],
-                  fontWeight: FontWeight.w500,
-                ),
+                    color: Colors.blue[800], fontWeight: FontWeight.w500),
               ),
               const TextSpan(
                 text: "Aurangabad",
                 style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
+                    color: Colors.black, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -111,16 +114,12 @@ class OrderListScreen extends StatelessWidget {
               TextSpan(
                 text: "To ",
                 style: TextStyle(
-                  color: Colors.blue[800],
-                  fontWeight: FontWeight.w500,
-                ),
+                    color: Colors.blue[800], fontWeight: FontWeight.w500),
               ),
               const TextSpan(
                 text: "Pune",
                 style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
+                    color: Colors.black, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -128,10 +127,7 @@ class OrderListScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           "April 15, 2024",
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 14,
-          ),
+          style: TextStyle(color: Colors.grey[600], fontSize: 14),
         ),
       ],
     );
@@ -154,7 +150,7 @@ class OrderListScreen extends StatelessWidget {
         padding: const EdgeInsets.all(12.0),
         child: Row(
           children: [
-            // Driver avatar
+            // Avatar
             Container(
               width: 48,
               height: 48,
@@ -162,55 +158,40 @@ class OrderListScreen extends StatelessWidget {
                 color: Colors.grey[200],
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.person_outline,
-                color: Colors.black54,
-                size: 24,
-              ),
+              child: const Icon(Icons.person_outline,
+                  color: Colors.black54, size: 24),
             ),
             const SizedBox(width: 12),
 
-            // Driver details
+            // Details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Driver name
                   Text(
                     name,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: Color(0xFF1A237E), // Deep indigo color
+                      color: Color(0xFF1A237E),
                     ),
                   ),
                   const SizedBox(height: 4),
-
-                  // Route time and locations
                   Text(
                     "$time – $origin – $destination",
                     style: const TextStyle(
-                      color: Colors.black87,
-                      fontSize: 13,
-                    ),
+                        color: Colors.black87, fontSize: 13),
                   ),
                   const SizedBox(height: 4),
-
-                  // Vehicle type and space information
                   Row(
                     children: [
-                      const Icon(
-                        Icons.local_shipping,
-                        size: 16,
-                        color: Colors.black54,
-                      ),
+                      const Icon(Icons.local_shipping,
+                          size: 16, color: Colors.black54),
                       const SizedBox(width: 4),
                       Text(
                         "$vehicleType - Space left: $spaceLeft",
                         style: const TextStyle(
-                          color: Colors.black87,
-                          fontSize: 13,
-                        ),
+                            color: Colors.black87, fontSize: 13),
                       ),
                     ],
                   ),
