@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import '../../Controllers/LoginService.dart';
+import '../../Controllers/AuthService.dart'; // ✅ Import AuthService
+import '../../Models/LoginModel.dart';
+import 'package:dolo/screens/home/homepage.dart';
 
 class SignupScreen extends StatefulWidget {
   final bool isKycRequired;
-  final Map<String, dynamic>? existingUserData; // For edit mode
+  final int? userId;
 
   const SignupScreen({
     Key? key,
     this.isKycRequired = false,
-    this.existingUserData,
+    this.userId,
   }) : super(key: key);
 
   @override
@@ -20,40 +23,25 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final LoginService _loginService = LoginService();
 
-  // Basic Profile Controllers
+  // Form controllers
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-
-  // KYC Controllers
   final TextEditingController _aadhaarController = TextEditingController();
-  final TextEditingController _licenseController = TextEditingController();
 
-  String _selectedUserType = 'sender';
+  // KYC Document handling
+  File? _aadhaarDocument;
+  String? _documentType;
+  String? _documentName;
   bool _isLoading = false;
-  File? _profileImage;
-  File? _licenseImage;
-  bool _isEditMode = false;
-
   final ImagePicker _picker = ImagePicker();
+  int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
-    _isEditMode = widget.existingUserData != null;
-    if (_isEditMode) {
-      _populateExistingData();
-    }
-  }
-
-  void _populateExistingData() {
-    final data = widget.existingUserData!;
-    _nameController.text = data['name'] ?? '';
-    _emailController.text = data['email'] ?? '';
-    _aadhaarController.text = data['aadhaar'] ?? '';
-    _selectedUserType = data['userType'] ?? 'sender';
+    _loadUserId();
   }
 
   @override
@@ -61,44 +49,117 @@ class _SignupScreenState extends State<SignupScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _aadhaarController.dispose();
-    _licenseController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickProfileImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
+  // ✅ LOAD USER ID FROM SECURE STORAGE
+  Future<void> _loadUserId() async {
+    try {
+      // First check if userId was passed as parameter
+      if (widget.userId != null && widget.userId! > 0) {
+        setState(() {
+          _currentUserId = widget.userId;
+        });
+        debugPrint('✅ UserId loaded from parameter: ${widget.userId}');
+        return;
+      }
+
+      // ✅ Load from AuthService (secure storage)
+      final userId = await AuthService.getUserId();
       setState(() {
-        _profileImage = File(image.path);
+        _currentUserId = userId;
       });
+      debugPrint('✅ UserId loaded from secure storage: $userId');
+    } catch (e) {
+      debugPrint('❌ Error loading userId: $e');
     }
   }
 
-  Future<void> _pickLicenseImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        _licenseImage = File(image.path);
-      });
+  Future<void> _pickAadhaarDocument() async {
+    try {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Upload Aadhaar Document'),
+          content: const Text('Choose how to upload your Aadhaar document'),
+          actions: [
+            // Camera option
+            TextButton.icon(
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Camera'),
+              onPressed: () async {
+                Navigator.pop(context);
+                final XFile? image = await _picker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 85,
+                );
+                if (image != null) {
+                  setState(() {
+                    _aadhaarDocument = File(image.path);
+                    _documentType = 'image';
+                    _documentName = image.name;
+                  });
+                  debugPrint('✅ Aadhaar image captured from camera: ${image.path}');
+                }
+              },
+            ),
+            // Gallery option
+            TextButton.icon(
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Gallery'),
+              onPressed: () async {
+                Navigator.pop(context);
+                final XFile? image = await _picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 85,
+                );
+                if (image != null) {
+                  setState(() {
+                    _aadhaarDocument = File(image.path);
+                    _documentType = 'image';
+                    _documentName = image.name;
+                  });
+                  debugPrint('✅ Aadhaar image selected from gallery: ${image.path}');
+                }
+              },
+            ),
+            // PDF option
+            TextButton.icon(
+              icon: const Icon(Icons.picture_as_pdf),
+              label: const Text('PDF File'),
+              onPressed: () async {
+                Navigator.pop(context);
+                FilePickerResult? result = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['pdf'],
+                );
+                if (result != null && result.files.single.path != null) {
+                  setState(() {
+                    _aadhaarDocument = File(result.files.single.path!);
+                    _documentType = 'pdf';
+                    _documentName = result.files.single.name;
+                  });
+                  debugPrint('✅ Aadhaar PDF selected: ${result.files.single.path}');
+                }
+              },
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _showSnackBar('Error picking document: $e', isError: true);
     }
   }
 
-  Future<void> _completeProfile() async {
+  // ✅ SUBMIT PROFILE AND SAVE TO SECURE STORAGE
+  Future<void> _submitProfile() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Check KYC requirement
-    if (widget.isKycRequired && _selectedUserType == 'traveller') {
-      if (_aadhaarController.text.isEmpty || (!_isEditMode && _licenseImage == null)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('KYC documents are required for trip creators'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
+    if (_aadhaarDocument == null) {
+      _showSnackBar('Please upload Aadhaar document (image or PDF)', isError: true);
+      return;
     }
 
     setState(() {
@@ -106,104 +167,194 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      final String userId = _auth.currentUser?.uid ?? '';
-      final String phoneNumber = _auth.currentUser?.phoneNumber ?? '';
-
-      // Prepare user data
-      Map<String, dynamic> userData = {
-        'uid': userId,
-        'name': _nameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'phone': phoneNumber,
-        'userType': _selectedUserType,
-        'profileCompleted': true,
-        'lastLogin': FieldValue.serverTimestamp(),
-      };
-
-      // Add creation timestamp only for new profiles
-      if (!_isEditMode) {
-        userData['createdAt'] = FieldValue.serverTimestamp();
-        userData['walletBalance'] = 0;
+      // Get userId from multiple sources
+      int userId = _currentUserId ?? widget.userId ?? 0;
+      if (userId == 0) {
+        userId = (await AuthService.getUserId()) ?? 0;
       }
 
-      // Handle profile image
-      if (_profileImage != null) {
-        userData['profileUrl'] = 'profile_uploaded'; // In real app, upload to storage
-      } else if (_isEditMode && widget.existingUserData!['profileUrl'] != null) {
-        userData['profileUrl'] = widget.existingUserData!['profileUrl'];
-      }
+      debugPrint('=== Submit Profile Started ===');
+      debugPrint('UserId: $userId');
 
-      // ✅ FIXED KYC LOGIC - Check if requirements are actually met
-      if (widget.isKycRequired && _selectedUserType == 'traveller') {
-        // Check if KYC is actually complete
-        bool hasAadhaar = _aadhaarController.text.trim().isNotEmpty;
-        bool hasLicense = _licenseImage != null ||
-            (_isEditMode && widget.existingUserData!['licenseStatus'] == 'uploaded');
-
-        String kycStatus;
-        if (hasAadhaar && hasLicense) {
-          kycStatus = 'verified'; // ✅ KYC complete - allow trip creation
-        } else {
-          kycStatus = 'pending'; // ❌ KYC incomplete - block trip creation
-        }
-
-        userData.addAll({
-          'kycStatus': kycStatus,
-          'aadhaar': _aadhaarController.text.trim(),
-          'licenseStatus': hasLicense ? 'uploaded' : 'not_uploaded',
+      if (userId == 0) {
+        _showSnackBar('User not authenticated. Please login again.', isError: true);
+        setState(() {
+          _isLoading = false;
         });
-      } else if (_selectedUserType == 'traveller') {
-        // Traveller without explicit KYC requirement
-        bool hasAadhaar = _aadhaarController.text.trim().isNotEmpty;
-        bool hasLicense = _licenseImage != null ||
-            (_isEditMode && widget.existingUserData!['licenseStatus'] == 'uploaded');
-
-        String kycStatus;
-        if (hasAadhaar && hasLicense) {
-          kycStatus = 'verified'; // ✅ Optional KYC complete
-        } else if (hasAadhaar || hasLicense) {
-          kycStatus = 'pending'; // ❌ Partial KYC
-        } else {
-          kycStatus = 'not_required'; // No KYC provided
-        }
-
-        userData['kycStatus'] = kycStatus;
-        if (hasAadhaar) {
-          userData['aadhaar'] = _aadhaarController.text.trim();
-        }
-        userData['licenseStatus'] = hasLicense ? 'uploaded' : 'not_uploaded';
-      } else {
-        userData['kycStatus'] = 'not_required';
+        return;
       }
 
-      // Save to Firestore (merge for edit mode)
-      if (_isEditMode) {
-        await _firestore.collection('users').doc(userId).update(userData);
-      } else {
-        await _firestore.collection('users').doc(userId).set(userData);
+      // Step 1: Update profile
+      debugPrint('Step 1: Updating profile...');
+      final profileRequest = ProfileUpdateRequest(
+        userId: userId,
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        aadhaar: _aadhaarController.text.trim(),
+        photoURL: '',
+      );
+
+      final profileResult = await _loginService.completeProfile(profileRequest);
+      if (profileResult == null) {
+        throw Exception('Failed to update profile');
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isEditMode ? 'Profile updated successfully!' : 'Profile completed successfully!'),
-          backgroundColor: Colors.green,
-        ),
+      debugPrint('✅ Profile updated successfully');
+
+      // Step 2: Upload KYC
+      debugPrint('Step 2: Uploading KYC document ($_documentType)...');
+      final kycResult = await _loginService.uploadKycDocument(
+        userId,
+        _aadhaarDocument!,
       );
 
-      // Navigate back
-      Navigator.of(context).pop(true);
+      if (kycResult == null) {
+        debugPrint('❌ KYC upload returned null');
+        _showSnackBar(
+          'Profile created but KYC upload failed. Please try again from profile settings.',
+          isError: true,
+        );
+      } else {
+        debugPrint('✅ KYC uploaded successfully!');
+        debugPrint('KYC Status: ${kycResult.kycStatus}');
 
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isEditMode ? 'Failed to update profile: ${e.toString()}' : 'Failed to complete profile: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+        // ✅ ENSURE USER SESSION IS SAVED TO SECURE STORAGE
+        final phone = await AuthService.getPhone();
+        if (phone != null) {
+          await AuthService.saveUserSession(
+            userId: userId,
+            phone: phone,
+          );
+          debugPrint('✅ User session confirmed in secure storage');
+        }
+
+        _showSnackBar(
+          'Profile and KYC submitted successfully! Status: ${kycResult.kycStatus}',
+        );
+      }
+
+      // Navigate to home
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+              (route) => false,
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error in _submitProfile: $e');
+      debugPrint('Stack trace: $stackTrace');
+      _showSnackBar('Error: ${e.toString()}', isError: true);
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Widget _buildDocumentPreview() {
+    if (_aadhaarDocument == null) return const SizedBox.shrink();
+
+    if (_documentType == 'pdf') {
+      return Container(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.red[200]!),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.picture_as_pdf, color: Colors.red[700], size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _documentName ?? 'document.pdf',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'PDF Document',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              onPressed: () {
+                setState(() {
+                  _aadhaarDocument = null;
+                  _documentType = null;
+                  _documentName = null;
+                });
+              },
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Container(
+        margin: const EdgeInsets.only(top: 12),
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                _aadhaarDocument!,
+                height: 150,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: CircleAvatar(
+                backgroundColor: Colors.red,
+                radius: 16,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.close, color: Colors.white, size: 16),
+                  onPressed: () {
+                    setState(() {
+                      _aadhaarDocument = null;
+                      _documentType = null;
+                      _documentName = null;
+                    });
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -212,20 +363,15 @@ class _SignupScreenState extends State<SignupScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF001127),
+        title: const Text(
+          'Complete Profile & KYC',
+          style: TextStyle(color: Colors.white),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          _isEditMode ? 'Update Profile' : 'Complete Profile',
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -233,324 +379,243 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header
-                Text(
-                  _isEditMode ? 'Update your profile' : 'Set up your profile',
-                  style: const TextStyle(
+                const SizedBox(height: 20),
+                const Text(
+                  'Complete your profile and upload Aadhaar',
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF001127),
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _isEditMode
-                      ? 'Update your information and preferences'
-                      : widget.isKycRequired
-                      ? 'Complete your profile with KYC to start creating trips'
-                      : 'Complete your profile to get started',
+                  'Fill in your details and upload Aadhaar document (image or PDF) to complete KYC',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     color: Colors.grey[600],
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-
-                // Profile Image Section
-                Center(
-                  child: GestureDetector(
-                    onTap: _pickProfileImage,
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: _profileImage != null
-                          ? ClipOval(
-                        child: Image.file(
-                          _profileImage!,
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                          : _isEditMode && widget.existingUserData!['profileUrl'] != null &&
-                          widget.existingUserData!['profileUrl'].isNotEmpty
-                          ? ClipOval(
-                        child: Image.network(
-                          widget.existingUserData!['profileUrl'],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.camera_alt,
-                              size: 40,
-                              color: Colors.grey,
-                            );
-                          },
-                        ),
-                      )
-                          : const Icon(
-                        Icons.camera_alt,
-                        size: 40,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Center(
-                  child: Text(
-                    'Tap to add/change profile photo',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Name Field
-                _buildTextField(
+                TextFormField(
                   controller: _nameController,
-                  label: 'Full Name*',
-                  hint: 'Enter your full name',
+                  decoration: InputDecoration(
+                    labelText: 'Full Name *',
+                    hintText: 'Enter your full name',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF001127), width: 2),
+                    ),
+                  ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Full name is required';
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your name';
+                    }
+                    if (value.trim().length < 2) {
+                      return 'Name must be at least 2 characters';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-
-                // Email Field
-                _buildTextField(
+                TextFormField(
                   controller: _emailController,
-                  label: 'Email*',
-                  hint: 'Enter your email address',
                   keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Email *',
+                    hintText: 'Enter your email',
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF001127), width: 2),
+                    ),
+                  ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Email is required';
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                      return 'Enter a valid email address';
+                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                    if (!emailRegex.hasMatch(value.trim())) {
+                      return 'Please enter a valid email';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-
-                // User Type Selection
-                const Text(
-                  'I am a*',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
+                TextFormField(
+                  controller: _aadhaarController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 12,
+                  decoration: InputDecoration(
+                    labelText: 'Aadhaar Number *',
+                    hintText: 'Enter your 12-digit Aadhaar',
+                    prefixIcon: const Icon(Icons.credit_card),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF001127), width: 2),
+                    ),
+                    counterText: '',
                   ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your Aadhaar number';
+                    }
+                    if (value.trim().length != 12) {
+                      return 'Aadhaar must be 12 digits';
+                    }
+                    if (!RegExp(r'^[0-9]+$').hasMatch(value.trim())) {
+                      return 'Aadhaar must contain only numbers';
+                    }
+                    return null;
+                  },
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: const Text('Sender'),
-                        subtitle: const Text('Send packages'),
-                        value: 'sender',
-                        groupValue: _selectedUserType,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedUserType = value!;
-                          });
-                        },
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: const Text('Traveller'),
-                        subtitle: const Text('Carry packages'),
-                        value: 'traveller',
-                        groupValue: _selectedUserType,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedUserType = value!;
-                          });
-                        },
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ],
-                ),
-
-                // KYC Section (shown if required or if user selects traveller)
-                if (widget.isKycRequired || _selectedUserType == 'traveller') ...[
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue[200]!),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.security, color: Colors.blue[700]),
-                            const SizedBox(width: 8),
-                            Text(
-                              'KYC Verification',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue[700],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.isKycRequired
-                              ? 'KYC is required for trip creators to ensure safety and trust.'
-                              : _selectedUserType == 'traveller'
-                              ? 'KYC is recommended for trip creators to build trust with senders.'
-                              : 'KYC verification helps build trust in the community.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.blue[700],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Aadhaar Field
-                        _buildTextField(
-                          controller: _aadhaarController,
-                          label: (widget.isKycRequired && _selectedUserType == 'traveller')
-                              ? 'Aadhaar Number*'
-                              : 'Aadhaar Number (${_selectedUserType == 'traveller' ? 'Recommended' : 'Optional'})',
-                          hint: 'Enter your Aadhaar number',
-                          keyboardType: TextInputType.number,
-                          validator: (widget.isKycRequired && _selectedUserType == 'traveller')
-                              ? (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Aadhaar number is required for travellers';
-                            }
-                            if (value.length != 12) {
-                              return 'Enter a valid 12-digit Aadhaar number';
-                            }
-                            return null;
-                          }
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // License Upload
-                        GestureDetector(
-                          onTap: _pickLicenseImage,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[300]!),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  _licenseImage != null ||
-                                      (_isEditMode && widget.existingUserData!['licenseStatus'] == 'uploaded')
-                                      ? Icons.check_circle
-                                      : Icons.upload_file,
-                                  size: 40,
-                                  color: _licenseImage != null ||
-                                      (_isEditMode && widget.existingUserData!['licenseStatus'] == 'uploaded')
-                                      ? Colors.green
-                                      : Colors.grey,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _licenseImage != null
-                                      ? 'New license selected'
-                                      : _isEditMode && widget.existingUserData!['licenseStatus'] == 'uploaded'
-                                      ? 'License already uploaded (tap to change)'
-                                      : 'Upload Driving License${(widget.isKycRequired && _selectedUserType == 'traveller') ? '*' : ' (${_selectedUserType == 'traveller' ? 'Recommended' : 'Optional'})'}',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: _licenseImage != null ||
-                                        (_isEditMode && widget.existingUserData!['licenseStatus'] == 'uploaded')
-                                        ? Colors.green
-                                        : Colors.grey[700],
-                                    fontWeight: _licenseImage != null ||
-                                        (_isEditMode && widget.existingUserData!['licenseStatus'] == 'uploaded')
-                                        ? FontWeight.w500
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                              ],
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.upload_file, color: Colors.blue[700]),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Aadhaar Document *',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                const SizedBox(height: 32),
-
-                // Complete/Update Profile Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF001127),
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        ],
                       ),
-                      elevation: 0,
-                    ),
-                    onPressed: _isLoading ? null : _completeProfile,
-                    child: _isLoading
-                        ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                        : Text(
-                      _isEditMode ? 'Update Profile' : 'Complete Profile',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Skip Button (only if not editing and KYC is not required)
-                if (!_isEditMode && !widget.isKycRequired)
-                  Center(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text(
-                        'Skip for now',
+                      const SizedBox(height: 8),
+                      Text(
+                        'Upload Aadhaar as image (JPG/PNG) or PDF file',
                         style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 16,
+                          fontSize: 12,
+                          color: Colors.grey[700],
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: _pickAadhaarDocument,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _aadhaarDocument != null ? Colors.green : Colors.grey[300]!,
+                              width: 2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _aadhaarDocument != null ? Icons.check_circle : Icons.upload_file,
+                                color: _aadhaarDocument != null ? Colors.green : Colors.grey[600],
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _aadhaarDocument != null
+                                      ? 'Document Selected ✓ (${_documentType?.toUpperCase()})'
+                                      : 'Tap to Upload Aadhaar (Image or PDF)',
+                                  style: TextStyle(
+                                    color: _aadhaarDocument != null ? Colors.green : Colors.grey[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      _buildDocumentPreview(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _submitProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF001127),
+                    disabledBackgroundColor: Colors.grey[300],
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                    ),
+                  )
+                      : const Text(
+                    'Submit Profile & KYC',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (!widget.isKycRequired)
+                  TextButton(
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HomePageWithNav(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Skip for now',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -559,54 +624,6 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          validator: validator,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[500]),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF001127), width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.red),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+
   cupertino_icons: ^1.0.8
   firebase_core: ^2.27.0
   firebase_auth: ^4.17.4
@@ -24,18 +26,28 @@ dependencies:
   geocoding: ^4.0.0
   google_places_autocomplete_text_field: ^1.1.0
   google_maps_flutter: ^2.12.3
+  flutter_polyline_points: ^2.0.0
+  http: ^1.1.0
+  socket_io_client: ^2.0.3+1
+  intl: ^0.20.2
+  url_launcher: ^6.3.2
+  shared_preferences: ^2.5.3
+  mime: ^2.0.0
+  http_parser: ^4.1.2
+  file_picker: ^8.0.7
+  flutter_secure_storage: ^9.2.4
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  flutter_launcher_icons: ^0.13.1  # <-- Added for custom app icons
+  flutter_launcher_icons: ^0.13.1
 
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/images/companylogo.png"   # <-- Path to your custom icon image
+  image_path: "assets/images/companylogo.png"
 
 flutter:
   uses-material-design: true

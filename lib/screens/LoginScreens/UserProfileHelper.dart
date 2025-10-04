@@ -1,143 +1,154 @@
-import 'package:dolo/screens/LoginScreens/signup_page.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Add this import
+import '../../Controllers/LoginService.dart';
+import 'package:dolo/screens/LoginScreens/signup_page.dart';
+import 'package:dolo/screens/LoginScreens/LoginSignupScreen.dart';
+import 'package:dolo/screens/home/homepage.dart';
+import '../../Models/LoginModel.dart';
 
 class UserProfileHelper {
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static final LoginService _loginService = LoginService();
 
-  // =========================
-  // Public APIs
-  // =========================
-
-  // Check if user exists and handle navigation accordingly (robust server read)
-  static Future<void> checkUserAndNavigate(BuildContext context) async {
+  // Check if user exists and handle navigation accordingly via API
+  static Future<void> checkUserAndNavigate(
+      BuildContext context, {
+        required int userId,
+        String? kycStatus,
+        bool? showProfilePrompt,
+      }) async {
     try {
-      final String? uid = _auth.currentUser?.uid;
-      if (uid == null) {
+      if (userId == 0) {
         _showErrorAndNavigateToLogin(context, 'User not authenticated');
         return;
       }
 
-      final doc = await _getUserDocByUid(uid);
-      if (doc == null || !doc.exists) {
-        _showProfileCreationDialog(context);
+      // Save userId to SharedPreferences for later use
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('userId', userId);
+
+      // Use the flags from login/verify API if provided
+      if (showProfilePrompt == true) {
+        _showProfileCreationDialog(context, userId);
         return;
       }
 
-      final data = doc.data() ?? {};
-      final bool profileCompleted = _asBool(data['profileCompleted']);
+      // Fetch user profile from API to get complete information
+      final profile = await _loginService.getUserProfile(userId);
 
-      if (profileCompleted) {
-        Navigator.pushReplacementNamed(context, '/home');
+      if (profile == null) {
+        _showProfileCreationDialog(context, userId);
+        return;
+      }
+
+      // Check if basic profile fields are complete
+      final isProfileComplete = _isProfileComplete(profile);
+
+      if (!isProfileComplete) {
+        _showProfileCompletionDialog(context, userId);
+        return;
+      }
+
+      // Profile is complete, check KYC status if needed
+      final userKycStatus = kycStatus ?? profile.kycStatus;
+
+      if (userKycStatus.toLowerCase() == 'pending') {
+        // KYC is pending, but user can still access the app
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+        );
+      } else if (userKycStatus.toLowerCase() == 'approved' ||
+          userKycStatus.toLowerCase() == 'not_required') {
+        // Approved or not required - full access
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+        );
       } else {
-        _showProfileCompletionDialog(context);
+        // Any other status, navigate to home
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+        );
       }
     } catch (e) {
       _showErrorAndNavigateToLogin(context, 'Error checking user profile: $e');
     }
   }
 
-  // Check profile completion before order/trip creation (robust + KYC gate)
-  static Future<bool> checkProfileForAction(BuildContext context, String action) async {
+  static Future<bool> checkProfileForAction(
+      BuildContext context,
+      String action,
+      int userId,
+      ) async {
     try {
-      final String? uid = _auth.currentUser?.uid;
-      if (uid == null) {
+      if (userId == 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please login first'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('Please login first'),
+            backgroundColor: Colors.red,
+          ),
         );
         return false;
       }
 
-      final doc = await _getUserDocByUid(uid);
-      if (doc == null || !doc.exists) {
-        _showActionRequiresProfileDialog(context, action, false);
+      final profile = await _loginService.getUserProfile(userId);
+
+      if (profile == null) {
+        _showActionRequiresProfileDialog(context, action, false, userId);
         return false;
       }
 
-      final data = doc.data() ?? {};
-      final bool profileCompleted = _asBool(data['profileCompleted']);
-
-      if (!profileCompleted) {
-        _showActionRequiresProfileDialog(context, action, false);
+      // Check if basic profile is complete
+      if (!_isProfileComplete(profile)) {
+        _showActionRequiresProfileDialog(context, action, false, userId);
         return false;
       }
 
-      // KYC needed only for trip creation
+      // Additional checks for creating trips
       if (action == 'create_trip') {
-        final String kycStatus = (data['kycStatus'] as String?)?.toLowerCase() ?? 'not_required';
+        final kycStatus = profile.kycStatus.toLowerCase();
 
-        // Only block if KYC is pending (incomplete)
         if (kycStatus == 'pending') {
-          _showKycRequiredDialog(context);
+          _showKycPendingDialog(context);
           return false;
         }
 
-        // Optional: Recommend KYC for travellers who haven't done it
-        final String userType = (data['userType'] as String?)?.toLowerCase() ?? '';
-        if (kycStatus == 'not_required' && userType == 'traveller') {
-          _showKycRecommendedDialog(context);
-          // Still allow trip creation - don't return false
+        if (kycStatus == 'rejected') {
+          _showKycRejectedDialog(context, userId);
+          return false;
+        }
+
+        // If KYC is not required or approved, show recommendation
+        if (kycStatus == 'not_required') {
+          _showKycRecommendedDialog(context, userId);
+          // Still allow the action to proceed, just show recommendation
         }
       }
-
       return true;
-    } catch (e, st) {
-      debugPrint('checkProfileForAction error: $e\n$st');
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Something went wrong. Please try again.'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
       );
       return false;
     }
   }
 
-  // =========================
-  // Internal helpers (robust fetch, bool casting)
-  // =========================
-
-  /// Force a SERVER read and support both patterns:
-  ///   1) users/<uid>
-  ///   2) users/<autoId> with a field { uid: <uid> }
-  static Future<DocumentSnapshot<Map<String, dynamic>>?> _getUserDocByUid(String uid) async {
-    // Try doc with id = uid (server-only to avoid stale cache)
-    final byId = await _firestore
-        .collection('users')
-        .doc(uid)
-        .get(const GetOptions(source: Source.server));
-    if (byId.exists) return byId;
-
-    // Fallback: query by field 'uid'
-    final query = await _firestore
-        .collection('users')
-        .where('uid', isEqualTo: uid)
-        .limit(1)
-        .get(const GetOptions(source: Source.server));
-
-    if (query.docs.isNotEmpty) return query.docs.first;
-    return null;
+  // Helper method to check if profile is complete
+  static bool _isProfileComplete(UserProfile profile) {
+    return profile.name.isNotEmpty &&
+        profile.email.isNotEmpty &&
+        profile.phone.isNotEmpty;
   }
 
-  static bool _asBool(dynamic v) {
-    if (v is bool) return v;
-    if (v is num) return v != 0;
-    if (v is String) {
-      final s = v.trim().toLowerCase();
-      return s == 'true' || s == 'yes' || s == '1';
-    }
-    return false;
-  }
-
-  // =========================
-  // UI helpers
-  // =========================
-
-  static void _showProfileCreationDialog(BuildContext context) {
+  static void _showProfileCreationDialog(BuildContext context, int userId) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (context) {
         return AlertDialog(
           title: const Text('Welcome to DOLO!'),
           content: const Text(
@@ -147,17 +158,25 @@ class UserProfileHelper {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.pushReplacementNamed(context, '/home');
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+                );
               },
               child: const Text('Skip for now'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, false);
+                _navigateToSignup(context, false, userId);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001127)),
-              child: const Text('Complete Profile', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF001127),
+              ),
+              child: const Text(
+                'Complete Profile',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -165,29 +184,39 @@ class UserProfileHelper {
     );
   }
 
-  static void _showProfileCompletionDialog(BuildContext context) {
+  static void _showProfileCompletionDialog(BuildContext context, int userId) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (context) {
         return AlertDialog(
           title: const Text('Complete Your Profile'),
-          content: const Text('Your profile is incomplete. Complete it now to access all features.'),
+          content: const Text(
+            'Your profile is incomplete. Complete it now to access all features.',
+          ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.pushReplacementNamed(context, '/home');
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+                );
               },
               child: const Text('Later'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, false);
+                _navigateToSignup(context, false, userId);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001127)),
-              child: const Text('Complete Now', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF001127),
+              ),
+              child: const Text(
+                'Complete Now',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -196,12 +225,15 @@ class UserProfileHelper {
   }
 
   static void _showActionRequiresProfileDialog(
-      BuildContext context, String action, bool isKycRequired) {
-    final String actionText = action == 'create_order' ? 'create an order' : 'create a trip';
-
+      BuildContext context,
+      String action,
+      bool isKycRequired,
+      int userId,
+      ) {
+    final actionText = action == 'create_order' ? 'create an order' : 'create a trip';
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (context) {
         return AlertDialog(
           title: const Text('Profile Required'),
           content: Text('Please complete your profile to $actionText.'),
@@ -213,10 +245,15 @@ class UserProfileHelper {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, isKycRequired);
+                _navigateToSignup(context, isKycRequired, userId);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001127)),
-              child: const Text('Complete Profile', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF001127),
+              ),
+              child: const Text(
+                'Complete Profile',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -224,15 +261,34 @@ class UserProfileHelper {
     );
   }
 
-  // Updated KYC required dialog - more specific about what's missing
-  static void _showKycRequiredDialog(BuildContext context) {
+  static void _showKycPendingDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (context) {
         return AlertDialog(
-          title: const Text('Complete KYC Verification'),
+          title: const Text('KYC Verification Pending'),
           content: const Text(
-            'Your KYC verification is incomplete. Please provide both Aadhaar number and upload your driving license to create trips.',
+            'Your KYC verification is under review. You can create trips once it\'s approved.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  static void _showKycRejectedDialog(BuildContext context, int userId) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('KYC Verification Required'),
+          content: const Text(
+            'Your previous KYC verification was not approved. Please complete the KYC process again to create trips.',
           ),
           actions: [
             TextButton(
@@ -242,10 +298,15 @@ class UserProfileHelper {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, true);
+                _navigateToSignup(context, true, userId);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001127)),
-              child: const Text('Complete KYC', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF001127),
+              ),
+              child: const Text(
+                'Complete KYC',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -253,11 +314,10 @@ class UserProfileHelper {
     );
   }
 
-  // New method: Recommend KYC for travellers (optional)
-  static void _showKycRecommendedDialog(BuildContext context) {
+  static void _showKycRecommendedDialog(BuildContext context, int userId) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (context) {
         return AlertDialog(
           title: const Text('KYC Recommended'),
           content: const Text(
@@ -271,10 +331,15 @@ class UserProfileHelper {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, true);
+                _navigateToSignup(context, true, userId);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001127)),
-              child: const Text('Complete KYC', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF001127),
+              ),
+              child: const Text(
+                'Complete KYC',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -282,25 +347,30 @@ class UserProfileHelper {
     );
   }
 
-  static void _navigateToSignup(BuildContext context, bool isKycRequired) {
-    Navigator.push(
+  static void _navigateToSignup(BuildContext context, bool isKycRequired, int userId) {
+    Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => SignupScreen(isKycRequired: isKycRequired),
+        builder: (context) => SignupScreen(
+          isKycRequired: isKycRequired,
+          userId: userId, // Pass userId to signup screen
+        ),
       ),
-    ).then((result) {
-      if (result == true) {
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
-    });
+    );
   }
 
   static void _showErrorAndNavigateToLogin(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
     );
-    Navigator.pushReplacementNamed(context, '/login');
+    Future.delayed(const Duration(seconds: 1), () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginSignupScreen()),
+      );
+    });
   }
 }

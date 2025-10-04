@@ -1,17 +1,19 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
+import '../../Controllers/OrderService.dart';
 import '../LoginScreens/UserProfileHelper.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Services/LocationService.dart';
+import '../../Models/OrderModel.dart';
+import '../LoginScreens/kyc_screen.dart';
+import '../LoginScreens/signup_page.dart';
 
 class CreateOrderPage extends StatefulWidget {
-  const CreateOrderPage({Key? key}) : super(key: key);
+  final VoidCallback? onOrderCreated;
+  const CreateOrderPage({Key? key, this.onOrderCreated}) : super(key: key);
 
   @override
   State<CreateOrderPage> createState() => _CreateOrderPageState();
@@ -23,39 +25,40 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   int _currentStep = 0;
   final int _totalSteps = 5;
 
+  // Services
+  final OrderService _orderService = OrderService();
+
   // Text controllers for form fields
-  final TextEditingController pickupController = TextEditingController();
-  final TextEditingController dropoffController = TextEditingController();
+  final TextEditingController originController = TextEditingController();
+  final TextEditingController destinationController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
-  final TextEditingController itemDescriptionController = TextEditingController();
   final TextEditingController weightController = TextEditingController();
-  final TextEditingController priceController = TextEditingController();
-  final TextEditingController notesController = TextEditingController();
+  final TextEditingController imageUrlController = TextEditingController();
+  final TextEditingController specialInstructionsController = TextEditingController();
 
   // Location variables
-  Position? pickupPosition;
-  Position? dropoffPosition;
-  bool isLoadingPickupLocation = false;
-  bool isLoadingDropoffLocation = false;
+  Position? originPosition;
+  Position? destinationPosition;
+  bool isLoadingOriginLocation = false;
+  bool isLoadingDestinationLocation = false;
 
   // Image handling
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
-  bool _isUploading = false;
+  bool _isCreatingOrder = false;
 
-  final FirebaseFirestore firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  // User ID - Replace with actual user ID from auth
+  int userId = 1; // TODO: Get from auth service
 
   @override
   void dispose() {
     _pageController.dispose();
-    pickupController.dispose();
-    dropoffController.dispose();
+    originController.dispose();
+    destinationController.dispose();
     dateController.dispose();
-    itemDescriptionController.dispose();
     weightController.dispose();
-    priceController.dispose();
-    notesController.dispose();
+    imageUrlController.dispose();
+    specialInstructionsController.dispose();
     super.dispose();
   }
 
@@ -88,128 +91,135 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   // Validate current step
   bool _validateCurrentStep() {
     switch (_currentStep) {
-      case 0: // Pickup Location
-        if (pickupController.text.trim().isEmpty) {
-          _showSnackBar('Please enter pickup location', Colors.orange);
+      case 0: // Origin Location
+        if (originController.text.trim().isEmpty) {
+          _showSnackBar('Please enter origin location', Colors.orange);
+          return false;
+        }
+        if (originPosition == null) {
+          _showSnackBar('Please get coordinates for origin location', Colors.orange);
           return false;
         }
         return true;
-      case 1: // Dropoff Location
-        if (dropoffController.text.trim().isEmpty) {
-          _showSnackBar('Please enter dropoff location', Colors.orange);
+      case 1: // Destination Location
+        if (destinationController.text.trim().isEmpty) {
+          _showSnackBar('Please enter destination location', Colors.orange);
+          return false;
+        }
+        if (destinationPosition == null) {
+          _showSnackBar('Please get coordinates for destination location', Colors.orange);
           return false;
         }
         return true;
-      case 2: // Date and Item Details
-        if (dateController.text.trim().isEmpty || itemDescriptionController.text.trim().isEmpty) {
-          _showSnackBar('Please fill in date and item description', Colors.orange);
+      case 2: // Date
+        if (dateController.text.trim().isEmpty) {
+          _showSnackBar('Please select delivery date', Colors.orange);
           return false;
         }
         return true;
-      case 3: // Weight and Price
-        if (weightController.text.trim().isEmpty || priceController.text.trim().isEmpty) {
-          _showSnackBar('Please enter weight and expected price', Colors.orange);
+      case 3: // Weight
+        if (weightController.text.trim().isEmpty) {
+          _showSnackBar('Please enter weight', Colors.orange);
+          return false;
+        }
+        final weight = double.tryParse(weightController.text.trim());
+        if (weight == null || weight <= 0) {
+          _showSnackBar('Please enter valid weight', Colors.orange);
           return false;
         }
         return true;
-      case 4: // Image and Notes
-        return true; // Image and notes are optional
+      case 4: // Image and Special Instructions (optional)
+        return true;
       default:
         return true;
     }
   }
 
-  // Get current location for pickup
-  Future<void> _getCurrentLocationForPickup() async {
+  // Get current location for origin
+  Future<void> _getCurrentLocationForOrigin() async {
     setState(() {
-      isLoadingPickupLocation = true;
+      isLoadingOriginLocation = true;
     });
-
     try {
       final position = await LocationService.getCurrentPosition();
-
       if (position != null) {
         final address = await LocationService.getAddressFromCoordinates(
           position.latitude,
           position.longitude,
         );
-
         setState(() {
-          pickupPosition = position;
-          pickupController.text = address ?? 'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
-          isLoadingPickupLocation = false;
+          originPosition = position;
+          originController.text = address ?? 'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
+          isLoadingOriginLocation = false;
         });
+        _showSnackBar('✅ Origin coordinates saved', Colors.green);
       } else {
         setState(() {
-          isLoadingPickupLocation = false;
+          isLoadingOriginLocation = false;
         });
         _showSnackBar('Unable to get current location. Please check permissions.', Colors.red);
       }
     } catch (e) {
       setState(() {
-        isLoadingPickupLocation = false;
+        isLoadingOriginLocation = false;
       });
       _showSnackBar('Error: $e', Colors.red);
     }
   }
 
-  // Get current location for dropoff
-  Future<void> _getCurrentLocationForDropoff() async {
+  // Get current location for destination
+  Future<void> _getCurrentLocationForDestination() async {
     setState(() {
-      isLoadingDropoffLocation = true;
+      isLoadingDestinationLocation = true;
     });
-
     try {
       final position = await LocationService.getCurrentPosition();
-
       if (position != null) {
         final address = await LocationService.getAddressFromCoordinates(
           position.latitude,
           position.longitude,
         );
-
         setState(() {
-          dropoffPosition = position;
-          dropoffController.text = address ?? 'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
-          isLoadingDropoffLocation = false;
+          destinationPosition = position;
+          destinationController.text = address ?? 'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
+          isLoadingDestinationLocation = false;
         });
+        _showSnackBar('✅ Destination coordinates saved', Colors.green);
       } else {
         setState(() {
-          isLoadingDropoffLocation = false;
+          isLoadingDestinationLocation = false;
         });
         _showSnackBar('Unable to get current location. Please check permissions.', Colors.red);
       }
     } catch (e) {
       setState(() {
-        isLoadingDropoffLocation = false;
+        isLoadingDestinationLocation = false;
       });
       _showSnackBar('Error: $e', Colors.red);
     }
   }
 
   // Search location from text input
-  Future<void> _searchLocation(TextEditingController controller, bool isPickup) async {
+  Future<void> _searchLocation(TextEditingController controller, bool isOrigin) async {
     if (controller.text.trim().isEmpty) {
       _showSnackBar('Please enter a location to search', Colors.orange);
       return;
     }
 
-    if (isPickup) {
+    if (isOrigin) {
       setState(() {
-        isLoadingPickupLocation = true;
+        isLoadingOriginLocation = true;
       });
     } else {
       setState(() {
-        isLoadingDropoffLocation = true;
+        isLoadingDestinationLocation = true;
       });
     }
 
     try {
       final locations = await LocationService.getCoordinatesFromAddress(controller.text.trim());
-
       if (locations != null && locations.isNotEmpty) {
         final location = locations.first;
-        // Create Position from Location
         final position = Position(
           latitude: location.latitude,
           longitude: location.longitude,
@@ -224,41 +234,312 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         );
 
         setState(() {
-          if (isPickup) {
-            pickupPosition = position;
-            isLoadingPickupLocation = false;
+          if (isOrigin) {
+            originPosition = position;
+            isLoadingOriginLocation = false;
           } else {
-            dropoffPosition = position;
-            isLoadingDropoffLocation = false;
+            destinationPosition = position;
+            isLoadingDestinationLocation = false;
           }
         });
+        _showSnackBar(isOrigin ? '✅ Origin coordinates found' : '✅ Destination coordinates found', Colors.green);
       } else {
         setState(() {
-          if (isPickup) {
-            isLoadingPickupLocation = false;
+          if (isOrigin) {
+            isLoadingOriginLocation = false;
           } else {
-            isLoadingDropoffLocation = false;
+            isLoadingDestinationLocation = false;
           }
         });
         _showSnackBar('Location not found. Please try a different search term.', Colors.orange);
       }
     } catch (e) {
       setState(() {
-        if (isPickup) {
-          isLoadingPickupLocation = false;
+        if (isOrigin) {
+          isLoadingOriginLocation = false;
         } else {
-          isLoadingDropoffLocation = false;
+          isLoadingDestinationLocation = false;
         }
       });
       _showSnackBar('Error searching location: $e', Colors.red);
     }
   }
 
+  Future<void> _createOrder() async {
+    // Validate all required fields
+    if (!_validateAllFields()) return;
+
+    try {
+      setState(() {
+        _isCreatingOrder = true;
+      });
+
+      print('DEBUG: Starting order creation process');
+
+      // Prepare order request
+      final orderRequest = OrderCreateRequest(
+        userId: userId,
+        origin: originController.text.trim(),
+        originLatitude: originPosition!.latitude,
+        originLongitude: originPosition!.longitude,
+        destination: destinationController.text.trim(),
+        destinationLatitude: destinationPosition!.latitude,
+        destinationLongitude: destinationPosition!.longitude,
+        deliveryDate: _formatDateForApi(dateController.text.trim()),
+        weight: double.parse(weightController.text.trim()),
+        imageUrl: imageUrlController.text.trim().isEmpty
+            ? 'https://example.com/default.jpg'
+            : imageUrlController.text.trim(),
+        specialInstructions: specialInstructionsController.text.trim().isEmpty
+            ? null
+            : specialInstructionsController.text.trim(),
+      );
+
+      print('DEBUG: Order request prepared: ${orderRequest.toJson()}');
+
+      // Call API to create order
+      final response = await _orderService.createOrder(orderRequest);
+
+      if (response != null) {
+        print('DEBUG: Order created successfully: ${response.message}, Order ID: ${response.orderId}');
+
+        // Clear all fields for next order
+        _clearAllFields();
+
+        // Reset to first step
+        setState(() {
+          _currentStep = 0;
+          _isCreatingOrder = false;
+        });
+        _pageController.animateToPage(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+
+        // Show success message
+        _showSuccessToast('Order created successfully! Order ID: #${response.orderId}');
+
+        // Call callback if provided
+        widget.onOrderCreated?.call();
+      } else {
+        setState(() {
+          _isCreatingOrder = false;
+        });
+
+        // Check if it's a KYC error by examining the error from OrderService
+        // You'll need to modify OrderService to return error details
+        _showKycRequiredDialog();
+      }
+    } catch (e, stackTrace) {
+      setState(() {
+        _isCreatingOrder = false;
+      });
+      print('DEBUG: Error creating order: $e');
+      print('DEBUG: Stack trace: $stackTrace');
+
+      // Check if error is related to KYC
+      if (e.toString().contains('KYC') || e.toString().contains('403')) {
+        _showKycRequiredDialog();
+      } else {
+        _showSnackBar('Failed to create order: $e', Colors.red);
+      }
+    }
+  }
+
+// Show KYC Required Dialog
+  void _showKycRequiredDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.verified_user,
+                color: Colors.orange[700],
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'KYC Verification Required',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'To create orders, you need to complete your KYC verification.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'This is required for security and compliance purposes.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text(
+                'Later',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                _navigateToKycScreen();
+              },
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('Complete KYC'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF001127),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+// Navigate to KYC Screen
+  // Navigate to KYC Screen
+  void _navigateToKycScreen() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => KycUploadScreen(
+          userId: userId,
+        ),
+      ),
+    );
+
+    // If KYC was uploaded successfully
+    if (result == true) {
+      _showSnackBar(
+        'KYC document uploaded successfully! You can now create orders.',
+        Colors.green,
+      );
+    }
+  }
+
+
+  // Format date for API (yyyy-MM-dd)
+  String _formatDateForApi(String dateString) {
+    // Input format: dd/MM/yyyy
+    // Output format: yyyy-MM-dd
+    try {
+      final parts = dateString.split('/');
+      if (parts.length == 3) {
+        return '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
+      }
+    } catch (e) {
+      print('Error formatting date: $e');
+    }
+    return dateString;
+  }
+
+  // Enhanced success toast message
+  void _showSuccessToast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: Colors.white24,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '✅ Order Created Successfully!',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      message,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: 'VIEW ORDERS',
+          textColor: Colors.white,
+          backgroundColor: Colors.white24,
+          onPressed: () {
+            widget.onOrderCreated?.call();
+          },
+        ),
+      ),
+    );
+  }
+
   // Pick image from gallery or camera
   Future<void> _pickImage() async {
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
@@ -267,24 +548,24 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
+              children: [
                 Container(
                   width: 40,
                   height: 4,
-                  margin: EdgeInsets.only(bottom: 20),
+                  margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
                     color: Colors.grey[300],
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                Text(
+                const Text(
                   'Add Package Photo',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
@@ -298,11 +579,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 15),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
                         ),
                       ),
                     ),
-                    SizedBox(width: 16),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () {
@@ -314,7 +595,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey[100],
                           foregroundColor: Colors.grey[700],
-                          padding: EdgeInsets.symmetric(vertical: 15),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
                         ),
                       ),
                     ),
@@ -336,10 +617,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         maxHeight: 1024,
         imageQuality: 80,
       );
-
       if (image != null) {
         setState(() {
           _selectedImage = File(image.path);
+          // For demo purposes, set a placeholder URL
+          imageUrlController.text = 'https://example.com/image_${DateTime.now().millisecondsSinceEpoch}.jpg';
         });
       }
     } catch (e) {
@@ -347,21 +629,41 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-  // Upload image to Firebase Storage
-  Future<String?> _uploadImage(File imageFile) async {
-    try {
-      final String fileName = 'order_images/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final Reference storageRef = FirebaseStorage.instance.ref().child(fileName);
-      final UploadTask uploadTask = storageRef.putFile(imageFile);
-
-      final TaskSnapshot snapshot = await uploadTask;
-      final String downloadUrl = await snapshot.ref.getDownloadURL();
-
-      return downloadUrl;
-    } catch (e) {
-      _showSnackBar('Error uploading image: $e', Colors.red);
-      return null;
+  bool _validateAllFields() {
+    if (originController.text.trim().isEmpty ||
+        destinationController.text.trim().isEmpty ||
+        dateController.text.trim().isEmpty ||
+        weightController.text.trim().isEmpty) {
+      _showSnackBar('Please fill all required fields', Colors.red);
+      return false;
     }
+
+    if (originPosition == null || destinationPosition == null) {
+      _showSnackBar('Please ensure both origin and destination coordinates are set', Colors.red);
+      return false;
+    }
+
+    final weight = double.tryParse(weightController.text.trim());
+    if (weight == null || weight <= 0) {
+      _showSnackBar('Please enter valid weight', Colors.red);
+      return false;
+    }
+
+    return true;
+  }
+
+  void _clearAllFields() {
+    originController.clear();
+    destinationController.clear();
+    dateController.clear();
+    weightController.clear();
+    imageUrlController.clear();
+    specialInstructionsController.clear();
+    setState(() {
+      _selectedImage = null;
+      originPosition = null;
+      destinationPosition = null;
+    });
   }
 
   void _showSnackBar(String message, Color color) {
@@ -374,6 +676,20 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() {
+        dateController.text = '${picked.day}/${picked.month}/${picked.year}';
+      });
+    }
   }
 
   @override
@@ -390,17 +706,18 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             Expanded(
               child: PageView(
                 controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (index) {
                   setState(() {
                     _currentStep = index;
                   });
                 },
                 children: [
-                  _buildStep1(), // Pickup Location
-                  _buildStep2(), // Dropoff Location
-                  _buildStep3(), // Date and Item Details
-                  _buildStep4(), // Weight and Price
-                  _buildStep5(), // Image and Notes
+                  _buildStep1(), // Origin Location
+                  _buildStep2(), // Destination Location
+                  _buildStep3(), // Delivery Date
+                  _buildStep4(), // Weight
+                  _buildStep5(), // Image URL and Special Instructions
                 ],
               ),
             ),
@@ -480,24 +797,24 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Step 1: Pickup Location
+  // Step 1: Origin Location
   Widget _buildStep1() {
     return _buildStepContainer(
-      title: '📍 Pickup Location',
-      subtitle: 'Where should we collect your package?',
+      title: '📍 Origin Location',
+      subtitle: 'Where should we collect the package?',
       child: Column(
         children: [
           const SizedBox(height: 40),
           _buildLocationInputField(
-            controller: pickupController,
+            controller: originController,
             icon: Icons.my_location,
-            label: 'Pickup Address',
-            hint: 'Enter your pickup location',
+            label: 'Origin Address',
+            hint: 'Enter origin location',
             helperText: 'Be specific with landmarks for easy pickup',
-            isLoading: isLoadingPickupLocation,
-            onCurrentLocationPressed: _getCurrentLocationForPickup,
-            onSearchPressed: () => _searchLocation(pickupController, true),
-            position: pickupPosition,
+            isLoading: isLoadingOriginLocation,
+            onCurrentLocationPressed: _getCurrentLocationForOrigin,
+            onSearchPressed: () => _searchLocation(originController, true),
+            position: originPosition,
           ),
           const SizedBox(height: 20),
           Container(
@@ -522,206 +839,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Step 2: Dropoff Location
-  Widget _buildStep2() {
-    return _buildStepContainer(
-      title: '🎯 Dropoff Location',
-      subtitle: 'Where should your package be delivered?',
-      child: Column(
-        children: [
-          const SizedBox(height: 40),
-          _buildLocationInputField(
-            controller: dropoffController,
-            icon: Icons.place,
-            label: 'Delivery Address',
-            hint: 'Enter destination location',
-            helperText: 'Exact delivery address with contact details',
-            isLoading: isLoadingDropoffLocation,
-            onCurrentLocationPressed: _getCurrentLocationForDropoff,
-            onSearchPressed: () => _searchLocation(dropoffController, false),
-            position: dropoffPosition,
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.green[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.local_shipping, color: Colors.green[700]),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Make sure the delivery address is complete and accessible.',
-                    style: TextStyle(
-                      color: Colors.green[700],
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Step 3: Date and Item Details
-  Widget _buildStep3() {
-    return _buildStepContainer(
-      title: '📅 Schedule & Details',
-      subtitle: 'When do you need this delivered?',
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          _buildStepInputField(
-            controller: dateController,
-            icon: Icons.calendar_today,
-            label: 'Preferred Date',
-            hint: 'Select delivery date',
-            readOnly: true,
-            onTap: () => _selectDate(context),
-          ),
-          const SizedBox(height: 16),
-          _buildStepInputField(
-            controller: itemDescriptionController,
-            icon: Icons.inventory,
-            label: 'Package Description',
-            hint: 'What are you sending?',
-            helperText: 'Describe your package contents (e.g., documents, electronics, gifts)',
-            maxLines: 3,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Step 4: Weight and Price
-  Widget _buildStep4() {
-    return _buildStepContainer(
-      title: '⚖️ Package Details',
-      subtitle: 'Tell us about your package specifications',
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          _buildStepInputField(
-            controller: weightController,
-            icon: Icons.scale,
-            label: 'Package Weight',
-            hint: 'Enter weight in kg',
-            keyboardType: TextInputType.number,
-            helperText: 'Approximate weight helps us match with suitable travelers',
-          ),
-          const SizedBox(height: 16),
-          _buildStepInputField(
-            controller: priceController,
-            icon: Icons.currency_rupee,
-            label: 'Expected Price',
-            hint: 'Enter your budget (₹)',
-            keyboardType: TextInputType.number,
-            helperText: 'This is your budget - final price will be negotiated',
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Step 5: Image and Notes
-  Widget _buildStep5() {
-    return _buildStepContainer(
-      title: '📸 Package Photo & Notes',
-      subtitle: 'Add a photo and any special instructions (optional)',
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          // Image section
-          GestureDetector(
-            onTap: _pickImage,
-            child: Container(
-              width: double.infinity,
-              height: 200,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _selectedImage != null
-                  ? ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  _selectedImage!,
-                  fit: BoxFit.cover,
-                ),
-              )
-                  : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.add_photo_alternate,
-                    size: 48,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add Package Photo',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tap to add photo (Optional)',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_selectedImage != null)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TextButton.icon(
-                  onPressed: _pickImage,
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Change Photo'),
-                ),
-                const SizedBox(width: 16),
-                TextButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _selectedImage = null;
-                    });
-                  },
-                  icon: const Icon(Icons.delete),
-                  label: const Text('Remove'),
-                  style: TextButton.styleFrom(foregroundColor: Colors.red),
-                ),
-              ],
-            ),
-          const SizedBox(height: 24),
-          _buildStepInputField(
-            controller: notesController,
-            icon: Icons.note,
-            label: 'Special Instructions',
-            hint: 'Any special handling instructions?',
-            helperText: 'Fragile items, time preferences, etc.',
-            maxLines: 3,
           ),
         ],
       ),
@@ -815,13 +932,12 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               ),
             ),
             onChanged: (value) {
-              // Clear position when user types manually
               if (position != null) {
                 setState(() {
-                  if (controller == pickupController) {
-                    pickupPosition = null;
+                  if (controller == originController) {
+                    originPosition = null;
                   } else {
-                    dropoffPosition = null;
+                    destinationPosition = null;
                   }
                 });
               }
@@ -854,55 +970,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             ),
           ),
         ],
-        if (helperText != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            helperText,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildStepInputField({
-    required TextEditingController controller,
-    required IconData icon,
-    required String label,
-    required String hint,
-    String? helperText,
-    TextInputType keyboardType = TextInputType.text,
-    bool readOnly = false,
-    VoidCallback? onTap,
-    int maxLines = 1,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            readOnly: readOnly,
-            onTap: onTap,
-            maxLines: maxLines,
-            decoration: InputDecoration(
-              labelText: label,
-              hintText: hint,
-              prefixIcon: Icon(icon, color: AppColors.primary),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(16),
-              labelStyle: TextStyle(color: AppColors.primary),
-            ),
-          ),
-        ),
         if (helperText != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -963,7 +1030,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: _isUploading
+              child: _isCreatingOrder
                   ? const SizedBox(
                 height: 20,
                 width: 20,
@@ -987,124 +1054,292 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+  // Step 2: Destination Location
+  Widget _buildStep2() {
+    return _buildStepContainer(
+      title: '🎯 Destination Location',
+      subtitle: 'Where should the package be delivered?',
+      child: Column(
+        children: [
+          const SizedBox(height: 40),
+          _buildLocationInputField(
+            controller: destinationController,
+            icon: Icons.place,
+            label: 'Destination Address',
+            hint: 'Enter destination location',
+            helperText: 'Exact delivery address',
+            isLoading: isLoadingDestinationLocation,
+            onCurrentLocationPressed: _getCurrentLocationForDestination,
+            onSearchPressed: () => _searchLocation(destinationController, false),
+            position: destinationPosition,
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.local_shipping, color: Colors.green[700]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Make sure the delivery address is complete and accessible.',
+                    style: TextStyle(
+                      color: Colors.green[700],
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
-    if (picked != null) {
-      setState(() {
-        dateController.text = '${picked.day}/${picked.month}/${picked.year}';
-      });
-    }
   }
 
-  Future<void> _createOrder() async {
-    // Profile gate check
-    final canProceed = await UserProfileHelper.checkProfileForAction(context, 'create_order');
-    if (!canProceed) return;
-
-    // Get current user ID
-    final String? uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      _showSnackBar('User not logged in', Colors.red);
-      return;
-    }
-
-    // Validate all required fields
-    if (!_validateAllFields()) return;
-
-    try {
-      setState(() {
-        _isUploading = true;
-      });
-
-      // Upload image if selected
-      String? imageUrl;
-      if (_selectedImage != null) {
-        imageUrl = await _uploadImage(_selectedImage!);
-        if (imageUrl == null) {
-          setState(() {
-            _isUploading = false;
-          });
-          return;
-        }
-      }
-
-      // Create order document with location data
-      await firestore.collection('orders').add({
-        'sender_id': uid,
-        'origin': pickupController.text.trim(),
-        'destination': dropoffController.text.trim(),
-        'date': dateController.text.trim(),
-        'item_description': itemDescriptionController.text.trim(),
-        'weight': weightController.text.trim(),
-        'expected_price': priceController.text.trim(),
-        'notes': notesController.text.trim(),
-        'image_url': imageUrl,
-        'status': 'pending',
-        'created_at': FieldValue.serverTimestamp(),
-        // Location coordinates
-        'pickup_coordinates': pickupPosition != null ? {
-          'latitude': pickupPosition!.latitude,
-          'longitude': pickupPosition!.longitude,
-        } : null,
-        'dropoff_coordinates': dropoffPosition != null ? {
-          'latitude': dropoffPosition!.latitude,
-          'longitude': dropoffPosition!.longitude,
-        } : null,
-      });
-
-      // Clear all fields
-      _clearAllFields();
-
-      // Reset to first step
-      setState(() {
-        _currentStep = 0;
-        _isUploading = false;
-      });
-      _pageController.animateToPage(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-
-      _showSnackBar('Order created successfully! 🎉', Colors.green);
-    } catch (e) {
-      setState(() {
-        _isUploading = false;
-      });
-      _showSnackBar('Failed to create order: $e', Colors.red);
-    }
+  // Step 3: Delivery Date
+  Widget _buildStep3() {
+    return _buildStepContainer(
+      title: '📅 Delivery Date',
+      subtitle: 'When do you need this delivered?',
+      child: Column(
+        children: [
+          const SizedBox(height: 40),
+          _buildStepInputField(
+            controller: dateController,
+            icon: Icons.calendar_today,
+            label: 'Delivery Date',
+            hint: 'Select delivery date',
+            helperText: 'Choose your preferred delivery date',
+            readOnly: true,
+            onTap: () => _selectDate(context),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange[700]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Date format: YYYY-MM-DD (e.g., 2025-09-30)',
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  bool _validateAllFields() {
-    if (pickupController.text.trim().isEmpty ||
-        dropoffController.text.trim().isEmpty ||
-        dateController.text.trim().isEmpty ||
-        itemDescriptionController.text.trim().isEmpty ||
-        weightController.text.trim().isEmpty ||
-        priceController.text.trim().isEmpty) {
-      _showSnackBar('Please fill all required fields', Colors.red);
-      return false;
-    }
-    return true;
+  // Step 4: Weight
+  Widget _buildStep4() {
+    return _buildStepContainer(
+      title: '⚖️ Package Weight',
+      subtitle: 'Tell us about the package weight',
+      child: Column(
+        children: [
+          const SizedBox(height: 40),
+          _buildStepInputField(
+            controller: weightController,
+            icon: Icons.scale,
+            label: 'Weight (kg)',
+            hint: 'Enter weight in kg',
+            keyboardType: TextInputType.number,
+            helperText: 'Approximate weight of the package',
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.purple[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.purple[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.purple[700]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Enter weight as a decimal number (e.g., 2.5 for 2.5 kg)',
+                    style: TextStyle(
+                      color: Colors.purple[700],
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _clearAllFields() {
-    pickupController.clear();
-    dropoffController.clear();
-    dateController.clear();
-    itemDescriptionController.clear();
-    weightController.clear();
-    priceController.clear();
-    notesController.clear();
-    setState(() {
-      _selectedImage = null;
-      pickupPosition = null;
-      dropoffPosition = null;
-    });
+  // Step 5: Image URL and Special Instructions
+  Widget _buildStep5() {
+    return _buildStepContainer(
+      title: '📸 Additional Details',
+      subtitle: 'Add image and special instructions (optional)',
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          // Image section
+          GestureDetector(
+            onTap: _pickImage,
+            child: Container(
+              width: double.infinity,
+              height: 200,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: _selectedImage != null
+                  ? ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  _selectedImage!,
+                  fit: BoxFit.cover,
+                ),
+              )
+                  : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add_photo_alternate,
+                    size: 48,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add Package Photo',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap to add photo (Optional)',
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_selectedImage != null)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: _pickImage,
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Change Photo'),
+                ),
+                const SizedBox(width: 16),
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _selectedImage = null;
+                      imageUrlController.clear();
+                    });
+                  },
+                  icon: const Icon(Icons.delete),
+                  label: const Text('Remove'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                ),
+              ],
+            ),
+          const SizedBox(height: 24),
+          _buildStepInputField(
+            controller: imageUrlController,
+            icon: Icons.link,
+            label: 'Image URL (Optional)',
+            hint: 'Enter image URL',
+            helperText: 'Or upload an image using the photo picker above',
+          ),
+          const SizedBox(height: 16),
+          _buildStepInputField(
+            controller: specialInstructionsController,
+            icon: Icons.note,
+            label: 'Special Instructions (Optional)',
+            hint: 'Any special handling instructions?',
+            helperText: 'Fragile items, time preferences, etc.',
+            maxLines: 3,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepInputField({
+    required TextEditingController controller,
+    required IconData icon,
+    required String label,
+    required String hint,
+    String? helperText,
+    TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    int maxLines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            readOnly: readOnly,
+            onTap: onTap,
+            maxLines: maxLines,
+            decoration: InputDecoration(
+              labelText: label,
+              hintText: hint,
+              prefixIcon: Icon(icon, color: AppColors.primary),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(16),
+              labelStyle: TextStyle(color: AppColors.primary),
+            ),
+          ),
+        ),
+        if (helperText != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            helperText,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }
