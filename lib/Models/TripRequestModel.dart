@@ -6,37 +6,43 @@ class TripRequestSendRequest {
   final int travelerId;
   final int orderId;
   final String travelDate;
-  final int availableSpace;
   final String vehicleInfo;
-  final String vehicleDetails;
   final String source;
   final String destination;
-  final String route;
+  final String pickupTime;  // ✅ Changed from startTripTime
+  final String dropoffTime; // ✅ Changed from endTripTime
 
   TripRequestSendRequest({
     required this.travelerId,
     required this.orderId,
     required this.travelDate,
-    required this.availableSpace,
     required this.vehicleInfo,
-    required this.vehicleDetails,
     required this.source,
     required this.destination,
-    required this.route,
+    required this.pickupTime,
+    required this.dropoffTime,
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    // Format date to YYYY-MM-DD only (remove timestamp if present)
+    String formattedDate = travelDate;
+    if (travelDate.contains('T')) {
+      formattedDate = travelDate.split('T')[0];
+    }
+
+    final json = {
       'traveler_id': travelerId,
       'order_id': orderId,
-      'travel_date': travelDate,
-      'available_space': availableSpace,
+      'travel_date': formattedDate,
       'vehicle_info': vehicleInfo,
-      'vehicle_details': vehicleDetails,
       'source': source,
       'destination': destination,
-      'route': route,
+      'pickup_time': pickupTime,   // ✅ API field name
+      'dropoff_time': dropoffTime, // ✅ API field name
     };
+
+    print('📤 Trip Request JSON: $json');
+    return json;
   }
 }
 
@@ -50,6 +56,7 @@ class TripRequestSendResponse {
   });
 
   factory TripRequestSendResponse.fromJson(Map<String, dynamic> json) {
+    print('📥 Trip Request Response: $json');
     return TripRequestSendResponse(
       message: json['message'] as String,
       tripRequestId: json['tripRequestId'] as int,
@@ -63,7 +70,6 @@ class TripRequestSendResponse {
     };
   }
 }
-
 // ============================================
 // Accept Trip Request Models
 // ============================================
@@ -121,12 +127,11 @@ class TripRequest {
   final int travelerId;
   final int orderId;
   final String travelDate;
-  final int availableSpace;
   final String vehicleInfo;
-  final String? vehicleDetails;
   final String source;
   final String destination;
-  final String? route;
+  final String pickupTime;   // ✅ Changed from startTripTime
+  final String dropoffTime;  // ✅ Changed from endTripTime
   final String status;
   final String? createdAt;
 
@@ -135,12 +140,11 @@ class TripRequest {
     required this.travelerId,
     required this.orderId,
     required this.travelDate,
-    required this.availableSpace,
     required this.vehicleInfo,
-    this.vehicleDetails,
     required this.source,
     required this.destination,
-    this.route,
+    required this.pickupTime,
+    required this.dropoffTime,
     required this.status,
     this.createdAt,
   });
@@ -151,12 +155,11 @@ class TripRequest {
       travelerId: json['traveler_id'] as int,
       orderId: json['order_id'] as int,
       travelDate: json['travel_date'] as String,
-      availableSpace: json['available_space'] as int,
       vehicleInfo: json['vehicle_info'] as String,
-      vehicleDetails: json['vehicle_details'] as String?,
       source: json['source'] as String,
       destination: json['destination'] as String,
-      route: json['route'] as String?,
+      pickupTime: json['pickup_time'] as String,   // ✅ API field name
+      dropoffTime: json['dropoff_time'] as String, // ✅ API field name
       status: json['status'] as String,
       createdAt: json['created_at'] as String?,
     );
@@ -168,12 +171,11 @@ class TripRequest {
       'traveler_id': travelerId,
       'order_id': orderId,
       'travel_date': travelDate,
-      'available_space': availableSpace,
       'vehicle_info': vehicleInfo,
-      'vehicle_details': vehicleDetails,
       'source': source,
       'destination': destination,
-      'route': route,
+      'pickup_time': pickupTime,   // ✅ API field name
+      'dropoff_time': dropoffTime, // ✅ API field name
       'status': status,
       'created_at': createdAt,
     };

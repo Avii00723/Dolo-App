@@ -15,7 +15,7 @@ class Order {
   final String specialInstructions;
   final String status;
   final double? distanceKm;
-  final int? calculatedPrice;
+  final double? calculatedPrice;  // ✅ Changed from int? to double?
   final String? createdAt;
 
   Order({
@@ -52,12 +52,12 @@ class Order {
       destinationLongitude: _parseDouble(json['destination_longitude']),
       deliveryDate: json['delivery_date'] ?? '',
       weight: _parseDouble(json['weight']),
-      expectedPrice: json['expected_price'] ?? 0,
+      expectedPrice: _parseInt(json['expected_price']),  // ✅ Use _parseInt
       imageUrl: json['image_url'] ?? '',
       specialInstructions: json['special_instructions'] ?? '',
       status: json['status'] ?? '',
       distanceKm: json['distance_km'] != null ? _parseDouble(json['distance_km']) : null,
-      calculatedPrice: json['calculated_price'],
+      calculatedPrice: json['calculated_price'] != null ? _parseDouble(json['calculated_price']) : null,  // ✅ Use _parseDouble
       createdAt: json['created_at'],
     );
   }
@@ -69,6 +69,15 @@ class Order {
     if (value is int) return value.toDouble();
     if (value is String) return double.tryParse(value) ?? 0.0;
     return 0.0;
+  }
+
+  // ✅ NEW: Helper method to parse int from String or num
+  static int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 
   Map<String, dynamic> toJson() {
@@ -95,6 +104,7 @@ class Order {
   }
 }
 
+// Rest of the classes remain the same...
 class OrderCreateRequest {
   final int userId;
   final String origin;

@@ -63,11 +63,12 @@ class TripRequestDisplay {
   final int orderId;
   final int travellerId;
   final String travellerName;
+  final String vehicleType;      // ✅ Changed from availableSpace
   final String vehicleInfo;
-  final int availableSpace;
+  final String pickupTime;    // ✅ Changed from startTripTime
+  final String dropoffTime;   // ✅ Changed from endTripTime
   final String status;
   final String? profileImageUrl;
-  final String? vehicleDetails;
   final String? route;
 
   TripRequestDisplay({
@@ -75,14 +76,16 @@ class TripRequestDisplay {
     required this.orderId,
     required this.travellerId,
     required this.travellerName,
+    required this.vehicleType,
     required this.vehicleInfo,
-    required this.availableSpace,
+    required this.pickupTime,
+    required this.dropoffTime,
     required this.status,
     this.profileImageUrl,
-    this.vehicleDetails,
     this.route,
   });
 }
+
 
 class YourOrdersPage extends StatefulWidget {
   const YourOrdersPage({Key? key}) : super(key: key);
@@ -187,14 +190,19 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
-  // Load trip requests for user's orders
+// Load trip requests for user's orders
   Future<void> _loadTripRequestsForOrders(List<int> orderIds) async {
     try {
-      final allRequests =
-      await _tripRequestService.getMyTripRequests(currentUserId);
+      print('🔍 Loading trip requests for orders: $orderIds');
+
+      final allRequests = await _tripRequestService.getMyTripRequests(currentUserId);
+      print('📦 Got ${allRequests.length} total trip requests');
+
       Map<int, List<TripRequestDisplay>> requestsByOrder = {};
 
       for (var request in allRequests) {
+        print('Processing request: ID=${request.id}, OrderID=${request.orderId}, Status=${request.status}');
+
         if (request.status == 'pending' && orderIds.contains(request.orderId)) {
           final displayRequest = TripRequestDisplay(
             id: request.id,
@@ -202,10 +210,9 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             travellerId: request.travelerId,
             travellerName: 'Traveler ${request.travelerId}',
             vehicleInfo: request.vehicleInfo,
-            availableSpace: request.availableSpace,
-            status: request.status,
-            vehicleDetails: request.vehicleDetails,
-            route: request.route,
+            pickupTime: request.pickupTime,      // ✅ Changed from startTripTime
+            dropoffTime: request.dropoffTime,    // ✅ Changed from endTripTime
+            status: request.status, vehicleType: request.vehicleInfo,
           );
 
           if (requestsByOrder.containsKey(request.orderId)) {
@@ -213,16 +220,27 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           } else {
             requestsByOrder[request.orderId] = [displayRequest];
           }
+
+          print('✅ Added request to order ${request.orderId}');
         }
       }
+
+      print('📊 Total requests by order: ${requestsByOrder.length}');
 
       setState(() {
         tripRequestsByOrder = requestsByOrder;
       });
     } catch (e) {
-      print('Error loading trip requests: $e');
+      print('❌ Error loading trip requests: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load trip requests: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+
 
   // Load orders where user sent trip requests
   Future<void> _loadMyRequestedOrders() async {
@@ -415,14 +433,18 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                       fontSize: 14,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  _buildInfoRow(Icons.directions_car, 'Vehicle Type', request.vehicleType),
                   const SizedBox(height: 4),
-                  Text('Vehicle: ${request.vehicleInfo}',
-                      style: const TextStyle(fontSize: 12)),
-                  Text('Space: ${request.availableSpace} kg',
-                      style: const TextStyle(fontSize: 12)),
-                  if (request.route != null)
-                    Text('Route: ${request.route}',
-                        style: const TextStyle(fontSize: 12)),
+                  _buildInfoRow(Icons.info_outline, 'Vehicle Info', request.vehicleInfo),
+                  const SizedBox(height: 4),
+                  _buildInfoRow(Icons.access_time, 'Start Time', request.pickupTime),
+                  const SizedBox(height: 4),
+                  _buildInfoRow(Icons.access_time_filled, 'End Time', request.dropoffTime),
+                  if (request.route != null) ...[
+                    const SizedBox(height: 4),
+                    _buildInfoRow(Icons.route, 'Route', request.route!),
+                  ],
                 ],
               ),
             ),
@@ -466,13 +488,38 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text('Accept',
-                style: TextStyle(color: Colors.white)),
+            child: const Text('Accept', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
+
+// Helper widget for info rows
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.blue[700]),
+        const SizedBox(width: 6),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 12, color: Colors.black54),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {

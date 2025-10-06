@@ -1,6 +1,5 @@
 // Modern Sender Order Card - COMPACT VERSION with Click to Expand
 import 'package:flutter/material.dart';
-
 import 'YourOrders.dart';
 
 class ModernSenderOrderCard extends StatelessWidget {
@@ -521,7 +520,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                         const SizedBox(height: 20),
                       ],
 
-                      // Trip Requests Section
+                      // Trip Requests Section - ✅ UPDATED
                       if (tripRequests != null && tripRequests!.isNotEmpty) ...[
                         Row(
                           children: [
@@ -641,6 +640,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
+  // ✅ UPDATED TRIP REQUEST CARD
   Widget _buildTripRequestCard(BuildContext context, TripRequestDisplay request) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -651,7 +651,9 @@ class ModernSenderOrderCard extends StatelessWidget {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Traveler Info Header
           Row(
             children: [
               CircleAvatar(
@@ -679,77 +681,125 @@ class ModernSenderOrderCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Text(
-                      request.vehicleInfo,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.directions_car, size: 12, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text(
+                          request.vehicleType,  // ✅ Vehicle Type
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${request.availableSpace} kg',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue[700],
-                  ),
-                ),
-              ),
             ],
           ),
-          if (request.route != null) ...[
-            const SizedBox(height: 8),
-            Row(
+
+          const SizedBox(height: 12),
+
+          // Vehicle Info
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Column(
               children: [
-                Icon(Icons.route, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    request.route!,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[600],
+                _buildInfoRowCompact(Icons.info_outline, 'Vehicle Info', request.vehicleInfo),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInfoRowCompact(
+                        Icons.access_time,
+                        'Start',
+                        request.pickupTime,  // ✅ Start Time
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildInfoRowCompact(
+                        Icons.access_time_filled,
+                        'End',
+                        request.dropoffTime,  // ✅ End Time
+                      ),
+                    ),
+                  ],
                 ),
+                if (request.route != null) ...[
+                  const SizedBox(height: 8),
+                  _buildInfoRowCompact(Icons.route, 'Route', request.route!),
+                ],
               ],
             ),
-          ],
+          ),
+
           const SizedBox(height: 12),
+
+          // Accept Button
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(context);
                 onAcceptRequest?.call(request, order.id);
               },
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              label: const Text(
+                'Accept Request',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green[600],
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-              ),
-              child: const Text(
-                'Accept Request',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // ✅ NEW HELPER WIDGET
+  Widget _buildInfoRowCompact(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[600]),
+        const SizedBox(width: 6),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 

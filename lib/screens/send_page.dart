@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../Constants/colorconstant.dart';
 import '../../Services/LocationService.dart';
-
 import '../../Models/OrderModel.dart';
 import '../../Models/TripRequestModel.dart';
 import '../Controllers/OrderService.dart';
@@ -234,172 +233,697 @@ class _SendPageState extends State<SendPage> {
   // Send trip request to order creator
   Future<void> _sendRequestToSender(Order order) async {
     try {
-      // Check if already sent request (you can add this check via API later)
       await _showTripRequestDialog(order);
     } catch (e) {
       _showSnackBar('Failed to send request: $e', Colors.red);
     }
   }
 
-  // Show dialog to collect trip details
+  // Enhanced trip request dialog with proper API integration
   Future<void> _showTripRequestDialog(Order order) async {
     final vehicleInfoController = TextEditingController();
-    final vehicleDetailsController = TextEditingController();
-    final spaceController = TextEditingController();
-    final routeController = TextEditingController(
-      text: '${order.origin} -> ${order.destination}',
-    );
+    final routeController = TextEditingController(text: '${order.origin} - ${order.destination}');
+
+    // Time controllers for start and end time
+    final startTimeController = TextEditingController();
+    final endTimeController = TextEditingController();
+
+    // Helper function to show time picker
+    Future<void> selectTime(BuildContext context, TextEditingController controller) async {
+      TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+      );
+
+      if (pickedTime != null) {
+        // Format time as HH:MM
+        final formattedTime = '${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}';
+        controller.text = formattedTime;
+      }
+    }
 
     return showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Send Trip Request',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: SingleChildScrollView(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          constraints: const BoxConstraints(maxHeight: 650),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header with gradient
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue[200]!),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primary.withOpacity(0.7),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(
-                      '${order.origin} → ${order.destination}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 28,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text('Date: ${order.deliveryDate}'),
-                    Text('Item: ${order.itemDescription}'),
-                    Text('Weight: ${order.weight}'),
-                    if (order.calculatedPrice != null)
-                      Text('Estimated Price: ₹${order.calculatedPrice}'),
+                    const SizedBox(width: 15),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Send Trip Request',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Fill in your travel details',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: vehicleInfoController,
-                decoration: InputDecoration(
-                  labelText: 'Vehicle Information*',
-                  hintText: 'e.g., Maruti Suzuki Swift, AC',
-                  prefixIcon: const Icon(Icons.directions_car),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+
+              // Scrollable content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Order Summary Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.blue.shade50,
+                              Colors.blue.shade50.withOpacity(0.5),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.blue.shade200,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue.shade700,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Order Details',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Colors.blue.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _buildOrderDetailRow(
+                              Icons.location_on,
+                              'Route',
+                              '${order.origin} → ${order.destination}',
+                              Colors.green,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildOrderDetailRow(
+                              Icons.calendar_today,
+                              'Date',
+                              order.deliveryDate,
+                              Colors.orange,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildOrderDetailRow(
+                              Icons.inventory_2,
+                              'Item',
+                              order.itemDescription,
+                              Colors.purple,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildOrderDetailRow(
+                              Icons.scale,
+                              'Weight',
+                              '${order.weight} kg',
+                              Colors.red,
+                            ),
+                            if (order.calculatedPrice != null) ...[
+                              const SizedBox(height: 8),
+                              _buildOrderDetailRow(
+                                Icons.currency_rupee,
+                                'Estimated Price',
+                                '₹${order.calculatedPrice}',
+                                Colors.green.shade700,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Your Travel Information',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+
+                      // Vehicle Type (Read-only, from search)
+                      _buildReadOnlyField(
+                        label: 'Vehicle Type',
+                        value: selectedVehicle ?? 'Not selected',
+                        icon: Icons.directions_car,
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      // Vehicle Info Field
+                      _buildEnhancedTextField(
+                        controller: vehicleInfoController,
+                        label: 'Vehicle Information',
+                        hint: 'e.g., Maruti Suzuki Swift, AC, Red Color',
+                        icon: Icons.info_outline,
+                        isRequired: true,
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      // Start Trip Time
+                      GestureDetector(
+                        onTap: () => selectTime(context, startTimeController),
+                        child: AbsorbPointer(
+                          child: _buildEnhancedTextField(
+                            controller: startTimeController,
+                            label: 'Start Trip Time',
+                            hint: 'e.g., 09:00',
+                            icon: Icons.access_time,
+                            isRequired: true,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      // End Trip Time
+                      GestureDetector(
+                        onTap: () => selectTime(context, endTimeController),
+                        child: AbsorbPointer(
+                          child: _buildEnhancedTextField(
+                            controller: endTimeController,
+                            label: 'End Trip Time',
+                            hint: 'e.g., 12:00',
+                            icon: Icons.access_time_filled,
+                            isRequired: true,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      // Route Field
+                      _buildEnhancedTextField(
+                        controller: routeController,
+                        label: 'Your Route',
+                        hint: 'e.g., Pune - Lonavala - Mumbai',
+                        icon: Icons.route,
+                        isRequired: true,
+                        maxLines: 2,
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: vehicleDetailsController,
-                decoration: InputDecoration(
-                  labelText: 'Vehicle Details*',
-                  hintText: 'e.g., Red, 4-seater, Petrol',
-                  prefixIcon: const Icon(Icons.info_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+
+              // Action buttons
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  border: Border(
+                    top: BorderSide(color: Colors.grey.shade200),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: spaceController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Available Space (kg)*',
-                  hintText: 'e.g., 10',
-                  prefixIcon: const Icon(Icons.inventory),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: routeController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: 'Route*',
-                  hintText: 'e.g., Pune -> Lonavala -> Mumbai',
-                  prefixIcon: const Icon(Icons.route),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                child: Row(
+                  children: [
+                    // Cancel button
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(
+                            color: Colors.grey.shade400,
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    // Send Request button
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          // Validate all fields
+                          if (vehicleInfoController.text.trim().isEmpty ||
+                              startTimeController.text.trim().isEmpty ||
+                              endTimeController.text.trim().isEmpty ||
+                              routeController.text.trim().isEmpty ||
+                              selectedVehicle == null) {
+                            _showSnackBar('Please fill all required fields', Colors.red);
+                            return;
+                          }
+
+                          // Close the trip request dialog first
+                          Navigator.pop(context);
+
+                          // Show loading dialog with proper context handling
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (loadingContext) => PopScope(
+                              canPop: false,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.all(30),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const CircularProgressIndicator(),
+                                      const SizedBox(height: 20),
+                                      Text(
+                                        'Sending request...',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: Colors.grey[700],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+
+                          try {
+                            // Format the date properly
+                            String formattedDate = order.deliveryDate;
+                            if (order.deliveryDate.contains('T')) {
+                              formattedDate = order.deliveryDate.split('T')[0];
+                            }
+
+                            // Prepare trip request with updated fields
+                            final tripRequest = TripRequestSendRequest(
+                              travelerId: userId,
+                              orderId: order.id,
+                              travelDate: formattedDate,
+                              vehicleInfo: vehicleInfoController.text.trim(),
+                              source: order.origin,
+                              destination: order.destination,
+                              pickupTime: startTimeController.text.trim(),    // ✅ Changed from startTripTime
+                              dropoffTime: endTimeController.text.trim(),    // ✅ Changed from endTripTime
+                            );
+
+                            print('DEBUG: Sending trip request...');
+                            print('DEBUG: Traveler ID: $userId');
+                            print('DEBUG: Order ID: ${order.id}');
+                            print('DEBUG: Vehicle Type: $selectedVehicle');
+                            print('DEBUG: Start Time: ${startTimeController.text}');
+                            print('DEBUG: End Time: ${endTimeController.text}');
+
+                            // Send trip request via API
+                            final response = await _tripRequestService.sendTripRequest(tripRequest);
+
+                            // Close loading dialog
+                            if (mounted) {
+                              Navigator.pop(context);
+
+                              if (response != null) {
+                                _showSuccessDialog(
+                                  tripRequestId: response.tripRequestId,
+                                  orderOwner: order.userName,
+                                );
+                              } else {
+                                _showSnackBar(
+                                  'Failed to send request. Please try again.',
+                                  Colors.red,
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            // Close loading dialog on error
+                            if (mounted) {
+                              Navigator.pop(context);
+                            }
+                            print('ERROR: Failed to send trip request: $e');
+                            _showSnackBar('Failed to send request: $e', Colors.red);
+                          }
+                        },
+                        icon: const Icon(Icons.send_rounded, size: 20),
+                        label: const Text(
+                          'Send Request',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 2,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      ),
+    );
+  }
+
+// Helper widget for read-only field
+  Widget _buildReadOnlyField({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
           ),
-          ElevatedButton(
-            onPressed: () async {
-              if (vehicleInfoController.text.trim().isEmpty ||
-                  vehicleDetailsController.text.trim().isEmpty ||
-                  spaceController.text.trim().isEmpty ||
-                  routeController.text.trim().isEmpty) {
-                _showSnackBar('Please fill all required fields', Colors.red);
-                return;
-              }
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.primary, size: 20),
+              const SizedBox(width: 12),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
-              final availableSpace = int.tryParse(spaceController.text.trim());
-              if (availableSpace == null || availableSpace <= 0) {
-                _showSnackBar('Please enter valid available space', Colors.red);
-                return;
-              }
 
-              try {
-                // Prepare trip request
-                final tripRequest = TripRequestSendRequest(
-                  travelerId: userId,
-                  orderId: order.id,
-                  travelDate: order.deliveryDate,
-                  availableSpace: availableSpace,
-                  vehicleInfo: vehicleInfoController.text.trim(),
-                  vehicleDetails: vehicleDetailsController.text.trim(),
-                  source: order.origin,
-                  destination: order.destination,
-                  route: routeController.text.trim(),
-                );
+  // Helper widget for order detail rows
+  Widget _buildOrderDetailRow(IconData icon, String label, String value, Color color) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-                // Send trip request via API
-                final response = await _tripRequestService.sendTripRequest(tripRequest);
-
-                if (response != null) {
-                  Navigator.pop(context);
-                  _showSnackBar(
-                    'Request sent successfully! Trip Request ID: #${response.tripRequestId}',
-                    Colors.green,
-                  );
-                } else {
-                  _showSnackBar('Failed to send request', Colors.red);
-                }
-              } catch (e) {
-                _showSnackBar('Failed to send request: $e', Colors.red);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+  // Enhanced text field widget
+  Widget _buildEnhancedTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    bool isRequired = false,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
               ),
             ),
-            child: const Text('Send Request', style: TextStyle(color: Colors.white)),
+            if (isRequired)
+              const Text(
+                ' *',
+                style: TextStyle(color: Colors.red, fontSize: 14),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            maxLines: maxLines,
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+              prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Loading dialog
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 20),
+                Text(
+                  'Sending request...',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.grey[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Success dialog
+  void _showSuccessDialog({required int tripRequestId, required String orderOwner}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle,
+                color: Colors.green.shade600,
+                size: 60,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Request Sent Successfully!',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'Trip Request ID',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '#$tripRequestId',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+            Text(
+              'Your request has been sent to $orderOwner. You will be notified when they respond.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Done',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -1083,4 +1607,3 @@ class CompactOrderCard extends StatelessWidget {
     );
   }
 }
-
