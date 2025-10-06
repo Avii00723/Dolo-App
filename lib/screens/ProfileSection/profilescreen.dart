@@ -130,11 +130,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     return name[0].toUpperCase();
   }
 
-  // ✅ UPDATED LOGOUT METHOD USING SECURE STORAGE
+// ✅ ALTERNATIVE ROBUST LOGOUT METHOD
+// ✅ FIXED LOGOUT METHOD - Replace the entire _showLogoutDialog method
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
@@ -158,33 +159,44 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
             ),
             ElevatedButton(
               onPressed: () async {
+                // Close confirmation dialog first
+                Navigator.of(dialogContext).pop();
+
+                // Show loading dialog
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext loadingContext) {
+                    return WillPopScope(
+                      onWillPop: () async => false,
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  },
+                );
+
                 try {
-                  // Close dialog
-                  Navigator.of(context).pop();
-
-                  // Show loading indicator
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-
-                  // ✅ Clear secure storage using AuthService
+                  // Clear secure storage
                   await AuthService.clearUserSession();
 
-                  // Close loading dialog
+                  // Small delay to ensure storage is cleared
+                  await Future.delayed(const Duration(milliseconds: 300));
+
+                  // Close loading dialog - Use rootNavigator
                   if (context.mounted) {
-                    Navigator.of(context).pop();
+                    Navigator.of(context, rootNavigator: true).pop();
                   }
 
-                  // Navigate to login screen
+                  // Small delay before navigation
+                  await Future.delayed(const Duration(milliseconds: 100));
+
+                  // Navigate to login screen and remove all previous routes
                   if (context.mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
@@ -193,32 +205,14 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                           (Route<dynamic> route) => false,
                     );
                   }
-
-                  // Show success message
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Row(
-                          children: [
-                            Icon(Icons.check_circle, color: Colors.white),
-                            SizedBox(width: 8),
-                            Text('Logged out successfully'),
-                          ],
-                        ),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    );
-                  }
                 } catch (e) {
                   print('Logout error: $e');
-                  // Close loading dialog if still open
+
+                  // Close loading dialog on error
                   if (context.mounted) {
-                    Navigator.of(context).pop();
+                    Navigator.of(context, rootNavigator: true).pop();
                   }
+
                   // Show error message
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -244,10 +238,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       },
     );
   }
-
-  // Keep all your existing widgets (_buildProfileCard, _buildMenuItem, etc.)
-  // ... (rest of your widget code remains the same)
-
   // In _buildProfileCard method, wrap the Card with InkWell
   Widget _buildProfileCard() {
     return FadeTransition(

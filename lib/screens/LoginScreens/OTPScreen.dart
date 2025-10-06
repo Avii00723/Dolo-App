@@ -142,13 +142,14 @@ class _OTPScreenState extends State<OTPScreen> {
                 ),
               ),
               const SizedBox(height: 48),
+              // Replace the OTP input Row section with this:
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: List.generate(
                   6,
                       (index) => SizedBox(
-                    width: 45,
-                    height: 55,
+                    width: 50,
+                    height: 60,  // Increased height
                     child: TextField(
                       controller: _otpControllers[index],
                       focusNode: _otpFocusNodes[index],
@@ -157,12 +158,21 @@ class _OTPScreenState extends State<OTPScreen> {
                       maxLength: 1,
                       enabled: !_isLoading,
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 24,  // Slightly larger for better visibility
                         fontWeight: FontWeight.bold,
+                        height: 1.2,  // Add line height to prevent cutoff
                       ),
                       decoration: InputDecoration(
                         counterText: '',
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 16,  // Add vertical padding
+                          horizontal: 0,
+                        ),
                         border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: Colors.grey[300]!),
                         ),
