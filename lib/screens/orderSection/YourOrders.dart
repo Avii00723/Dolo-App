@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../Controllers/OrderService.dart';
 import '../../Controllers/TripRequestService.dart';
+import '../../Controllers/AuthService.dart'; // ✅ ADDED
 import '../Inbox Section/indoxscreen.dart';
 import '../../Models/OrderModel.dart' as OrderModels;
 import '../../Models/TripRequestModel.dart';
 import '../../screens/orderSection/OrderCard.dart';
 import 'TravellerCard.dart';
+
 // Local models for UI display
 class OrderDisplay {
   final int id;
@@ -63,29 +65,24 @@ class TripRequestDisplay {
   final int orderId;
   final int travellerId;
   final String travellerName;
-  final String vehicleType;      // ✅ Changed from availableSpace
   final String vehicleInfo;
-  final String pickupTime;    // ✅ Changed from startTripTime
-  final String dropoffTime;   // ✅ Changed from endTripTime
+  final String pickupTime;
+  final String dropoffTime;
   final String status;
   final String? profileImageUrl;
-  final String? route;
 
   TripRequestDisplay({
     required this.id,
     required this.orderId,
     required this.travellerId,
     required this.travellerName,
-    required this.vehicleType,
     required this.vehicleInfo,
     required this.pickupTime,
     required this.dropoffTime,
     required this.status,
     this.profileImageUrl,
-    this.route,
   });
 }
-
 
 class YourOrdersPage extends StatefulWidget {
   const YourOrdersPage({Key? key}) : super(key: key);
@@ -100,8 +97,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
 
-  // User ID - Replace with actual user ID from auth
-  int currentUserId = 1; // TODO: Get from auth service
+  // ✅ CHANGED: Fetch from AuthService instead of hardcoding
+  int? currentUserId;
 
   late TabController _tabController;
   Timer? _refreshTimer;
@@ -110,7 +107,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   List<OrderDisplay> myOrders = [];
   List<OrderDisplay> myRequestedOrders = [];
   Map<int, List<TripRequestDisplay>> tripRequestsByOrder = {};
-
   bool isLoadingMyOrders = false;
   bool isLoadingMyRequests = false;
 
@@ -118,12 +114,51 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadAllData();
+    _initializeUser(); // ✅ ADDED
 
     // Auto-refresh every 30 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      _loadAllData();
+      if (currentUserId != null) {
+        _loadAllData();
+      }
     });
+  }
+
+  // ✅ ADDED: Initialize user from AuthService
+  Future<void> _initializeUser() async {
+    try {
+      final userId = await AuthService.getUserId();
+
+      if (userId == null) {
+        print('❌ No user ID found in AuthService');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please log in again'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        currentUserId = userId;
+      });
+
+      print('✅ User ID loaded from AuthService: $userId');
+      await _loadAllData();
+    } catch (e) {
+      print('❌ Error initializing user: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading user data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -135,6 +170,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
   // Load all data from API
   Future<void> _loadAllData() async {
+    if (currentUserId == null) {
+      print('⚠️ Cannot load data - no user ID');
+      return;
+    }
+
     await Future.wait([
       _loadMyOrders(),
       _loadMyRequestedOrders(),
@@ -143,18 +183,23 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
   // Load user's created orders from API
   Future<void> _loadMyOrders() async {
+    if (currentUserId == null) return; // ✅ ADDED safety check
+
     setState(() {
       isLoadingMyOrders = true;
     });
 
     try {
-      final orders = await _orderService.getMyOrders(currentUserId);
+      print('🔍 Loading orders for user: $currentUserId');
+      final orders = await _orderService.getMyOrders(currentUserId!);
+      print('📦 Received ${orders.length} orders');
+
       final List<OrderDisplay> displayOrders = [];
 
       for (var order in orders) {
         displayOrders.add(OrderDisplay(
           id: order.id,
-          userId: currentUserId,
+          userId: currentUserId!,
           userName: 'You',
           senderInitial: 'Y',
           origin: order.origin,
@@ -176,33 +221,42 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       }
 
       // Load trip requests for each order
-      await _loadTripRequestsForOrders(orders.map((o) => o.id).toList());
+      if (orders.isNotEmpty) {
+        await _loadTripRequestsForOrders(orders.map((o) => o.id).toList());
+      }
 
       setState(() {
         myOrders = displayOrders;
         isLoadingMyOrders = false;
       });
+
+      print('✅ Loaded ${displayOrders.length} orders successfully');
     } catch (e) {
-      print('Error loading my orders: $e');
+      print('❌ Error loading my orders: $e');
       setState(() {
         isLoadingMyOrders = false;
+        myOrders = [];
       });
     }
   }
 
-// Load trip requests for user's orders
+  // Load trip requests for user's orders
   Future<void> _loadTripRequestsForOrders(List<int> orderIds) async {
+    if (currentUserId == null) return; // ✅ ADDED safety check
+
     try {
       print('🔍 Loading trip requests for orders: $orderIds');
 
-      final allRequests = await _tripRequestService.getMyTripRequests(currentUserId);
+      final allRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
       print('📦 Got ${allRequests.length} total trip requests');
 
       Map<int, List<TripRequestDisplay>> requestsByOrder = {};
 
       for (var request in allRequests) {
-        print('Processing request: ID=${request.id}, OrderID=${request.orderId}, Status=${request.status}');
+        print('Processing request: ID=${request.id}, OrderID=${request.orderId}, TravelerID=${request.travelerId}, Status=${request.status}');
 
+        // Only show requests where currentUser created the order
+        // The traveler (who sent request) should be different from current user
         if (request.status == 'pending' && orderIds.contains(request.orderId)) {
           final displayRequest = TripRequestDisplay(
             id: request.id,
@@ -210,9 +264,9 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             travellerId: request.travelerId,
             travellerName: 'Traveler ${request.travelerId}',
             vehicleInfo: request.vehicleInfo,
-            pickupTime: request.pickupTime,      // ✅ Changed from startTripTime
-            dropoffTime: request.dropoffTime,    // ✅ Changed from endTripTime
-            status: request.status, vehicleType: request.vehicleInfo,
+            pickupTime: request.pickupTime,
+            dropoffTime: request.dropoffTime,
+            status: request.status,
           );
 
           if (requestsByOrder.containsKey(request.orderId)) {
@@ -232,72 +286,80 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       });
     } catch (e) {
       print('❌ Error loading trip requests: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load trip requests: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load trip requests: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
-
-  // Load orders where user sent trip requests
+  // Load orders where user sent trip requests (as traveler)
   Future<void> _loadMyRequestedOrders() async {
+    if (currentUserId == null) return; // ✅ ADDED safety check
+
     setState(() {
       isLoadingMyRequests = true;
     });
 
     try {
-      final tripRequests =
-      await _tripRequestService.getMyTripRequests(currentUserId);
+      print('🔍 Loading trip requests sent by user: $currentUserId');
+
+      // Get all trip requests sent by this user (as traveler)
+      final tripRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
+      print('📦 Found ${tripRequests.length} trip requests');
+
       final List<OrderDisplay> displayOrders = [];
       final Set<int> processedOrderIds = {};
 
       for (var request in tripRequests) {
-        if (processedOrderIds.contains(request.orderId)) continue;
+        // Only show requests where current user is the TRAVELER
+        if (request.travelerId != currentUserId) {
+          print('⏭️ Skipping request ${request.id} - not sent by current user');
+          continue;
+        }
+
+        if (processedOrderIds.contains(request.orderId)) {
+          print('⏭️ Skipping duplicate order ${request.orderId}');
+          continue;
+        }
+
         processedOrderIds.add(request.orderId);
 
-        try {
-          final orders = await _orderService.getMyOrders(request.orderId);
-          if (orders.isNotEmpty) {
-            final order = orders.first;
-            displayOrders.add(OrderDisplay(
-              id: order.id,
-              userId: order.id,
-              userName: order.userName,
-              senderInitial: order.userName.isNotEmpty ? order.userName[0] : 'U',
-              origin: order.origin,
-              destination: order.destination,
-              date: order.deliveryDate,
-              itemDescription: order.itemDescription,
-              weight: order.weight,
-              status: order.status,
-              originLatitude: order.originLatitude,
-              originLongitude: order.originLongitude,
-              destinationLatitude: order.destinationLatitude,
-              destinationLongitude: order.destinationLongitude,
-              orderType: 'receive',
-              estimatedDistance: order.distanceKm,
-              expectedPrice: order.expectedPrice,
-              requestStatus: request.status,
-              notes: order.specialInstructions,
-              imageUrl: order.imageUrl,
-            ));
-          }
-        } catch (e) {
-          print('Error loading order ${request.orderId}: $e');
-        }
+        // Use order data from trip request response
+        displayOrders.add(OrderDisplay(
+          id: request.orderId,
+          userId: request.orderId, // Order creator's user ID
+          userName: 'Order Creator',
+          senderInitial: 'O',
+          origin: request.source,
+          destination: request.destination,
+          date: request.travelDate,
+          itemDescription: 'Package delivery',
+          weight: 0.0,
+          status: request.status,
+          orderType: 'receive',
+          requestStatus: request.status,
+          notes: request.vehicleInfo,
+        ));
+
+        print('✅ Added order ${request.orderId} to My Requests');
       }
 
       setState(() {
         myRequestedOrders = displayOrders;
         isLoadingMyRequests = false;
       });
+
+      print('✅ Loaded ${displayOrders.length} requested orders');
     } catch (e) {
-      print('Error loading requested orders: $e');
+      print('❌ Error loading requested orders: $e');
       setState(() {
         isLoadingMyRequests = false;
+        myRequestedOrders = [];
       });
     }
   }
@@ -361,12 +423,14 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
   Future<void> _acceptTripRequest(
       TripRequestDisplay request, int orderId) async {
+    if (currentUserId == null) return; // ✅ ADDED safety check
+
     try {
       final negotiatedPrice = await _showPriceNegotiationDialog(request);
       if (negotiatedPrice == null) return;
 
       final acceptRequest = TripRequestAcceptRequest(
-        orderCreatorId: currentUserId,
+        orderCreatorId: currentUserId!,
         tripRequestId: request.id,
         negotiatedPrice: negotiatedPrice,
       );
@@ -434,17 +498,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildInfoRow(Icons.directions_car, 'Vehicle Type', request.vehicleType),
-                  const SizedBox(height: 4),
                   _buildInfoRow(Icons.info_outline, 'Vehicle Info', request.vehicleInfo),
                   const SizedBox(height: 4),
-                  _buildInfoRow(Icons.access_time, 'Start Time', request.pickupTime),
+                  _buildInfoRow(Icons.access_time, 'Pickup Time', request.pickupTime),
                   const SizedBox(height: 4),
-                  _buildInfoRow(Icons.access_time_filled, 'End Time', request.dropoffTime),
-                  if (request.route != null) ...[
-                    const SizedBox(height: 4),
-                    _buildInfoRow(Icons.route, 'Route', request.route!),
-                  ],
+                  _buildInfoRow(Icons.access_time_filled, 'Dropoff Time', request.dropoffTime),
                 ],
               ),
             ),
@@ -480,6 +538,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                 );
                 return;
               }
+
               Navigator.pop(context, price);
             },
             style: ElevatedButton.styleFrom(
@@ -495,7 +554,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     );
   }
 
-// Helper widget for info rows
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -520,9 +578,23 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
+    // ✅ ADDED: Show loading state while fetching user ID
+    if (currentUserId == null) {
+      return Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          title: const Text('Your Orders'),
+          backgroundColor: const Color(0xFF0A1A2A),
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(

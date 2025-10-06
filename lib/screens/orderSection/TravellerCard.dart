@@ -1,8 +1,7 @@
 // Modern Traveller Order Card - COMPACT VERSION with Click to Expand
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-
 import 'YourOrders.dart';
+
 class ModernTravellerOrderCard extends StatelessWidget {
   final OrderDisplay order;
   final VoidCallback? onTrackOrder;
@@ -159,19 +158,25 @@ class ModernTravellerOrderCard extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   // Quick Info Row
-                  Row(
-                    children: [
-                      _buildCompactChip(Icons.calendar_today, _formatDate(order.date)),
-                      const SizedBox(width: 8),
-                      _buildCompactChip(Icons.scale, '${order.weight} kg'),
-                      const SizedBox(width: 8),
-                      if (order.expectedPrice != null)
-                        _buildCompactChip(
-                          Icons.currency_rupee,
-                          '₹${order.expectedPrice}',
-                          color: Colors.green,
-                        ),
-                    ],
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildCompactChip(Icons.calendar_today, _formatDate(order.date)),
+                        if (order.weight > 0) ...[
+                          const SizedBox(width: 8),
+                          _buildCompactChip(Icons.scale, '${order.weight} kg'),
+                        ],
+                        if (order.expectedPrice != null) ...[
+                          const SizedBox(width: 8),
+                          _buildCompactChip(
+                            Icons.currency_rupee,
+                            '₹${order.expectedPrice}',
+                            color: Colors.green,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 8),
 
@@ -235,8 +240,34 @@ class ModernTravellerOrderCard extends StatelessWidget {
     }
   }
 
+  // Helper to parse trip details from notes
+  Map<String, String> _parseTripDetails() {
+    if (order.notes == null || order.notes!.isEmpty) {
+      return {};
+    }
+
+    final Map<String, String> details = {};
+    final parts = order.notes!.split(' • ');
+
+    for (var part in parts) {
+      if (part.contains(': ')) {
+        final keyValue = part.split(': ');
+        if (keyValue.length == 2) {
+          details[keyValue[0].trim()] = keyValue[1].trim();
+        }
+      } else {
+        // Assume first part without colon is vehicle info
+        details['Vehicle Info'] = part.trim();
+      }
+    }
+
+    return details;
+  }
+
   // FLOATING MODAL WITH FULL DETAILS
   void _showOrderDetailsModal(BuildContext context) {
+    final tripDetails = _parseTripDetails();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -393,6 +424,53 @@ class ModernTravellerOrderCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
 
+                      // ✅ NEW: Your Trip Request Section
+                      if (tripDetails.isNotEmpty) ...[
+                        const Text(
+                          'Your Trip Request',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blue[200]!),
+                          ),
+                          child: Column(
+                            children: [
+                              if (tripDetails['Vehicle Info'] != null)
+                                _buildTripDetailRow(
+                                  Icons.directions_car,
+                                  'Vehicle',
+                                  tripDetails['Vehicle Info']!,
+                                ),
+                              if (tripDetails['Pickup'] != null) ...[
+                                const SizedBox(height: 12),
+                                _buildTripDetailRow(
+                                  Icons.access_time,
+                                  'Pickup Time',
+                                  tripDetails['Pickup']!,
+                                ),
+                              ],
+                              if (tripDetails['Dropoff'] != null) ...[
+                                const SizedBox(height: 12),
+                                _buildTripDetailRow(
+                                  Icons.access_time_filled,
+                                  'Dropoff Time',
+                                  tripDetails['Dropoff']!,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
                       // Date
                       _buildDetailRow(
                         Icons.calendar_today,
@@ -499,12 +577,14 @@ class ModernTravellerOrderCard extends StatelessWidget {
                               'Item Description',
                               order.itemDescription,
                             ),
-                            const Divider(height: 24),
-                            _buildDetailRow(
-                              Icons.scale_outlined,
-                              'Weight',
-                              '${order.weight} kg',
-                            ),
+                            if (order.weight > 0) ...[
+                              const Divider(height: 24),
+                              _buildDetailRow(
+                                Icons.scale_outlined,
+                                'Weight',
+                                '${order.weight} kg',
+                              ),
+                            ],
                             if (order.expectedPrice != null) ...[
                               const Divider(height: 24),
                               _buildDetailRow(
@@ -512,14 +592,6 @@ class ModernTravellerOrderCard extends StatelessWidget {
                                 'Expected Price',
                                 '₹${order.expectedPrice}',
                                 valueColor: Colors.green[700],
-                              ),
-                            ],
-                            if (order.notes != null && order.notes!.isNotEmpty) ...[
-                              const Divider(height: 24),
-                              _buildDetailRow(
-                                Icons.note_outlined,
-                                'Special Instructions',
-                                order.notes!,
                               ),
                             ],
                           ],
@@ -578,6 +650,41 @@ class ModernTravellerOrderCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  // ✅ NEW: Trip detail row widget
+  Widget _buildTripDetailRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: Colors.blue[700]),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

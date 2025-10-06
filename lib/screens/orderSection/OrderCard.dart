@@ -520,7 +520,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                         const SizedBox(height: 20),
                       ],
 
-                      // Trip Requests Section - ✅ UPDATED
+                      // Trip Requests Section - ✅ FIXED
                       if (tripRequests != null && tripRequests!.isNotEmpty) ...[
                         Row(
                           children: [
@@ -640,7 +640,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  // ✅ UPDATED TRIP REQUEST CARD
+  // ✅ FIXED TRIP REQUEST CARD - Removed vehicleType and route references
   Widget _buildTripRequestCard(BuildContext context, TripRequestDisplay request) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -682,19 +682,13 @@ class ModernSenderOrderCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Icon(Icons.directions_car, size: 12, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          request.vehicleType,  // ✅ Vehicle Type
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      'Traveler ID: ${request.travellerId}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -704,7 +698,7 @@ class ModernSenderOrderCard extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // Vehicle Info
+          // Vehicle Info & Times
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -714,35 +708,30 @@ class ModernSenderOrderCard extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildInfoRowCompact(Icons.info_outline, 'Vehicle Info', request.vehicleInfo),
+                _buildInfoRowCompact(Icons.directions_car, 'Vehicle', request.vehicleInfo),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
                       child: _buildInfoRowCompact(
                         Icons.access_time,
-                        'Start',
-                        request.pickupTime,  // ✅ Start Time
+                        'Pickup',
+                        request.pickupTime,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _buildInfoRowCompact(
                         Icons.access_time_filled,
-                        'End',
-                        request.dropoffTime,  // ✅ End Time
+                        'Dropoff',
+                        request.dropoffTime,
                       ),
                     ),
                   ],
                 ),
-                if (request.route != null) ...[
-                  const SizedBox(height: 8),
-                  _buildInfoRowCompact(Icons.route, 'Route', request.route!),
-                ],
               ],
             ),
           ),
-
           const SizedBox(height: 12),
 
           // Accept Button
@@ -773,7 +762,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  // ✅ NEW HELPER WIDGET
+  // ✅ HELPER WIDGET
   Widget _buildInfoRowCompact(IconData icon, String label, String value) {
     return Row(
       children: [

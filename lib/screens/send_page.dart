@@ -6,6 +6,7 @@ import '../../Models/OrderModel.dart';
 import '../../Models/TripRequestModel.dart';
 import '../Controllers/OrderService.dart';
 import '../Controllers/TripRequestService.dart';
+import '../Controllers/AuthService.dart'; // ✅ ADDED
 
 class SendPage extends StatefulWidget {
   const SendPage({Key? key}) : super(key: key);
@@ -20,7 +21,7 @@ class _SendPageState extends State<SendPage> {
   final TextEditingController dateController = TextEditingController();
   final TextEditingController hoursController = TextEditingController();
 
-  // Vehicle selection - UPDATED with Train and Plane
+  // Vehicle selection
   String? selectedVehicle;
   final List<String> vehicleOptions = [
     'Car',
@@ -48,12 +49,39 @@ class _SendPageState extends State<SendPage> {
   Position? originPosition;
   bool isLoadingLocation = false;
 
-  // User ID - Replace with actual user ID from auth
-  int userId = 5; // TODO: Get from auth service
+  // ✅ CHANGED: Fetch user ID from AuthService
+  int? currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _initializeUser(); // ✅ ADDED
+  }
+
+  // ✅ ADDED: Initialize user from AuthService
+  Future<void> _initializeUser() async {
+    try {
+      final userId = await AuthService.getUserId();
+
+      if (userId == null) {
+        print('❌ No user ID found in AuthService');
+        if (mounted) {
+          _showSnackBar('Please log in to continue', Colors.red);
+        }
+        return;
+      }
+
+      setState(() {
+        currentUserId = userId;
+      });
+
+      print('✅ User ID loaded from AuthService: $userId');
+    } catch (e) {
+      print('❌ Error initializing user: $e');
+      if (mounted) {
+        _showSnackBar('Error loading user data: $e', Colors.red);
+      }
+    }
   }
 
   // Get current location
@@ -61,6 +89,7 @@ class _SendPageState extends State<SendPage> {
     setState(() {
       isLoadingLocation = true;
     });
+
     try {
       final position = await LocationService.getCurrentPosition();
       if (position != null) {
@@ -68,12 +97,14 @@ class _SendPageState extends State<SendPage> {
           position.latitude,
           position.longitude,
         );
+
         setState(() {
           originPosition = position;
           fromController.text = address ??
               'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
           isLoadingLocation = false;
         });
+
         _showSnackBar('✅ Location coordinates saved', Colors.green);
       } else {
         setState(() {
@@ -104,6 +135,7 @@ class _SendPageState extends State<SendPage> {
       final locations = await LocationService.getCoordinatesFromAddress(
           fromController.text.trim()
       );
+
       if (locations != null && locations.isNotEmpty) {
         final location = locations.first;
         final position = Position(
@@ -123,6 +155,7 @@ class _SendPageState extends State<SendPage> {
           originPosition = position;
           isLoadingLocation = false;
         });
+
         _showSnackBar('✅ Origin coordinates found', Colors.green);
       } else {
         setState(() {
@@ -145,6 +178,7 @@ class _SendPageState extends State<SendPage> {
       firstDate: DateTime.now(),
       lastDate: DateTime(2101),
     );
+
     if (picked != null) {
       setState(() {
         dateController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
@@ -152,8 +186,14 @@ class _SendPageState extends State<SendPage> {
     }
   }
 
-  // Search available orders using API
+  // ✅ FIXED: Search available orders using API with userId parameter
   Future<void> _searchAvailableOrders() async {
+    // ✅ ADDED: Check if user is logged in
+    if (currentUserId == null) {
+      _showSnackBar('Please log in to search orders', Colors.red);
+      return;
+    }
+
     // Validate all required fields
     if (fromController.text.trim().isEmpty ||
         toController.text.trim().isEmpty ||
@@ -184,6 +224,7 @@ class _SendPageState extends State<SendPage> {
 
     try {
       print('DEBUG: Starting search...');
+      print('DEBUG: User ID: $currentUserId');
       print('DEBUG: From: "${fromController.text.trim()}"');
       print('DEBUG: To: "${toController.text.trim()}"');
       print('DEBUG: Date: "${dateController.text.trim()}"');
@@ -192,7 +233,7 @@ class _SendPageState extends State<SendPage> {
       print('DEBUG: Vehicle: $selectedVehicle');
       print('DEBUG: Hours: $hours');
 
-      // Call API to search orders
+      // ✅ FIXED: Call API with userId parameter
       final orders = await _orderService.searchOrders(
         origin: fromController.text.trim(),
         destination: toController.text.trim(),
@@ -201,6 +242,7 @@ class _SendPageState extends State<SendPage> {
         originLongitude: originPosition!.longitude,
         vehicle: selectedVehicle!,
         timeHours: hours,
+        userId: currentUserId!, // ✅ ADDED userId parameter
       );
 
       print('DEBUG: API returned ${orders.length} orders');
@@ -239,12 +281,15 @@ class _SendPageState extends State<SendPage> {
     }
   }
 
-  // Enhanced trip request dialog with proper API integration
+// Enhanced trip request dialog with proper API integration
   Future<void> _showTripRequestDialog(Order order) async {
-    final vehicleInfoController = TextEditingController();
-    final routeController = TextEditingController(text: '${order.origin} - ${order.destination}');
+    // ✅ ADDED: Check if user is logged in
+    if (currentUserId == null) {
+      _showSnackBar('Please log in to send requests', Colors.red);
+      return;
+    }
 
-    // Time controllers for start and end time
+    final vehicleInfoController = TextEditingController();
     final startTimeController = TextEditingController();
     final endTimeController = TextEditingController();
 
@@ -256,8 +301,8 @@ class _SendPageState extends State<SendPage> {
       );
 
       if (pickedTime != null) {
-        // Format time as HH:MM
-        final formattedTime = '${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}';
+        // Format time as HH:MM:SS
+        final formattedTime = '${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}:00';
         controller.text = formattedTime;
       }
     }
@@ -265,11 +310,11 @@ class _SendPageState extends State<SendPage> {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: EdgeInsets.zero,
         content: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
+          width: MediaQuery.of(dialogContext).size.width * 0.9,
           constraints: const BoxConstraints(maxHeight: 650),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -417,8 +462,8 @@ class _SendPageState extends State<SendPage> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 20),
+
                       const Text(
                         'Your Travel Information',
                         style: TextStyle(
@@ -435,7 +480,6 @@ class _SendPageState extends State<SendPage> {
                         value: selectedVehicle ?? 'Not selected',
                         icon: Icons.directions_car,
                       ),
-
                       const SizedBox(height: 15),
 
                       // Vehicle Info Field
@@ -446,49 +490,35 @@ class _SendPageState extends State<SendPage> {
                         icon: Icons.info_outline,
                         isRequired: true,
                       ),
-
                       const SizedBox(height: 15),
 
-                      // Start Trip Time
+                      // Pickup Time
                       GestureDetector(
-                        onTap: () => selectTime(context, startTimeController),
+                        onTap: () => selectTime(dialogContext, startTimeController),
                         child: AbsorbPointer(
                           child: _buildEnhancedTextField(
                             controller: startTimeController,
-                            label: 'Start Trip Time',
+                            label: 'Pickup Time',
                             hint: 'e.g., 09:00',
                             icon: Icons.access_time,
                             isRequired: true,
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 15),
 
-                      // End Trip Time
+                      // Dropoff Time
                       GestureDetector(
-                        onTap: () => selectTime(context, endTimeController),
+                        onTap: () => selectTime(dialogContext, endTimeController),
                         child: AbsorbPointer(
                           child: _buildEnhancedTextField(
                             controller: endTimeController,
-                            label: 'End Trip Time',
-                            hint: 'e.g., 12:00',
+                            label: 'Dropoff Time',
+                            hint: 'e.g., 14:00',
                             icon: Icons.access_time_filled,
                             isRequired: true,
                           ),
                         ),
-                      ),
-
-                      const SizedBox(height: 15),
-
-                      // Route Field
-                      _buildEnhancedTextField(
-                        controller: routeController,
-                        label: 'Your Route',
-                        hint: 'e.g., Pune - Lonavala - Mumbai',
-                        icon: Icons.route,
-                        isRequired: true,
-                        maxLines: 2,
                       ),
                     ],
                   ),
@@ -509,7 +539,7 @@ class _SendPageState extends State<SendPage> {
                     // Cancel button
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => Navigator.pop(dialogContext),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           side: BorderSide(
@@ -530,7 +560,6 @@ class _SendPageState extends State<SendPage> {
                         ),
                       ),
                     ),
-
                     const SizedBox(width: 12),
 
                     // Send Request button
@@ -541,81 +570,79 @@ class _SendPageState extends State<SendPage> {
                           // Validate all fields
                           if (vehicleInfoController.text.trim().isEmpty ||
                               startTimeController.text.trim().isEmpty ||
-                              endTimeController.text.trim().isEmpty ||
-                              routeController.text.trim().isEmpty ||
-                              selectedVehicle == null) {
+                              endTimeController.text.trim().isEmpty) {
                             _showSnackBar('Please fill all required fields', Colors.red);
                             return;
                           }
 
                           // Close the trip request dialog first
-                          Navigator.pop(context);
+                          Navigator.pop(dialogContext);
 
-                          // Show loading dialog with proper context handling
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (loadingContext) => PopScope(
-                              canPop: false,
-                              child: Center(
-                                child: Container(
-                                  padding: const EdgeInsets.all(30),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const CircularProgressIndicator(),
-                                      const SizedBox(height: 20),
-                                      Text(
-                                        'Sending request...',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          color: Colors.grey[700],
-                                          fontWeight: FontWeight.w500,
+                          try {
+                            // Show loading dialog
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (loadingContext) => PopScope(
+                                canPop: false,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(30),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const CircularProgressIndicator(),
+                                        const SizedBox(height: 20),
+                                        Text(
+                                          'Sending request...',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            color: Colors.grey[700],
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
+                            );
 
-                          try {
                             // Format the date properly
                             String formattedDate = order.deliveryDate;
                             if (order.deliveryDate.contains('T')) {
                               formattedDate = order.deliveryDate.split('T')[0];
                             }
 
-                            // Prepare trip request with updated fields
+                            // Prepare trip request with currentUserId
                             final tripRequest = TripRequestSendRequest(
-                              travelerId: userId,
+                              travelerId: currentUserId!,
                               orderId: order.id,
                               travelDate: formattedDate,
                               vehicleInfo: vehicleInfoController.text.trim(),
                               source: order.origin,
                               destination: order.destination,
-                              pickupTime: startTimeController.text.trim(),    // ✅ Changed from startTripTime
-                              dropoffTime: endTimeController.text.trim(),    // ✅ Changed from endTripTime
+                              pickupTime: startTimeController.text.trim(),
+                              dropoffTime: endTimeController.text.trim(),
                             );
 
                             print('DEBUG: Sending trip request...');
-                            print('DEBUG: Traveler ID: $userId');
+                            print('DEBUG: Traveler ID: $currentUserId');
                             print('DEBUG: Order ID: ${order.id}');
-                            print('DEBUG: Vehicle Type: $selectedVehicle');
-                            print('DEBUG: Start Time: ${startTimeController.text}');
-                            print('DEBUG: End Time: ${endTimeController.text}');
+                            print('DEBUG: Vehicle Info: ${vehicleInfoController.text}');
+                            print('DEBUG: Pickup Time: ${startTimeController.text}');
+                            print('DEBUG: Dropoff Time: ${endTimeController.text}');
 
                             // Send trip request via API
                             final response = await _tripRequestService.sendTripRequest(tripRequest);
 
-                            // Close loading dialog
-                            if (mounted) {
-                              Navigator.pop(context);
+                            // ✅ FIXED: Close loading dialog safely
+                            if (context.mounted) {
+                              Navigator.of(context).pop(); // Close loading dialog
 
                               if (response != null) {
                                 _showSuccessDialog(
@@ -630,12 +657,15 @@ class _SendPageState extends State<SendPage> {
                               }
                             }
                           } catch (e) {
-                            // Close loading dialog on error
-                            if (mounted) {
-                              Navigator.pop(context);
+                            // ✅ FIXED: Close loading dialog on error safely
+                            if (context.mounted) {
+                              Navigator.of(context).pop(); // Close loading dialog
                             }
                             print('ERROR: Failed to send trip request: $e');
-                            _showSnackBar('Failed to send request: $e', Colors.red);
+
+                            if (context.mounted) {
+                              _showSnackBar('Failed to send request: $e', Colors.red);
+                            }
                           }
                         },
                         icon: const Icon(Icons.send_rounded, size: 20),
@@ -667,7 +697,7 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-// Helper widget for read-only field
+  // Helper widget for read-only field
   Widget _buildReadOnlyField({
     required String label,
     required String value,
@@ -710,7 +740,6 @@ class _SendPageState extends State<SendPage> {
       ],
     );
   }
-
 
   // Helper widget for order detail rows
   Widget _buildOrderDetailRow(IconData icon, String label, String value, Color color) {
@@ -793,41 +822,6 @@ class _SendPageState extends State<SendPage> {
           ),
         ),
       ],
-    );
-  }
-
-  // Loading dialog
-  void _showLoadingDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: Center(
-          child: Container(
-            padding: const EdgeInsets.all(30),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 20),
-                Text(
-                  'Sending request...',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -944,6 +938,16 @@ class _SendPageState extends State<SendPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ ADDED: Show loading state while fetching user ID
+    if (currentUserId == null) {
+      return Scaffold(
+        backgroundColor: Colors.grey[50],
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: SafeArea(
@@ -970,6 +974,7 @@ class _SendPageState extends State<SendPage> {
                 ),
               ),
               const SizedBox(height: 30),
+
               // Title
               const Text(
                 'Search Available Orders',
@@ -980,6 +985,7 @@ class _SendPageState extends State<SendPage> {
                 ),
               ),
               const SizedBox(height: 20),
+
               // Search form
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -1013,6 +1019,7 @@ class _SendPageState extends State<SendPage> {
                     buildInputBox('Travel Hours', hoursController, Icons.access_time,
                         keyboardType: TextInputType.number),
                     const SizedBox(height: 20),
+
                     // Search button
                     SizedBox(
                       width: double.infinity,
@@ -1048,6 +1055,7 @@ class _SendPageState extends State<SendPage> {
                 ),
               ),
               const SizedBox(height: 20),
+
               // Available Orders List
               if (availableOrders.isNotEmpty)
                 _buildAvailableOrdersList()
@@ -1058,6 +1066,7 @@ class _SendPageState extends State<SendPage> {
                 )
               else
                 _buildEmptyState(),
+
               const SizedBox(height: 30),
             ],
           ),
@@ -1479,6 +1488,7 @@ class CompactOrderCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
+
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -1534,6 +1544,7 @@ class CompactOrderCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
+
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -1553,6 +1564,7 @@ class CompactOrderCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
+
               SizedBox(
                 width: double.infinity,
                 height: 36,

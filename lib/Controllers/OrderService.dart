@@ -47,6 +47,7 @@ class OrderService {
 
 
   // Search orders with vehicle and time_hours parameters
+  // ✅ FIXED: Add userId parameter to searchOrders
   Future<List<Order>> searchOrders({
     required String origin,
     required String destination,
@@ -55,17 +56,19 @@ class OrderService {
     required double originLongitude,
     required String vehicle,
     required double timeHours,
+    required int userId, // ✅ ADDED
   }) async {
     print('=== SEARCH ORDERS API CALL ===');
     print('Endpoint: ${ApiConstants.searchOrders}');
     print('Query Parameters:');
-    print('  - origin: $origin');
-    print('  - destination: $destination');
-    print('  - delivery_date: $deliveryDate');
-    print('  - origin_latitude: $originLatitude');
-    print('  - origin_longitude: $originLongitude');
-    print('  - vehicle: $vehicle');
-    print('  - time_hours: $timeHours');
+    print(' - origin: $origin');
+    print(' - destination: $destination');
+    print(' - delivery_date: $deliveryDate');
+    print(' - origin_latitude: $originLatitude');
+    print(' - origin_longitude: $originLongitude');
+    print(' - vehicle: $vehicle');
+    print(' - time_hours: $timeHours');
+    print(' - userId: $userId'); // ✅ ADDED
 
     try {
       final response = await _api.get(
@@ -78,6 +81,7 @@ class OrderService {
           'origin_longitude': originLongitude.toString(),
           'vehicle': vehicle,
           'time_hours': timeHours.toString(),
+          'userId': userId.toString(), // ✅ ADDED
         },
         parser: (json) {
           print('Raw JSON Response: $json');
@@ -94,12 +98,11 @@ class OrderService {
       );
 
       print('Response Success: ${response.success}');
-
       if (!response.success) {
         print('❌ SEARCH ORDERS FAILED');
       } else {
         print('✅ SEARCH ORDERS SUCCESS');
-        print('Total Orders: ${(response.data as List<Order>).length}');
+        print('Total Orders: ${(response.data as List).length}');
       }
 
       return response.success ? (response.data as List<Order>) : [];
