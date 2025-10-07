@@ -386,13 +386,59 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _getDisplayName(),
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: profileExists ? Colors.black : Colors.grey[600],
-                            ),
+                          // ✅ Name with Rating in same row
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _getDisplayName(),
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: profileExists ? Colors.black : Colors.grey[600],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              // ✅ Show rating only if profile is complete
+                              if (_isProfileComplete()) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.lightBlue[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.lightBlue[200]!,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.star,
+                                        color: Colors.lightBlue[700],
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        '4.6',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.lightBlue[900],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -420,6 +466,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       ),
     );
   }
+
 
   Widget _buildProfileStatusChip() {
     if (!_isProfileComplete()) {

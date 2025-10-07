@@ -45,7 +45,52 @@ class OrderService {
     }
   }
 
+// Mark order as completed/delivered
+  Future<bool> completeOrder(int orderId, int userId) async {
+    final endpoint = '${ApiConstants.completeOrder}/$orderId';
+    print('=== COMPLETE ORDER API CALL ===');
+    print('Endpoint: $endpoint');
+    print('Order ID: $orderId');
+    print('User ID: $userId');
 
+    try {
+      final response = await _api.put(
+        endpoint,
+        body: {
+          'userId': userId, // ✅ ADDED userId to body
+        },
+        parser: (json) => json,
+      );
+
+      print('Response Success: ${response.success}');
+      print('Response Data: ${response.data}');
+
+      if (!response.success) {
+        print('❌ COMPLETE ORDER FAILED');
+        print('Error: ${response.error}');
+        print('Status Code: ${response.statusCode}');
+
+        // Handle specific errors
+        if (response.statusCode == 403 && response.error?.contains('KYC') == true) {
+          throw Exception('KYC_NOT_APPROVED');
+        }
+
+        if (response.statusCode == 404) {
+          throw Exception('ORDER_NOT_FOUND');
+        }
+
+        throw Exception(response.error ?? 'Failed to complete order');
+      } else {
+        print('✅ COMPLETE ORDER SUCCESS');
+      }
+
+      return response.success;
+    } catch (e, stackTrace) {
+      print('❌ COMPLETE ORDER EXCEPTION: $e');
+      print('Stack Trace: $stackTrace');
+      rethrow;
+    }
+  }
   // Search orders with vehicle and time_hours parameters
   // ✅ FIXED: Add userId parameter to searchOrders
   Future<List<Order>> searchOrders({

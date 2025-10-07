@@ -96,9 +96,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   // Services
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
-
   int? currentUserId;
-
   late TabController _tabController;
   Timer? _refreshTimer;
 
@@ -126,7 +124,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   Future<void> _initializeUser() async {
     try {
       final userId = await AuthService.getUserId();
-
       if (userId == null) {
         print('❌ No user ID found in AuthService');
         if (mounted) {
@@ -143,7 +140,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       setState(() {
         currentUserId = userId;
       });
-
       print('✅ User ID loaded from AuthService: $userId');
       await _loadAllData();
     } catch (e) {
@@ -191,7 +187,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       print('📦 Received ${orders.length} orders');
 
       final List<OrderDisplay> displayOrders = [];
-
       for (var order in orders) {
         displayOrders.add(OrderDisplay(
           id: order.id,
@@ -224,7 +219,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         myOrders = displayOrders;
         isLoadingMyOrders = false;
       });
-
       print('✅ Loaded ${displayOrders.length} orders successfully');
     } catch (e) {
       print('❌ Error loading my orders: $e');
@@ -240,7 +234,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
     try {
       print('🔍 Loading trip requests for orders: $orderIds');
-
       final allRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
       print('📦 Got ${allRequests.length} total trip requests');
 
@@ -272,7 +265,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       }
 
       print('📊 Total requests by order: ${requestsByOrder.length}');
-
       setState(() {
         tripRequestsByOrder = requestsByOrder;
       });
@@ -298,7 +290,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
     try {
       print('🔍 Loading trip requests sent by user: $currentUserId');
-
       final tripRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
       print('📦 Found ${tripRequests.length} trip requests');
 
@@ -317,7 +308,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         }
 
         processedOrderIds.add(request.orderId);
-
         displayOrders.add(OrderDisplay(
           id: request.orderId,
           userId: request.orderId,
@@ -333,7 +323,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           requestStatus: request.status,
           notes: request.vehicleInfo,
         ));
-
         print('✅ Added order ${request.orderId} to My Requests');
       }
 
@@ -341,7 +330,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         myRequestedOrders = displayOrders;
         isLoadingMyRequests = false;
       });
-
       print('✅ Loaded ${displayOrders.length} requested orders');
     } catch (e) {
       print('❌ Error loading requested orders: $e');
@@ -400,6 +388,370 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     );
   }
 
+  // ✅ NEW COMPLETE ORDER METHOD WITH RATING DIALOG
+  // ✅ FIXED COMPLETE ORDER METHOD WITH RATING DIALOG
+  Future<void> _completeOrder(OrderDisplay order) async {
+    // Check if user ID is available
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 12),
+              Text('User ID not found. Please log in again.'),
+            ],
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Show rating dialog first
+      final ratingData = await _showRatingDialog(order);
+
+      if (ratingData == null) {
+        // User cancelled
+        return;
+      }
+
+      // Show loading
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Completing order...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // ✅ Call API with userId parameter
+      final success = await _orderService.completeOrder(order.id, currentUserId!);
+
+      if (success && mounted) {
+        // TODO: Send rating to backend when rating API is ready
+        print('📝 Rating: ${ratingData['rating']} stars');
+        print('💬 Feedback: ${ratingData['feedback']}');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Order completed successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // Refresh orders
+        await _loadAllData();
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'Failed to complete order';
+
+        if (e.toString().contains('KYC_NOT_APPROVED')) {
+          errorMessage = 'KYC not approved. Please complete KYC verification.';
+        } else if (e.toString().contains('ORDER_NOT_FOUND')) {
+          errorMessage = 'Order not found or you don\'t have permission.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(errorMessage)),
+              ],
+            ),
+            backgroundColor: Colors.red[600],
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  // ✅ RATING DIALOG
+  Future<Map<String, dynamic>?> _showRatingDialog(OrderDisplay order) async {
+    double rating = 5.0;
+    final feedbackController = TextEditingController();
+
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: EdgeInsets.zero,
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue[600]!, Colors.blue[400]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Colors.white,
+                        size: 48,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Rate Your Experience',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Order #${order.id}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Order Info
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.route, size: 16, color: Colors.grey[600]),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${order.origin} → ${order.destination}',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey[600]),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    order.itemDescription,
+                                    style: const TextStyle(fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Star Rating
+                      const Text(
+                        'How was the delivery?',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(5, (index) {
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  rating = index + 1.0;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Icon(
+                                  index < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                                  color: Colors.amber[600],
+                                  size: 40,
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          _getRatingText(rating),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Feedback TextField
+                      const Text(
+                        'Additional Feedback (Optional)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: feedbackController,
+                        maxLines: 3,
+                        maxLength: 200,
+                        decoration: InputDecoration(
+                          hintText: 'Share your experience with the traveler...',
+                          hintStyle: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[400],
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Action Buttons
+                Padding(
+                  padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context, null),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context, {
+                              'rating': rating,
+                              'feedback': feedbackController.text.trim(),
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[600],
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Submit & Complete',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getRatingText(double rating) {
+    if (rating <= 1) return 'Poor';
+    if (rating <= 2) return 'Fair';
+    if (rating <= 3) return 'Good';
+    if (rating <= 4) return 'Very Good';
+    return 'Excellent';
+  }
+
   void _openInbox() {
     Navigator.push(
       context,
@@ -422,7 +774,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       final acceptRequest = TripRequestAcceptRequest(
         orderCreatorId: currentUserId!,
         tripRequestId: request.id,
-        negotiatedPrice: 0, // Use 0 or remove this field if your API allows null
+        negotiatedPrice: 0,
       );
 
       final response = await _tripRequestService.acceptTripRequest(acceptRequest);
@@ -629,13 +981,13 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         itemBuilder: (context, index) {
           final order = myOrders[index];
           final requests = tripRequestsByOrder[order.id] ?? [];
-
           return ModernSenderOrderCard(
             order: order,
             tripRequests: requests,
             onAcceptRequest: _acceptTripRequest,
             onTrackOrder: () => _openOrderTracking(order),
             onMarkReceived: () => _markOrderReceived(order),
+            onCompleteOrder: () => _completeOrder(order), // ✅ RATING FLOW
           );
         },
       ),

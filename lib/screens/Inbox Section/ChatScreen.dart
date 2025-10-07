@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -23,11 +21,11 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  Map<String, dynamic>? orderData;
-  Map<String, dynamic>? otherUserData;
-  String? chatId;
+  final String currentUserId = '1';
+  late Map<String, dynamic> otherUserData;
+  List<Map<String, dynamic>> messages = [];
+
   bool isLoading = true;
   String? replyingToMessageId;
   Map<String, dynamic>? replyingToMessage;
@@ -35,54 +33,231 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeChat();
+    _initializeDummyData();
   }
 
-  Future<void> _initializeChat() async {
-    try {
-      await Future.wait([
-        _fetchOrderData(),
-        _fetchOtherUserData(),
-        _getChatId(),
-      ]);
-      setState(() {
-        isLoading = false;
-      });
-    } catch (e) {
-      print('Error initializing chat: $e');
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
+  void _initializeDummyData() {
+    setState(() {
+      otherUserData = {
+        'name': 'Rajesh Kumar',
+        'profileUrl': '',
+      };
 
-  Future<void> _fetchOrderData() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('orders')
-        .doc(widget.orderId)
-        .get();
-    orderData = doc.data();
-  }
+      messages = [
+        {
+          'messageId': '1',
+          'message': 'Hi! I saw your delivery request from Mumbai to Pune. I am traveling on the same route tomorrow.',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 10)),
+          'type': 'text',
+        },
+        {
+          'messageId': '2',
+          'message': 'Great! What time are you planning to travel?',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 45)),
+          'type': 'text',
+        },
+        {
+          'messageId': '3',
+          'message': 'I will be leaving Mumbai at 10 AM tomorrow and should reach Pune by 1 PM.',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 30)),
+          'type': 'text',
+        },
+        {
+          'messageId': '4',
+          'message': 'Perfect timing! Can you handle a 5.5kg electronics package?',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 20)),
+          'type': 'text',
+        },
+        {
+          'messageId': '5',
+          'message': 'Yes, definitely! I have enough space in my car and I\'ll handle it carefully.',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 10)),
+          'type': 'text',
+        },
+        {
+          'messageId': '6',
+          'message': 'Where exactly will you pick it up from?',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 5)),
+          'type': 'text',
+        },
+        {
+          'messageId': '7',
+          'message': 'I\'m near Mumbai Central station. Can you come there around 9:30 AM?',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9)),
+          'type': 'text',
+        },
+        {
+          'messageId': '8',
+          'message': 'Sure, I can reach there by 9:30 AM. Please share the exact pickup address.',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 50)),
+          'type': 'text',
+        },
+        {
+          'messageId': '9',
+          'message': '📨 Trip request sent',
+          'senderId': 'system',
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 45)),
+          'type': 'system',
+        },
+        {
+          'messageId': '10',
+          'message': 'I\'ve sent you a trip request. Please check!',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 40)),
+          'type': 'text',
+        },
+        {
+          'messageId': '11',
+          'message': '✅ Trip request accepted',
+          'senderId': 'system',
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 30)),
+          'type': 'system',
+        },
+        {
+          'messageId': '12',
+          'message': 'Great! I\'ve accepted your request. Looking forward to helping you!',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 25)),
+          'type': 'text',
+        },
+        {
+          'messageId': '13',
+          'message': 'Thank you so much! Here\'s the pickup address: Shop No. 5, Platform 1, Mumbai Central Station',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 20)),
+          'type': 'text',
+        },
+        {
+          'messageId': '14',
+          'message': 'Perfect! I\'ve noted it down. And where should I deliver it in Pune?',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 15)),
+          'type': 'text',
+        },
+        {
+          'messageId': '15',
+          'message': 'Delivery address: B-204, Seasons Mall, Magarpatta, Pune. My colleague will receive it.',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 10)),
+          'type': 'text',
+        },
+        {
+          'messageId': '16',
+          'message': 'Got it! Please share the receiver\'s contact number.',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 5)),
+          'type': 'text',
+        },
+        {
+          'messageId': '17',
+          'message': 'Receiver contact: +91 98765 43210 (Priya)',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8)),
+          'type': 'text',
+        },
+        {
+          'messageId': '18',
+          'message': 'Noted! One more thing - the package is fragile, right? I saw electronics mentioned.',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 7, minutes: 50)),
+          'type': 'text',
+        },
+        {
+          'messageId': '19',
+          'message': 'Yes, it\'s a laptop. Please handle with care and avoid placing anything heavy on it.',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 7, minutes: 45)),
+          'type': 'text',
+        },
+        {
+          'messageId': '20',
+          'message': 'Don\'t worry! I\'ll keep it safely in the front seat. See you tomorrow at 9:30 AM! 👍',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 7, minutes: 40)),
+          'type': 'text',
+        },
+        {
+          'messageId': '21',
+          'message': 'Thank you! See you tomorrow. Have a safe journey! 🙏',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 7, minutes: 35)),
+          'type': 'text',
+        },
+        {
+          'messageId': '22',
+          'message': 'Good morning! I\'m on my way to the pickup location. Will reach in 15 minutes.',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(hours: 8)),
+          'type': 'text',
+        },
+        {
+          'messageId': '23',
+          'message': 'Perfect! I\'m already here at Platform 1. Waiting near Shop No. 5.',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(hours: 7, minutes: 50)),
+          'type': 'text',
+        },
+        {
+          'messageId': '24',
+          'message': 'Package picked up! Starting my journey to Pune now. Will update you when I reach.',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(hours: 7, minutes: 30)),
+          'type': 'text',
+        },
+        {
+          'messageId': '25',
+          'message': 'Great! Thank you so much. Have a safe drive! 🚗',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(hours: 7, minutes: 25)),
+          'type': 'text',
+        },
+        {
+          'messageId': '26',
+          'message': 'Hi! I\'ve reached Pune. On my way to Magarpatta now. Should reach in 20 minutes.',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(hours: 4, minutes: 20)),
+          'type': 'text',
+        },
+        {
+          'messageId': '27',
+          'message': 'Excellent! I\'ve informed Priya. She\'s ready to receive it.',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(hours: 4, minutes: 15)),
+          'type': 'text',
+        },
+        {
+          'messageId': '28',
+          'message': 'Package delivered successfully to Priya at Seasons Mall! She confirmed receipt. 📦✅',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(hours: 4)),
+          'type': 'text',
+        },
+        {
+          'messageId': '29',
+          'message': 'Awesome! Thank you so much for the safe delivery! You were very professional. 🙏',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().subtract(const Duration(hours: 3, minutes: 55)),
+          'type': 'text',
+        },
+        {
+          'messageId': '30',
+          'message': 'My pleasure! Glad I could help. Feel free to contact me for any future deliveries on this route! 😊',
+          'senderId': widget.otherUserId,
+          'timestamp': DateTime.now().subtract(const Duration(hours: 3, minutes: 50)),
+          'type': 'text',
+        },
+      ];
 
-  Future<void> _fetchOtherUserData() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.otherUserId)
-        .get();
-    otherUserData = doc.data();
-  }
-
-  Future<void> _getChatId() async {
-    final participants = [currentUserId, widget.otherUserId]..sort();
-    chatId = '${participants[0]}_${participants[1]}_${widget.orderId}';
-
-    // Create chat document if it doesn't exist
-    await FirebaseFirestore.instance.collection('chats').doc(chatId).set({
-      'participants': participants,
-      'orderId': widget.orderId,
-      'lastMessageTime': FieldValue.serverTimestamp(),
-      'lastMessage': '',
-    }, SetOptions(merge: true));
+      isLoading = false;
+    });
   }
 
   @override
@@ -99,8 +274,7 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: _buildModernAppBar(),
       body: Column(
         children: [
-          _buildOrderInfoCard(),
-          Expanded(child: _buildMessagesStream()),
+          Expanded(child: _buildMessagesList()),
           if (replyingToMessage != null) _buildReplyPreview(),
           _buildMessageInput(),
         ],
@@ -128,17 +302,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 colors: [Colors.blue.shade400, Colors.blue.shade600],
               ),
             ),
-            child: otherUserData?['profileUrl']?.isNotEmpty == true
-                ? ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.network(
-                otherUserData!['profileUrl'],
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    _buildAvatarFallback(),
-              ),
-            )
-                : _buildAvatarFallback(),
+            child: _buildAvatarFallback(),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -146,7 +310,7 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  otherUserData?['name'] ?? 'Unknown User',
+                  otherUserData['name'] ?? 'Unknown User',
                   style: const TextStyle(
                     color: Colors.black87,
                     fontSize: 16,
@@ -156,7 +320,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Order #${widget.orderId.substring(0, 8)}',
+                  'Order #${widget.orderId}',
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontSize: 12,
@@ -168,40 +332,11 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      actions: [
-        if (_showDeliveryButton())
-          Container(
-            margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
-            child: ElevatedButton(
-              onPressed: _markParcelReceived,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade600,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check_circle, size: 16),
-                  SizedBox(width: 4),
-                  Text(
-                    'Received',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
     );
   }
 
   Widget _buildAvatarFallback() {
-    final name = otherUserData?['name'] ?? 'U';
+    final name = otherUserData['name'] ?? 'U';
     return Center(
       child: Text(
         name[0].toUpperCase(),
@@ -214,185 +349,26 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildOrderInfoCard() {
-    if (orderData == null) return const SizedBox.shrink();
+  Widget _buildMessagesList() {
+    if (messages.isEmpty) {
+      return _buildEmptyMessages();
+    }
 
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(orderData!['status'] ?? 'pending'),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _getStatusIcon(orderData!['status'] ?? 'pending'),
-                      color: Colors.white,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      (orderData!['status'] ?? 'pending').toString().toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Text(
-                orderData!['date'] ?? '',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Route
-          Row(
-            children: [
-              Icon(Icons.radio_button_checked, color: Colors.green.shade600, size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  orderData!['origin'] ?? 'Unknown',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.location_on, color: Colors.red.shade600, size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  orderData!['destination'] ?? 'Unknown',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Details
-          Row(
-            children: [
-              _buildInfoPill(Icons.inventory_2_outlined, orderData!['item_description'] ?? 'Package'),
-              const SizedBox(width: 8),
-              _buildInfoPill(Icons.scale, '${orderData!['weight'] ?? '0'}kg'),
-              if (orderData!['expected_price'] != null) ...[
-                const SizedBox(width: 8),
-                _buildInfoPill(Icons.currency_rupee, '₹${orderData!['expected_price']}'),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoPill(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: Colors.grey.shade600),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessagesStream() {
-    if (chatId == null) return const SizedBox.shrink();
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .orderBy('timestamp', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyMessages();
-        }
-
-        return ListView.builder(
-          controller: _scrollController,
-          reverse: true,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            final message = snapshot.data!.docs[index];
-            final data = message.data() as Map<String, dynamic>;
-            final isMe = data['senderId'] == currentUserId;
-
-            return ModernMessageBubble(
-              message: data,
-              messageId: message.id,
-              isMe: isMe,
-              onReply: (messageData) => _setReplyMessage(message.id, messageData),
-              onCopy: _copyMessage,
-              onLaunchUrl: _launchUrl,
-            );
-          },
+    return ListView.builder(
+      controller: _scrollController,
+      reverse: true,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: messages.length,
+      itemBuilder: (context, index) {
+        final message = messages[messages.length - 1 - index];
+        final isMe = message['senderId'] == currentUserId;
+        return ModernMessageBubble(
+          message: message,
+          messageId: message['messageId'],
+          isMe: isMe,
+          onReply: (messageData) => _setReplyMessage(message['messageId'], messageData),
+          onCopy: _copyMessage,
+          onLaunchUrl: _launchUrl,
         );
       },
     );
@@ -440,7 +416,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildReplyPreview() {
     if (replyingToMessage == null) return const SizedBox.shrink();
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(12),
@@ -549,115 +524,31 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  bool _showDeliveryButton() {
-    if (orderData == null) return false;
-
-    // Show button for traveller when order is in_transit or arrived
-    final status = orderData!['status'] ?? '';
-    final isTraveller = currentUserId != orderData!['sender_id'];
-
-    return isTraveller && (status == 'in_transit' || status == 'arrived');
-  }
-
-  Future<void> _markParcelReceived() async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('orders')
-          .doc(widget.orderId)
-          .update({
-        'status': 'delivered',
-        'delivery_timestamp': FieldValue.serverTimestamp(),
-      });
-
-      // Send system message
-      await _sendSystemMessage('📦 Order marked as delivered');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Order marked as delivered successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _sendMessage() async {
+  void _sendMessage() {
     final message = _messageController.text.trim();
-    if (message.isEmpty || chatId == null) return;
+    if (message.isEmpty) return;
 
-    _messageController.clear();
-
-    try {
-      final messageData = {
+    setState(() {
+      messages.add({
+        'messageId': DateTime.now().millisecondsSinceEpoch.toString(),
         'message': message,
         'senderId': currentUserId,
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': DateTime.now(),
         'type': 'text',
         if (replyingToMessageId != null) 'replyTo': replyingToMessageId,
         if (replyingToMessage != null) 'replyMessage': replyingToMessage!['message'],
-      };
-
-      await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .add(messageData);
-
-      // Update chat last message
-      await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(chatId)
-          .update({
-        'lastMessage': message,
-        'lastMessageTime': FieldValue.serverTimestamp(),
       });
+    });
 
-      _clearReply();
+    _messageController.clear();
+    _clearReply();
 
-      // Scroll to bottom
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    } catch (e) {
-      print('Error sending message: $e');
-    }
-  }
-
-  Future<void> _sendSystemMessage(String message) async {
-    if (chatId == null) return;
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .add({
-        'message': message,
-        'senderId': 'system',
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': 'system',
-      });
-
-      await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(chatId)
-          .update({
-        'lastMessage': message,
-        'lastMessageTime': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print('Error sending system message: $e');
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -701,40 +592,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange.shade600;
-      case 'matched':
-        return Colors.blue.shade600;
-      case 'in_transit':
-        return Colors.purple.shade600;
-      case 'arrived':
-        return Colors.deepPurple.shade600;
-      case 'delivered':
-        return Colors.green.shade600;
-      default:
-        return Colors.grey.shade600;
-    }
-  }
-
-  IconData _getStatusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Icons.schedule;
-      case 'matched':
-        return Icons.handshake;
-      case 'in_transit':
-        return Icons.local_shipping;
-      case 'arrived':
-        return Icons.location_on;
-      case 'delivered':
-        return Icons.check_circle;
-      default:
-        return Icons.help;
-    }
-  }
-
   @override
   void dispose() {
     _messageController.dispose();
@@ -764,7 +621,6 @@ class ModernMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSystem = message['senderId'] == 'system';
-
     if (isSystem) {
       return _buildSystemMessage();
     }
@@ -924,7 +780,7 @@ class ModernMessageBubble extends StatelessWidget {
   Widget _buildMessageContent() {
     final messageText = message['message'] ?? '';
     final urlRegex = RegExp(
-      r'https?://(?:[-\w.])+(?::[0-9]+)?(?:/(?:[\w/_.])*(?:\?[-\w&=%.]*)?)?\#?(?:[\w]*)?',
+      r'https?://(?:[-\w.])+(?::[0-9]+)?(?:/(?:[\w/_.])*(?:\?[-\w&=%.]*)?)?#?(?:[\w]*)?',
       caseSensitive: false,
     );
 
@@ -1033,9 +889,12 @@ class ModernMessageBubble extends StatelessWidget {
   String _formatTime(dynamic timestamp) {
     if (timestamp == null) return '';
 
-    final time = timestamp is Timestamp
-        ? timestamp.toDate()
-        : DateTime.parse(timestamp.toString());
+    DateTime time;
+    if (timestamp is DateTime) {
+      time = timestamp;
+    } else {
+      time = DateTime.parse(timestamp.toString());
+    }
 
     final now = DateTime.now();
     final difference = now.difference(time);

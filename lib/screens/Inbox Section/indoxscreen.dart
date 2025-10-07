@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../Controllers/AuthService.dart';
-import '../../Controllers/ChatService.dart';
 import 'ChatScreen.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -25,10 +24,11 @@ class _InboxScreenState extends State<InboxScreen> {
 
   Future<void> _initializeAndLoadInbox() async {
     _currentUserId = await AuthService.getUserId();
-    await _loadInbox();
+    await _loadDummyInbox();
   }
 
-  Future<void> _loadInbox() async {
+  // ✅ Load dummy data matching API response format
+  Future<void> _loadDummyInbox() async {
     if (!mounted) return;
 
     setState(() {
@@ -36,23 +36,30 @@ class _InboxScreenState extends State<InboxScreen> {
       _errorMessage = null;
     });
 
-    final result = await ChatService.getInbox();
+    // Simulate network delay
+    await Future.delayed(const Duration(milliseconds: 800));
 
     if (!mounted) return;
 
+    // ✅ Dummy data matching the API response structure
     setState(() {
-      _isLoading = false;
-      if (result['success']) {
-        _conversations = List<Map<String, dynamic>>.from(result['inbox']);
-        print('✅ Loaded ${_conversations.length} conversations');
+      _conversations = [
+        {
+          'transaction_id': 1,
+          'other_user_id': 2,
+          'other_user_name': 'Rajesh Kumar',
+          'other_user_photo': '', // Empty means will use avatar fallback
+          'order_id': 101,
+          'origin': 'Mumbai Central',
+          'destination': 'Pune Station',
+          'lastMessage': 'Hi, I can deliver your package tomorrow morning',
+          'lastMessageTime': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
+          'accepted_by': null, // Not yet accepted
+        },
 
-        // Clear error message if successful (even if empty)
-        _errorMessage = null;
-      } else {
-        // Only set error message if it's a real error (not 400/empty state)
-        _errorMessage = result['error'];
-        print('❌ Error loading inbox: ${result['error']}');
-      }
+      ];
+      _isLoading = false;
+      print('✅ Loaded ${_conversations.length} dummy conversations');
     });
   }
 
@@ -75,7 +82,7 @@ class _InboxScreenState extends State<InboxScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: _loadInbox,
+            onPressed: _loadDummyInbox,
             tooltip: 'Refresh',
           ),
         ],
@@ -96,7 +103,6 @@ class _InboxScreenState extends State<InboxScreen> {
     }
 
     // Show error state only if there's an actual error message
-    // (not when inbox is just empty due to 400)
     if (_errorMessage != null) {
       return _buildErrorState();
     }
@@ -107,7 +113,7 @@ class _InboxScreenState extends State<InboxScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadInbox,
+      onRefresh: _loadDummyInbox,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _conversations.length,
@@ -222,7 +228,7 @@ class _InboxScreenState extends State<InboxScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _loadInbox,
+              onPressed: _loadDummyInbox,
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
@@ -239,19 +245,18 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   void _openChat(Map<String, dynamic> conversation) {
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => ChatScreen(
-    //       transactionId: conversation['transaction_id'],
-    //       otherUserId: conversation['other_user_id'],
-    //       orderId: conversation['order_id'],
-    //     ),
-    //   ),
-    // ).then((_) {
-    //   // Refresh inbox when returning from chat
-    //   _loadInbox();
-    // });
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          otherUserId: conversation['other_user_id'].toString(),
+          orderId: conversation['order_id'].toString(),
+        ),
+      ),
+    ).then((_) {
+      // Refresh inbox when returning from chat
+      _loadDummyInbox();
+    });
   }
 }
 

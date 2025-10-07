@@ -8,6 +8,7 @@ class ModernSenderOrderCard extends StatelessWidget {
   final Function(TripRequestDisplay, int)? onAcceptRequest;
   final VoidCallback? onTrackOrder;
   final VoidCallback? onMarkReceived;
+  final VoidCallback? onCompleteOrder; // ✅ ADDED
 
   const ModernSenderOrderCard({
     Key? key,
@@ -16,6 +17,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     this.onAcceptRequest,
     this.onTrackOrder,
     this.onMarkReceived,
+    this.onCompleteOrder, // ✅ ADDED
   }) : super(key: key);
 
   @override
@@ -187,8 +189,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                         ],
                       ),
                     ),
-
                   const SizedBox(height: 8),
+
                   // Tap to view indicator
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -520,7 +522,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                         const SizedBox(height: 20),
                       ],
 
-                      // Trip Requests Section - ✅ FIXED
+                      // Trip Requests Section
                       if (tripRequests != null && tripRequests!.isNotEmpty) ...[
                         Row(
                           children: [
@@ -640,7 +642,6 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  // ✅ FIXED TRIP REQUEST CARD - Removed vehicleType and route references
   Widget _buildTripRequestCard(BuildContext context, TripRequestDisplay request) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -695,7 +696,6 @@ class ModernSenderOrderCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 12),
 
           // Vehicle Info & Times
@@ -762,7 +762,6 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  // ✅ HELPER WIDGET
   Widget _buildInfoRowCompact(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -792,8 +791,9 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
+  // ✅ UPDATED MODAL ACTIONS WITH COMPLETE ORDER BUTTON
   Widget _buildModalActions(BuildContext context) {
-    switch (order.status) {
+    switch (order.status.toLowerCase()) {
       case 'pending':
         return Container(
           width: double.infinity,
@@ -820,7 +820,54 @@ class ModernSenderOrderCard extends StatelessWidget {
           ),
         );
 
+      case 'accepted':
       case 'matched':
+        return Column(
+          children: [
+            // Track Order Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onTrackOrder?.call();
+                },
+                icon: const Icon(Icons.my_location, size: 18),
+                label: const Text('Track Order'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue[600],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // ✅ Complete Order Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onCompleteOrder?.call();
+                },
+                icon: const Icon(Icons.check_circle_outline, size: 18),
+                label: const Text('Mark as Delivered'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green[600],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+
       case 'in-transit':
         return SizedBox(
           width: double.infinity,
@@ -898,6 +945,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'pending':
         return Colors.orange[600]!;
+      case 'accepted':
       case 'matched':
         return Colors.blue[600]!;
       case 'in-transit':

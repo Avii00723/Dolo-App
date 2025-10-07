@@ -16,6 +16,8 @@ class ApiConstants {
   static const String searchOrders = '$baseUrl/orders/search';
   static const String updateOrder = '$baseUrl/orders/update';
   static const String myOrders = '$baseUrl/orders/myorders';
+  static const String completeOrder = '$baseUrl/orders/complete';
+
 
   // Trip Requests
   static const String sendTripRequest = '$baseUrl/trip-requests/send';
