@@ -474,7 +474,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
                       // Date
                       _buildDetailRow(
                         Icons.calendar_today,
-                        'Delivery Date',
+                        'Travel Date',
                         _formatDate(order.date),
                       ),
                       const SizedBox(height: 16),

@@ -427,12 +427,12 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
     try {
       final negotiatedPrice = await _showPriceNegotiationDialog(request);
-      if (negotiatedPrice == null) return;
+      // if (negotiatedPrice == null) return;
 
       final acceptRequest = TripRequestAcceptRequest(
         orderCreatorId: currentUserId!,
         tripRequestId: request.id,
-        negotiatedPrice: negotiatedPrice,
+        negotiatedPrice: negotiatedPrice!,
       );
 
       final response =
@@ -507,18 +507,18 @@ class _YourOrdersPageState extends State<YourOrdersPage>
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Negotiated Price (₹)*',
-                hintText: 'Enter amount',
-                prefixIcon: const Icon(Icons.currency_rupee),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
+            // TextField(
+            //   controller: priceController,
+            //   keyboardType: TextInputType.number,
+            //   decoration: InputDecoration(
+            //     labelText: 'Negotiated Price (₹)*',
+            //     hintText: 'Enter amount',
+            //     prefixIcon: const Icon(Icons.currency_rupee),
+            //     border: OutlineInputBorder(
+            //       borderRadius: BorderRadius.circular(8),
+            //     ),
+            //   ),
+            // ),
           ],
         ),
         actions: [

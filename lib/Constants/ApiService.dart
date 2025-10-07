@@ -22,18 +22,21 @@ class ApiResponse<T> {
   final String? error;
   final int? statusCode;
   final String? endpoint;
+  final bool userNotFound; // ✅ NEW: Flag for user not found
 
   ApiResponse.success(this.data, {this.statusCode, this.endpoint})
       : success = true,
-        error = null;
+        error = null,
+        userNotFound = false;
 
-  ApiResponse.error(this.error, {this.statusCode, this.endpoint})
+  ApiResponse.error(this.error, {this.statusCode, this.endpoint, this.userNotFound = false})
       : success = false,
         data = null;
 }
 
 class ApiService {
   static const String baseUrl = ApiConstants.baseUrl;
+
   final Map<String, String> defaultHeaders = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -47,6 +50,24 @@ class ApiService {
     return '$cleanBase$cleanEndpoint';
   }
 
+  // ✅ Helper method to check if response indicates user doesn't exist
+  bool _isUserNotFoundError(int statusCode, dynamic responseBody) {
+    if (statusCode == 404) return true;
+
+    if (responseBody is Map<String, dynamic>) {
+      final message = responseBody['message']?.toString().toLowerCase() ?? '';
+      final error = responseBody['error']?.toString().toLowerCase() ?? '';
+
+      return message.contains('user does not exist') ||
+          message.contains('user not found') ||
+          message.contains('not found') ||
+          error.contains('user does not exist') ||
+          error.contains('user not found');
+    }
+
+    return false;
+  }
+
   // Generic GET request
   Future<ApiResponse<T>> get<T>(
       String endpoint, {
@@ -57,7 +78,6 @@ class ApiService {
       }) async {
     try {
       final url = buildUrlWithQuery(endpoint, queryParameters);
-
       print('┌─────────────────────────────────────');
       print('│ 📡 GET REQUEST');
       print('├─────────────────────────────────────');
@@ -73,7 +93,7 @@ class ApiService {
         headers: {...defaultHeaders, ...?headers},
       );
 
-      return _processResponse<T>(response, endpoint, parser);
+      return _processResponse(response, endpoint, parser);
     } on SocketException {
       print('❌ Network error - check your connection');
       return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
@@ -115,7 +135,7 @@ class ApiService {
         body: encodedBody,
       );
 
-      return _processResponse<T>(response, endpoint, parser);
+      return _processResponse(response, endpoint, parser);
     } on SocketException {
       print('❌ Network error - check your connection');
       return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
@@ -157,7 +177,7 @@ class ApiService {
         body: encodedBody,
       );
 
-      return _processResponse<T>(response, endpoint, parser);
+      return _processResponse(response, endpoint, parser);
     } on SocketException {
       print('❌ Network error - check your connection');
       return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
@@ -194,7 +214,7 @@ class ApiService {
         headers: {...defaultHeaders, ...?headers},
       );
 
-      return _processResponse<T>(response, endpoint, parser);
+      return _processResponse(response, endpoint, parser);
     } on SocketException {
       print('❌ Network error - check your connection');
       return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
@@ -219,13 +239,13 @@ class ApiService {
     return url;
   }
 
+  // ✅ MODIFIED: Enhanced response processing with user existence checking
   ApiResponse<T> _processResponse<T>(
       http.Response response,
       String endpoint,
       T Function(dynamic)? parser,
       ) {
     final statusCode = response.statusCode;
-
     print('┌─────────────────────────────────────');
     print('│ 📥 RESPONSE');
     print('├─────────────────────────────────────');
@@ -240,7 +260,6 @@ class ApiService {
 
     if (statusCode >= 200 && statusCode < 300) {
       print('✅ SUCCESS - Status: $statusCode');
-
       try {
         final parsed = parser != null ? parser(responseBody) : responseBody;
         print('✅ Data parsed successfully');
@@ -253,12 +272,14 @@ class ApiService {
     } else {
       print('❌ ERROR - Status: $statusCode');
 
+      // ✅ Check if user doesn't exist
+      final userNotFound = _isUserNotFoundError(statusCode, responseBody);
+
       final errorMsg = responseBody is Map && responseBody['message'] != null
           ? responseBody['message'].toString()
           : 'Request failed: HTTP $statusCode';
 
       print('❌ Error Message: $errorMsg');
-
       if (responseBody is Map) {
         print('❌ Error Details: $responseBody');
       }
@@ -276,6 +297,9 @@ class ApiService {
           break;
         case 404:
           print('⚠️ NOT FOUND - Resource does not exist');
+          if (userNotFound) {
+            print('🚨 USER DOES NOT EXIST - Will trigger logout');
+          }
           break;
         case 500:
           print('⚠️ INTERNAL SERVER ERROR - Backend issue');
@@ -284,7 +308,12 @@ class ApiService {
           print('⚠️ UNKNOWN ERROR - Status code: $statusCode');
       }
 
-      return ApiResponse.error(errorMsg, statusCode: statusCode, endpoint: endpoint);
+      return ApiResponse.error(
+        errorMsg,
+        statusCode: statusCode,
+        endpoint: endpoint,
+        userNotFound: userNotFound, // ✅ Pass the flag
+      );
     }
   }
 }

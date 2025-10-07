@@ -6,7 +6,8 @@ import '../../Models/OrderModel.dart';
 import '../../Models/TripRequestModel.dart';
 import '../Controllers/OrderService.dart';
 import '../Controllers/TripRequestService.dart';
-import '../Controllers/AuthService.dart'; // ✅ ADDED
+import '../Controllers/AuthService.dart';
+import 'orderSection/SearchResultPage.dart'; // ✅ ADDED
 
 class SendPage extends StatefulWidget {
   const SendPage({Key? key}) : super(key: key);
@@ -219,7 +220,6 @@ class _SendPageState extends State<SendPage> {
 
     setState(() {
       isSearching = true;
-      availableOrders.clear();
     });
 
     try {
@@ -233,7 +233,6 @@ class _SendPageState extends State<SendPage> {
       print('DEBUG: Vehicle: $selectedVehicle');
       print('DEBUG: Hours: $hours');
 
-      // ✅ FIXED: Call API with userId parameter
       final orders = await _orderService.searchOrders(
         origin: fromController.text.trim(),
         destination: toController.text.trim(),
@@ -242,25 +241,35 @@ class _SendPageState extends State<SendPage> {
         originLongitude: originPosition!.longitude,
         vehicle: selectedVehicle!,
         timeHours: hours,
-        userId: currentUserId!, // ✅ ADDED userId parameter
+        userId: currentUserId!,
       );
 
       print('DEBUG: API returned ${orders.length} orders');
 
       setState(() {
-        availableOrders = orders;
         isSearching = false;
       });
+
+      // ✅ NEW: Navigate to results page
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SearchResultsPage(
+              orders: orders,
+              fromLocation: fromController.text.trim(),
+              toLocation: toController.text.trim(),
+              date: dateController.text.trim(),
+              onSendRequest: (order) => _sendRequestToSender(order),
+            ),
+          ),
+        );
+      }
 
       if (orders.isEmpty) {
         _showSnackBar(
           'No orders found for this route on ${dateController.text.trim()}',
           Colors.orange,
-        );
-      } else {
-        _showSnackBar(
-          'Found ${orders.length} order${orders.length > 1 ? 's' : ''} on ${dateController.text.trim()}',
-          Colors.green,
         );
       }
     } catch (e) {
@@ -271,6 +280,7 @@ class _SendPageState extends State<SendPage> {
       _showSnackBar('Error searching orders: $e', Colors.red);
     }
   }
+
 
   // Send trip request to order creator
   Future<void> _sendRequestToSender(Order order) async {
@@ -485,8 +495,8 @@ class _SendPageState extends State<SendPage> {
                       // Vehicle Info Field
                       _buildEnhancedTextField(
                         controller: vehicleInfoController,
-                        label: 'Vehicle Information',
-                        hint: 'e.g., Maruti Suzuki Swift, AC, Red Color',
+                        label: 'Vehicle Number',
+                        hint: 'e.g., XX XX XX XXXX',
                         icon: Icons.info_outline,
                         isRequired: true,
                       ),
@@ -498,7 +508,7 @@ class _SendPageState extends State<SendPage> {
                         child: AbsorbPointer(
                           child: _buildEnhancedTextField(
                             controller: startTimeController,
-                            label: 'Pickup Time',
+                            label: 'Start Time',
                             hint: 'e.g., 09:00',
                             icon: Icons.access_time,
                             isRequired: true,
@@ -513,7 +523,7 @@ class _SendPageState extends State<SendPage> {
                         child: AbsorbPointer(
                           child: _buildEnhancedTextField(
                             controller: endTimeController,
-                            label: 'Dropoff Time',
+                            label: 'Arrival Time',
                             hint: 'e.g., 14:00',
                             icon: Icons.access_time_filled,
                             isRequired: true,
@@ -1337,29 +1347,29 @@ class _SendPageState extends State<SendPage> {
               height: 1.5,
             ),
           ),
-          const SizedBox(height: 30),
-          ElevatedButton.icon(
-            onPressed: () {
-              fromController.clear();
-              toController.clear();
-              dateController.clear();
-              hoursController.clear();
-              setState(() {
-                selectedVehicle = null;
-                originPosition = null;
-              });
-            },
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('Clear Search'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
+          // const SizedBox(height: 30),
+          // ElevatedButton.icon(
+          //   onPressed: () {
+          //     fromController.clear();
+          //     toController.clear();
+          //     dateController.clear();
+          //     hoursController.clear();
+          //     setState(() {
+          //       selectedVehicle = null;
+          //       originPosition = null;
+          //     });
+          //   },
+          //   icon: const Icon(Icons.refresh, size: 18),
+          //   label: const Text('Clear Search'),
+          //   style: ElevatedButton.styleFrom(
+          //     backgroundColor: AppColors.primary,
+          //     foregroundColor: Colors.white,
+          //     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          //     shape: RoundedRectangleBorder(
+          //       borderRadius: BorderRadius.circular(10),
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );

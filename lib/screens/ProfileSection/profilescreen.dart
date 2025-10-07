@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Controllers/ProfileService.dart';
-import '../../Controllers/AuthService.dart'; // Import AuthService
+import '../../Controllers/AuthService.dart';
 import '../LoginScreens/LoginSignupScreen.dart';
 import '../LoginScreens/signup_page.dart';
 import 'ProfileDetailPage.dart';
@@ -44,6 +44,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     super.dispose();
   }
 
+  // ✅ MODIFIED: Enhanced user data loading with navigation to login if user doesn't exist
   Future<void> _loadUserData() async {
     try {
       setState(() {
@@ -53,29 +54,41 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       // ✅ Get userId from AuthService (Secure Storage)
       userId = await AuthService.getUserId();
 
-      if (userId != null) {
-        final profile = await _profileService.getUserProfile(userId!);
-        if (profile != null) {
-          setState(() {
-            userProfile = profile;
-            profileExists = true;
-            isLoading = false;
-            notificationsEnabled = true;
-          });
-          _animationController.forward();
+      if (userId == null) {
+        print('⚠️ No userId found - navigating to login');
+        await _navigateToLogin('Session expired. Please login again.');
+        return;
+      }
+
+      // ✅ Fetch user profile
+      final profile = await _profileService.getUserProfile(userId!);
+
+      if (profile != null) {
+        setState(() {
+          userProfile = profile;
+          profileExists = true;
+          isLoading = false;
+          notificationsEnabled = true;
+        });
+        _animationController.forward();
+      } else {
+        // ✅ Profile is null - could mean user doesn't exist
+        // Check if session was cleared (indicates user doesn't exist)
+        final stillLoggedIn = await AuthService.isLoggedIn();
+
+        if (!stillLoggedIn) {
+          print('🚨 User session cleared - user does not exist in database');
+          await _navigateToLogin('User account not found. Please login again.');
         } else {
+          // Profile just doesn't exist yet, but user is valid
           setState(() {
             profileExists = false;
             isLoading = false;
           });
         }
-      } else {
-        setState(() {
-          isLoading = false;
-        });
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      print('❌ Error loading user data: $e');
       setState(() {
         isLoading = false;
       });
@@ -83,6 +96,45 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     }
   }
 
+  // ✅ NEW: Navigate to login screen and clear all routes
+  Future<void> _navigateToLogin(String message) async {
+    // Ensure session is cleared
+    await AuthService.clearUserSession();
+
+    if (!mounted) return;
+
+    // Show message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.info_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+
+    // Small delay to show message
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    // Navigate to login and remove all previous routes
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => const LoginSignupScreen(),
+      ),
+          (Route<dynamic> route) => false,
+    );
+  }
+
+  // ✅ MODIFIED: Update notification preference with user existence check
   Future<void> _updateNotificationPreference(bool enabled) async {
     try {
       if (userId != null) {
@@ -90,6 +142,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           userId!,
           {'notificationsEnabled': enabled},
         );
+
         if (success) {
           setState(() {
             notificationsEnabled = enabled;
@@ -97,6 +150,15 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           _showSuccessSnackBar(
               enabled ? 'Notifications enabled' : 'Notifications disabled'
           );
+        } else {
+          // Check if session was cleared (user doesn't exist)
+          final stillLoggedIn = await AuthService.isLoggedIn();
+          if (!stillLoggedIn) {
+            print('🚨 User session cleared during update - user does not exist');
+            await _navigateToLogin('User account not found. Please login again.');
+          } else {
+            _showErrorSnackBar('Failed to update notification preference');
+          }
         }
       }
     } catch (e) {
@@ -130,8 +192,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     return name[0].toUpperCase();
   }
 
-// ✅ ALTERNATIVE ROBUST LOGOUT METHOD
-// ✅ FIXED LOGOUT METHOD - Replace the entire _showLogoutDialog method
+  // ✅ Logout dialog method
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -206,8 +267,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                     );
                   }
                 } catch (e) {
-                  print('Logout error: $e');
-
+                  print('❌ Logout error: $e');
                   // Close loading dialog on error
                   if (context.mounted) {
                     Navigator.of(context, rootNavigator: true).pop();
@@ -238,7 +298,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       },
     );
   }
-  // In _buildProfileCard method, wrap the Card with InkWell
+
   Widget _buildProfileCard() {
     return FadeTransition(
       opacity: _animation,
@@ -255,12 +315,10 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
               ),
             ).then((result) {
               if (result == true) {
-                // Reload profile data after update
                 _loadUserData();
               }
             });
           } else {
-            // Navigate to complete profile
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -362,7 +420,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       ),
     );
   }
-
 
   Widget _buildProfileStatusChip() {
     if (!_isProfileComplete()) {
@@ -631,7 +688,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                     ],
                   ),
                   const SizedBox(height: 24),
-                  // ✅ LOGOUT BUTTON CONNECTED
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(

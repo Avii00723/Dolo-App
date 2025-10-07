@@ -23,6 +23,7 @@ class ApiConstants {
   static const String getMyTripRequests = '$baseUrl/trip-requests/mytrip';
 
   // Chat
+  static const String getChatInbox = '$baseUrl/chat/inbox'; // append /{userId}
   static const String sendChatMessage = '$baseUrl/chat/send';
   static const String getChatMessages = '$baseUrl/chat'; // append /{transaction_id}/{user_id}
 }
