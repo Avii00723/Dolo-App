@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../Controllers/OrderService.dart';
 import '../../Controllers/TripRequestService.dart';
-import '../../Controllers/AuthService.dart'; // ✅ ADDED
+import '../../Controllers/AuthService.dart';
 import '../Inbox Section/indoxscreen.dart';
 import '../../Models/OrderModel.dart' as OrderModels;
 import '../../Models/TripRequestModel.dart';
@@ -97,7 +97,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
 
-  // ✅ CHANGED: Fetch from AuthService instead of hardcoding
   int? currentUserId;
 
   late TabController _tabController;
@@ -114,7 +113,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _initializeUser(); // ✅ ADDED
+    _initializeUser();
 
     // Auto-refresh every 30 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
@@ -124,7 +123,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     });
   }
 
-  // ✅ ADDED: Initialize user from AuthService
   Future<void> _initializeUser() async {
     try {
       final userId = await AuthService.getUserId();
@@ -168,7 +166,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     super.dispose();
   }
 
-  // Load all data from API
   Future<void> _loadAllData() async {
     if (currentUserId == null) {
       print('⚠️ Cannot load data - no user ID');
@@ -181,9 +178,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     ]);
   }
 
-  // Load user's created orders from API
   Future<void> _loadMyOrders() async {
-    if (currentUserId == null) return; // ✅ ADDED safety check
+    if (currentUserId == null) return;
 
     setState(() {
       isLoadingMyOrders = true;
@@ -220,7 +216,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         ));
       }
 
-      // Load trip requests for each order
       if (orders.isNotEmpty) {
         await _loadTripRequestsForOrders(orders.map((o) => o.id).toList());
       }
@@ -240,9 +235,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
-  // Load trip requests for user's orders
   Future<void> _loadTripRequestsForOrders(List<int> orderIds) async {
-    if (currentUserId == null) return; // ✅ ADDED safety check
+    if (currentUserId == null) return;
 
     try {
       print('🔍 Loading trip requests for orders: $orderIds');
@@ -255,8 +249,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       for (var request in allRequests) {
         print('Processing request: ID=${request.id}, OrderID=${request.orderId}, TravelerID=${request.travelerId}, Status=${request.status}');
 
-        // Only show requests where currentUser created the order
-        // The traveler (who sent request) should be different from current user
         if (request.status == 'pending' && orderIds.contains(request.orderId)) {
           final displayRequest = TripRequestDisplay(
             id: request.id,
@@ -297,9 +289,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
-  // Load orders where user sent trip requests (as traveler)
   Future<void> _loadMyRequestedOrders() async {
-    if (currentUserId == null) return; // ✅ ADDED safety check
+    if (currentUserId == null) return;
 
     setState(() {
       isLoadingMyRequests = true;
@@ -308,7 +299,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     try {
       print('🔍 Loading trip requests sent by user: $currentUserId');
 
-      // Get all trip requests sent by this user (as traveler)
       final tripRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
       print('📦 Found ${tripRequests.length} trip requests');
 
@@ -316,7 +306,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       final Set<int> processedOrderIds = {};
 
       for (var request in tripRequests) {
-        // Only show requests where current user is the TRAVELER
         if (request.travelerId != currentUserId) {
           print('⏭️ Skipping request ${request.id} - not sent by current user');
           continue;
@@ -329,10 +318,9 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
         processedOrderIds.add(request.orderId);
 
-        // Use order data from trip request response
         displayOrders.add(OrderDisplay(
           id: request.orderId,
-          userId: request.orderId, // Order creator's user ID
+          userId: request.orderId,
           userName: 'Order Creator',
           senderInitial: 'O',
           origin: request.source,
@@ -423,20 +411,21 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
   Future<void> _acceptTripRequest(
       TripRequestDisplay request, int orderId) async {
-    if (currentUserId == null) return; // ✅ ADDED safety check
+    if (currentUserId == null) return;
+
+    // Show confirmation dialog
+    final confirmed = await _showAcceptConfirmationDialog(request);
+    if (confirmed != true) return;
 
     try {
-      final negotiatedPrice = await _showPriceNegotiationDialog(request);
-      // if (negotiatedPrice == null) return;
-
+      // Accept with default/no negotiated price (0 or null based on your API)
       final acceptRequest = TripRequestAcceptRequest(
         orderCreatorId: currentUserId!,
         tripRequestId: request.id,
-        negotiatedPrice: negotiatedPrice!,
+        negotiatedPrice: 0, // Use 0 or remove this field if your API allows null
       );
 
-      final response =
-      await _tripRequestService.acceptTripRequest(acceptRequest);
+      final response = await _tripRequestService.acceptTripRequest(acceptRequest);
 
       if (response != null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -444,6 +433,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             content: Text(
                 'Trip request accepted! Transaction ID: #${response.transactionId}'),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
         );
         _loadAllData();
@@ -465,10 +455,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
-  Future<int?> _showPriceNegotiationDialog(TripRequestDisplay request) async {
-    final priceController = TextEditingController();
-
-    return showDialog<int>(
+  Future<bool?> _showAcceptConfirmationDialog(TripRequestDisplay request) async {
+    return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -480,6 +468,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              'Are you sure you want to accept this trip request?',
+              style: TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -506,41 +499,15 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            // TextField(
-            //   controller: priceController,
-            //   keyboardType: TextInputType.number,
-            //   decoration: InputDecoration(
-            //     labelText: 'Negotiated Price (₹)*',
-            //     hintText: 'Enter amount',
-            //     prefixIcon: const Icon(Icons.currency_rupee),
-            //     border: OutlineInputBorder(
-            //       borderRadius: BorderRadius.circular(8),
-            //     ),
-            //   ),
-            // ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              final price = int.tryParse(priceController.text.trim());
-              if (price == null || price <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter valid price'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              Navigator.pop(context, price);
-            },
+            onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green[600],
               shape: RoundedRectangleBorder(
@@ -580,7 +547,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
   @override
   Widget build(BuildContext context) {
-    // ✅ ADDED: Show loading state while fetching user ID
     if (currentUserId == null) {
       return Scaffold(
         backgroundColor: Colors.grey[50],
