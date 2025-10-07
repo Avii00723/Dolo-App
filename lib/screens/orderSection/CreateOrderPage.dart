@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import '../../Controllers/OrderService.dart';
+import '../../Controllers/AuthService.dart'; // ✅ ADD THIS IMPORT
 import '../LoginScreens/UserProfileHelper.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Services/LocationService.dart';
@@ -47,8 +48,44 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   final ImagePicker _picker = ImagePicker();
   bool _isCreatingOrder = false;
 
-  // User ID - Replace with actual user ID from auth
-  int userId = 2; // TODO: Get from auth service
+  // ✅ FIXED: User ID fetched from AuthService
+  int? userId; // Changed from int to int? (nullable)
+  bool _isLoadingUser = true; // Track loading state
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeUser(); // ✅ Fetch userId on init
+  }
+
+  // ✅ NEW: Initialize user from AuthService
+  Future<void> _initializeUser() async {
+    try {
+      final fetchedUserId = await AuthService.getUserId();
+      if (fetchedUserId == null) {
+        print('❌ No user ID found in AuthService');
+        if (mounted) {
+          _showSnackBar('Please log in to create orders', Colors.red);
+          Navigator.of(context).pop(); // Go back if no userId
+        }
+        return;
+      }
+
+      setState(() {
+        userId = fetchedUserId;
+        _isLoadingUser = false;
+      });
+      print('✅ User ID loaded from AuthService: $userId');
+    } catch (e) {
+      print('❌ Error initializing user: $e');
+      setState(() {
+        _isLoadingUser = false;
+      });
+      if (mounted) {
+        _showSnackBar('Error loading user data: $e', Colors.red);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -265,7 +302,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
+  // ✅ UPDATED: Create order with null check for userId
   Future<void> _createOrder() async {
+    // ✅ Check if userId is loaded
+    if (userId == null) {
+      _showSnackBar('User ID not found. Please log in again.', Colors.red);
+      return;
+    }
+
     // Validate all required fields
     if (!_validateAllFields()) return;
 
@@ -276,9 +320,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
       print('DEBUG: Starting order creation process');
 
-      // Prepare order request
+      // Prepare order request with non-null userId
       final orderRequest = OrderCreateRequest(
-        userId: userId,
+        userId: userId!, // ✅ Use fetched userId
         origin: originController.text.trim(),
         originLatitude: originPosition!.latitude,
         originLongitude: originPosition!.longitude,
@@ -327,8 +371,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           _isCreatingOrder = false;
         });
 
-        // Check if it's a KYC error by examining the error from OrderService
-        // You'll need to modify OrderService to return error details
+        // Check if it's a KYC error
         _showKycRequiredDialog();
       }
     } catch (e, stackTrace) {
@@ -347,7 +390,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-// Show KYC Required Dialog
+  // Show KYC Required Dialog
   void _showKycRequiredDialog() {
     showDialog(
       context: context,
@@ -442,14 +485,18 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-// Navigate to KYC Screen
-  // Navigate to KYC Screen
+  // ✅ UPDATED: KYC screen navigation with null check
   void _navigateToKycScreen() async {
+    if (userId == null) {
+      _showSnackBar('User ID not found. Please log in again.', Colors.red);
+      return;
+    }
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => KycUploadScreen(
-          userId: userId,
+          userId: userId!, // ✅ Use fetched userId
         ),
       ),
     );
@@ -462,7 +509,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       );
     }
   }
-
 
   // Format date for API (yyyy-MM-dd)
   String _formatDateForApi(String dateString) {
@@ -694,6 +740,71 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Show loading indicator while fetching userId
+    if (_isLoadingUser) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppColors.primary),
+              const SizedBox(height: 16),
+              Text(
+                'Loading user data...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ✅ Show error if userId couldn't be loaded
+    if (userId == null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+              const SizedBox(height: 16),
+              Text(
+                'User not found',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Please log in to create orders',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Go Back'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ✅ Normal UI when userId is loaded
     return Scaffold(
       body: SafeArea(
         child: Column(

@@ -11,7 +11,7 @@ class ModernSenderOrderCard extends StatelessWidget {
   final VoidCallback? onMarkReceived;
   final VoidCallback? onCompleteOrder;
   final Function(OrderDisplay)? onUpdateOrder;
-  final Function(int)? onDeleteOrder; // ✅ NEW
+  final Function(int)? onDeleteOrder;
 
   const ModernSenderOrderCard({
     Key? key,
@@ -22,7 +22,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     this.onMarkReceived,
     this.onCompleteOrder,
     this.onUpdateOrder,
-    this.onDeleteOrder, // ✅ NEW
+    this.onDeleteOrder,
   }) : super(key: key);
 
   @override
@@ -59,8 +59,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                 children: [
                   // Order ID Badge
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.blue[600],
                       borderRadius: BorderRadius.circular(12),
@@ -77,8 +76,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                   const Spacer(),
                   // Status Badge
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: _getStatusColor(order.status),
                       borderRadius: BorderRadius.circular(12),
@@ -106,8 +104,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Route - Compact
                   Row(
                     children: [
-                      Icon(Icons.radio_button_checked,
-                          color: Colors.green[600], size: 14),
+                      Icon(Icons.radio_button_checked, color: Colors.green[600], size: 14),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -158,8 +155,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Quick Info Row
                   Row(
                     children: [
-                      _buildCompactChip(
-                          Icons.calendar_today, _formatDate(order.date)),
+                      _buildCompactChip(Icons.calendar_today, _formatDate(order.date)),
                       const SizedBox(width: 8),
                       _buildCompactChip(Icons.scale, '${order.weight} kg'),
                       const SizedBox(width: 8),
@@ -176,8 +172,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Trip Requests Indicator
                   if (tripRequests != null && tripRequests!.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.orange[50],
                         borderRadius: BorderRadius.circular(8),
@@ -186,8 +181,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.people_outline,
-                              color: Colors.orange[700], size: 14),
+                          Icon(Icons.people_outline, color: Colors.orange[700], size: 14),
                           const SizedBox(width: 6),
                           Text(
                             '${tripRequests!.length} Request${tripRequests!.length > 1 ? 's' : ''}',
@@ -215,8 +209,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_ios,
-                          size: 10, color: Colors.grey[400]),
+                      Icon(Icons.arrow_forward_ios, size: 10, color: Colors.grey[400]),
                     ],
                   ),
                 ],
@@ -263,7 +256,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     }
   }
 
-  // ✅ NEW: DELETE CONFIRMATION DIALOG
+  // DELETE CONFIRMATION DIALOG
   Future<void> _showDeleteConfirmation(BuildContext context) async {
     return showDialog(
       context: context,
@@ -291,8 +284,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_rounded,
-                        color: Colors.white, size: 28),
+                    const Icon(Icons.warning_rounded, color: Colors.white, size: 28),
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Column(
@@ -337,8 +329,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.info_outline,
-                                  color: Colors.red[700], size: 20),
+                              Icon(Icons.info_outline, color: Colors.red[700], size: 20),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
@@ -389,40 +380,40 @@ class ModernSenderOrderCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            print('🔴 DELETE BUTTON PRESSED'); // ✅ ADD THIS
-                            print(
-                                'Order ID to delete: ${order.id}'); // ✅ ADD THIS
-                            print(
-                                'onDeleteOrder callback is ${onDeleteOrder == null ? 'NULL' : 'NOT NULL'}'); // ✅ ADD THIS
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              print('🔴 DELETE BUTTON PRESSED');
+                              print('Order ID to delete: ${order.id}');
+                              print('onDeleteOrder callback is ${onDeleteOrder == null ? 'NULL' : 'NOT NULL'}');
 
-                            Navigator.pop(context); // Close confirmation dialog
-                            Navigator.pop(context); // Close details modal
+                              Navigator.pop(context); // Close confirmation dialog
+                              Navigator.pop(context); // Close details modal
 
-                            if (onDeleteOrder != null) {
-                              print('🔴 CALLING DELETE CALLBACK'); // ✅ ADD THIS
-                              onDeleteOrder!(order.id);
-                            } else {
-                              print('❌ DELETE CALLBACK IS NULL'); // ✅ ADD THIS
-                            }
-                          },
-                          icon: const Icon(Icons.delete_forever, size: 18),
-                          label: const Text(
-                            'Delete',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              if (onDeleteOrder != null) {
+                                print('🔴 CALLING DELETE CALLBACK');
+                                onDeleteOrder!(order.id);
+                              } else {
+                                print('❌ DELETE CALLBACK IS NULL');
+                              }
+                            },
+                            icon: const Icon(Icons.delete_forever, size: 18),
+                            label: const Text(
+                              'Delete',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red[600],
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red[600],
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
                             ),
-                            elevation: 0,
                           ),
                         ),
                       ],
@@ -437,20 +428,18 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  // EDIT ORDER DIALOG
+  // ✅ UPDATED EDIT ORDER DIALOG WITH OPTIONAL FIELDS
   Future<void> _showEditOrderDialog(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
 
     // Pre-populate with current order data
     final originController = TextEditingController(text: order.origin);
-    final destinationController =
-        TextEditingController(text: order.destination);
-    final itemDescController =
-        TextEditingController(text: order.itemDescription);
-    final weightController =
-        TextEditingController(text: order.weight.toString());
-    final priceController =
-        TextEditingController(text: order.expectedPrice?.toString() ?? '');
+    final destinationController = TextEditingController(text: order.destination);
+    final itemDescController = TextEditingController(text: order.itemDescription);
+    final weightController = TextEditingController(text: order.weight.toString());
+    final priceController = TextEditingController(
+        text: order.expectedPrice?.toString() ?? ''
+    );
     final notesController = TextEditingController(text: order.notes ?? '');
     DateTime selectedDate = DateTime.parse(order.date);
 
@@ -459,8 +448,7 @@ class ModernSenderOrderCard extends StatelessWidget {
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: EdgeInsets.zero,
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
@@ -522,24 +510,21 @@ class ModernSenderOrderCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Origin
+                          // Origin - REQUIRED
                           _buildEditField(
                             controller: originController,
-                            label: 'Origin',
+                            label: 'Origin *',
                             icon: Icons.radio_button_checked,
-                            validator: (val) =>
-                                val?.isEmpty ?? true ? 'Origin required' : null,
+                            validator: (val) => val?.isEmpty ?? true ? 'Origin required' : null,
                           ),
                           const SizedBox(height: 16),
 
-                          // Destination
+                          // Destination - REQUIRED
                           _buildEditField(
                             controller: destinationController,
-                            label: 'Destination',
+                            label: 'Destination *',
                             icon: Icons.location_on,
-                            validator: (val) => val?.isEmpty ?? true
-                                ? 'Destination required'
-                                : null,
+                            validator: (val) => val?.isEmpty ?? true ? 'Destination required' : null,
                           ),
                           const SizedBox(height: 16),
 
@@ -550,8 +535,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 context: context,
                                 initialDate: selectedDate,
                                 firstDate: DateTime.now(),
-                                lastDate: DateTime.now()
-                                    .add(const Duration(days: 365)),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
                               );
                               if (picked != null) {
                                 setState(() {
@@ -567,16 +551,14 @@ class ModernSenderOrderCard extends StatelessWidget {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.calendar_today,
-                                      size: 18, color: Colors.grey[600]),
+                                  Icon(Icons.calendar_today, size: 18, color: Colors.grey[600]),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Delivery Date',
+                                          'Delivery Date *',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey[600],
@@ -593,23 +575,19 @@ class ModernSenderOrderCard extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  Icon(Icons.edit,
-                                      size: 16, color: Colors.blue[600]),
+                                  Icon(Icons.edit, size: 16, color: Colors.blue[600]),
                                 ],
                               ),
                             ),
                           ),
                           const SizedBox(height: 16),
 
-                          // Item Description
+                          // Item Description - OPTIONAL
                           _buildEditField(
                             controller: itemDescController,
-                            label: 'Item Description',
+                            label: 'Item Description (Optional)',
                             icon: Icons.inventory_2_outlined,
                             maxLines: 2,
-                            validator: (val) => val?.isEmpty ?? true
-                                ? 'Description required'
-                                : null,
                           ),
                           const SizedBox(height: 16),
 
@@ -619,7 +597,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                               Expanded(
                                 child: _buildEditField(
                                   controller: weightController,
-                                  label: 'Weight (kg)',
+                                  label: 'Weight (kg) *',
                                   icon: Icons.scale,
                                   keyboardType: TextInputType.number,
                                   validator: (val) {
@@ -635,7 +613,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                               Expanded(
                                 child: _buildEditField(
                                   controller: priceController,
-                                  label: 'Expected Price (₹)',
+                                  label: 'Price (₹) - Optional',
                                   icon: Icons.currency_rupee,
                                   keyboardType: TextInputType.number,
                                 ),
@@ -644,7 +622,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 16),
 
-                          // Notes
+                          // Notes - OPTIONAL
                           _buildEditField(
                             controller: notesController,
                             label: 'Special Instructions (Optional)',
@@ -690,7 +668,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             if (formKey.currentState!.validate()) {
-                              // Create updated order object
+                              // Create updated order object with defaults for optional fields
                               final updatedOrder = OrderDisplay(
                                 id: order.id,
                                 userId: order.userId,
@@ -699,11 +677,13 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 origin: originController.text.trim(),
                                 destination: destinationController.text.trim(),
                                 date: selectedDate.toIso8601String(),
-                                itemDescription: itemDescController.text.trim(),
+                                itemDescription: itemDescController.text.trim().isNotEmpty
+                                    ? itemDescController.text.trim()
+                                    : 'Package', // Default value
                                 weight: double.parse(weightController.text),
                                 status: order.status,
                                 expectedPrice: priceController.text.isNotEmpty
-                                    ? int.parse(priceController.text)
+                                    ? int.tryParse(priceController.text)
                                     : null,
                                 notes: notesController.text.trim().isNotEmpty
                                     ? notesController.text.trim()
@@ -711,17 +691,17 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 originLatitude: order.originLatitude,
                                 originLongitude: order.originLongitude,
                                 destinationLatitude: order.destinationLatitude,
-                                destinationLongitude:
-                                    order.destinationLongitude,
+                                destinationLongitude: order.destinationLongitude,
                                 orderType: order.orderType,
                                 estimatedDistance: order.estimatedDistance,
                                 requestStatus: order.requestStatus,
-                                imageUrl: order.imageUrl,
+                                imageUrl: order.imageUrl ?? 'https://example.com/default.jpg',
                                 profileImageUrl: order.profileImageUrl,
                                 matchedTravellerId: order.matchedTravellerId,
                               );
 
                               Navigator.pop(context);
+                              print('✅ Calling onUpdateOrder with order ID: ${updatedOrder.id}');
                               onUpdateOrder?.call(updatedOrder);
                             }
                           },
@@ -817,8 +797,7 @@ class ModernSenderOrderCard extends StatelessWidget {
 
               // Header
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
                   border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
@@ -826,16 +805,14 @@ class ModernSenderOrderCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.blue[600],
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.send_outlined,
-                              color: Colors.white, size: 16),
+                          const Icon(Icons.send_outlined, color: Colors.white, size: 16),
                           const SizedBox(width: 6),
                           Text(
                             'Order #${order.id}',
@@ -850,8 +827,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: _getStatusColor(order.status),
                         borderRadius: BorderRadius.circular(12),
@@ -918,8 +894,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                             ),
                             if (order.estimatedDistance != null) ...[
                               Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                                 child: Row(
                                   children: [
                                     const SizedBox(width: 12),
@@ -930,10 +905,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                                         gradient: LinearGradient(
                                           begin: Alignment.topCenter,
                                           end: Alignment.bottomCenter,
-                                          colors: [
-                                            Colors.green[400]!,
-                                            Colors.red[400]!
-                                          ],
+                                          colors: [Colors.green[400]!, Colors.red[400]!],
                                         ),
                                       ),
                                     ),
@@ -1009,8 +981,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 valueColor: Colors.green[700],
                               ),
                             ],
-                            if (order.notes != null &&
-                                order.notes!.isNotEmpty) ...[
+                            if (order.notes != null && order.notes!.isNotEmpty) ...[
                               const Divider(height: 24),
                               _buildDetailRow(
                                 Icons.note_outlined,
@@ -1024,8 +995,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                       const SizedBox(height: 20),
 
                       // Image if available
-                      if (order.imageUrl != null &&
-                          order.imageUrl!.isNotEmpty) ...[
+                      if (order.imageUrl != null && order.imageUrl!.isNotEmpty) ...[
                         const Text(
                           'Package Image',
                           style: TextStyle(
@@ -1041,8 +1011,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                             height: 180,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
+                            errorBuilder: (context, error, stackTrace) => Container(
                               height: 180,
                               decoration: BoxDecoration(
                                 color: Colors.grey[200],
@@ -1100,9 +1069,9 @@ class ModernSenderOrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         ...tripRequests!.map((request) => _buildTripRequestCard(
-                              context,
-                              request,
-                            )),
+                          context,
+                          request,
+                        )),
                         const SizedBox(height: 20),
                       ],
 
@@ -1154,8 +1123,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildRoutePoint(
-      IconData icon, String label, String location, Color color) {
+  Widget _buildRoutePoint(IconData icon, String label, String location, Color color) {
     return Row(
       children: [
         Icon(icon, color: color, size: 18),
@@ -1187,8 +1155,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTripRequestCard(
-      BuildContext context, TripRequestDisplay request) {
+  Widget _buildTripRequestCard(BuildContext context, TripRequestDisplay request) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -1254,8 +1221,7 @@ class ModernSenderOrderCard extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildInfoRowCompact(
-                    Icons.directions_car, 'Vehicle', request.vehicleInfo),
+                _buildInfoRowCompact(Icons.directions_car, 'Vehicle', request.vehicleInfo),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -1338,7 +1304,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  // ✅ UPDATED MODAL ACTIONS WITH EDIT AND DELETE BUTTONS FOR PENDING ORDERS
+  // MODAL ACTIONS WITH EDIT AND DELETE BUTTONS FOR PENDING ORDERS
   Widget _buildModalActions(BuildContext context) {
     switch (order.status.toLowerCase()) {
       case 'pending':
@@ -1366,7 +1332,7 @@ class ModernSenderOrderCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // ✅ Delete Button
+            // Delete Button
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(

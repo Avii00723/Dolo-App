@@ -1068,12 +1068,131 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             onAcceptRequest: _acceptTripRequest,
             onTrackOrder: () => _openOrderTracking(order),
             onMarkReceived: () => _markOrderReceived(order),
-            onCompleteOrder: () => _completeOrder(order), // ✅ RATING FLOW
-            onDeleteOrder: _deleteOrder, // ✅ MAKE SURE THIS IS ADDED
+            onCompleteOrder: () => _completeOrder(order),
+            onUpdateOrder: _updateOrder, // ✅ ADD THIS LINE - IT'S MISSING!
+            onDeleteOrder: _deleteOrder,
           );
         },
       ),
     );
+  }
+
+// ✅ NEW: UPDATE ORDER METHOD
+  Future<void> _updateOrder(OrderDisplay updatedOrder) async {
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User ID not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Show loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Updating order...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Create update request with only changed fields
+      final updateRequest = OrderModels.OrderUpdateRequest(
+        userId: currentUserId!,
+        origin: updatedOrder.origin,
+        originLatitude: updatedOrder.originLatitude!,
+        originLongitude: updatedOrder.originLongitude!,
+        destination: updatedOrder.destination,
+        destinationLatitude: updatedOrder.destinationLatitude!,
+        destinationLongitude: updatedOrder.destinationLongitude!,
+        deliveryDate: _formatDateForApi(updatedOrder.date),
+        weight: updatedOrder.weight,
+        imageUrl: updatedOrder.imageUrl,
+        specialInstructions: updatedOrder.notes,
+      );
+
+      final response = await _orderService.updateOrder(
+        updatedOrder.id,
+        updateRequest,
+      );
+
+      if (response != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Order updated successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // Refresh orders
+        await _loadAllData();
+      } else {
+        throw Exception('Failed to update order');
+      }
+    } catch (e) {
+      print('Error updating order: $e');
+      if (mounted) {
+        String errorMessage = 'Update failed: $e';
+
+        if (e.toString().contains('KYC_NOT_APPROVED')) {
+          errorMessage = 'KYC not approved. Cannot update order.';
+        } else if (e.toString().contains('ORDER_NOT_FOUND')) {
+          errorMessage = 'Order not found or not owned by you.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(errorMessage)),
+              ],
+            ),
+            backgroundColor: Colors.red[600],
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+// Helper method to format date for API
+  String _formatDateForApi(String dateString) {
+    try {
+      // If already in ISO format, parse and reformat
+      final date = DateTime.parse(dateString);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (e) {
+      // If in dd/MM/yyyy format
+      final parts = dateString.split('/');
+      if (parts.length == 3) {
+        return '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
+      }
+      return dateString;
+    }
   }
 
   Widget _buildMyRequestedOrdersTab() {

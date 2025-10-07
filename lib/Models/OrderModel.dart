@@ -173,77 +173,57 @@ class OrderCreateResponse {
 }
 
 class OrderUpdateRequest {
-  final String? origin;
-  final double? originLatitude;
-  final double? originLongitude;
-  final String? destination;
-  final double? destinationLatitude;
-  final double? destinationLongitude;
-  final String? deliveryDate;
-  final double? weight;
-  final String? imageUrl;
-  final String? specialInstructions;
-  final String? status;
+  final int userId;
+  final String origin;
+  final double originLatitude;
+  final double originLongitude;
+  final String destination;
+  final double destinationLatitude;
+  final double destinationLongitude;
+  final String deliveryDate;
+  final double weight;
+  final String? imageUrl; // Optional
+  final String? specialInstructions; // Optional
 
   OrderUpdateRequest({
-    this.origin,
-    this.originLatitude,
-    this.originLongitude,
-    this.destination,
-    this.destinationLatitude,
-    this.destinationLongitude,
-    this.deliveryDate,
-    this.weight,
+    required this.userId,
+    required this.origin,
+    required this.originLatitude,
+    required this.originLongitude,
+    required this.destination,
+    required this.destinationLatitude,
+    required this.destinationLongitude,
+    required this.deliveryDate,
+    required this.weight,
     this.imageUrl,
     this.specialInstructions,
-    this.status,
   });
 
   Map<String, dynamic> toJson() {
-    final map = <String, dynamic>{};
+    final map = {
+      'userId': userId,
+      'origin': origin,
+      'origin_latitude': originLatitude,
+      'origin_longitude': originLongitude,
+      'destination': destination,
+      'destination_latitude': destinationLatitude,
+      'destination_longitude': destinationLongitude,
+      'delivery_date': deliveryDate,
+      'weight': weight,
+    };
 
-    if (origin != null) map['origin'] = origin;
-    if (originLatitude != null) map['origin_latitude'] = originLatitude;
-    if (originLongitude != null) map['origin_longitude'] = originLongitude;
-    if (destination != null) map['destination'] = destination;
-    if (destinationLatitude != null) map['destination_latitude'] = destinationLatitude;
-    if (destinationLongitude != null) map['destination_longitude'] = destinationLongitude;
-    if (deliveryDate != null) map['delivery_date'] = deliveryDate;
-    if (weight != null) map['weight'] = weight;
-    if (imageUrl != null) map['image_url'] = imageUrl;
-    if (specialInstructions != null) map['special_instructions'] = specialInstructions;
-    if (status != null) map['status'] = status;
+    // Only add optional fields if they have values
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      map['image_url'] = imageUrl!;
+    }
+    if (specialInstructions != null && specialInstructions!.isNotEmpty) {
+      map['special_instructions'] = specialInstructions!;
+    }
 
-    print('📤 Update Request JSON: $map');
     return map;
   }
-
-  factory OrderUpdateRequest.fromJson(Map<String, dynamic> json) {
-    return OrderUpdateRequest(
-      origin: json['origin'],
-      originLatitude: json['origin_latitude'] != null
-          ? Order._parseDouble(json['origin_latitude'])
-          : null,
-      originLongitude: json['origin_longitude'] != null
-          ? Order._parseDouble(json['origin_longitude'])
-          : null,
-      destination: json['destination'],
-      destinationLatitude: json['destination_latitude'] != null
-          ? Order._parseDouble(json['destination_latitude'])
-          : null,
-      destinationLongitude: json['destination_longitude'] != null
-          ? Order._parseDouble(json['destination_longitude'])
-          : null,
-      deliveryDate: json['delivery_date'],
-      weight: json['weight'] != null
-          ? Order._parseDouble(json['weight'])
-          : null,
-      imageUrl: json['image_url'],
-      specialInstructions: json['special_instructions'],
-      status: json['status'],
-    );
-  }
 }
+
 class OrderDeleteRequest {
   final int userId;
 
