@@ -91,6 +91,58 @@ class OrderService {
       rethrow;
     }
   }
+
+  // ✅ FIXED: Delete order using query parameters (RECOMMENDED)
+  Future<bool> deleteOrder(int orderId, int userId) async {
+    final endpoint = '${ApiConstants.deleteOrder}/$orderId';
+    print('=== DELETE ORDER API CALL ===');
+    print('Endpoint: $endpoint');
+    print('Order ID: $orderId');
+    print('User ID: $userId');
+
+    try {
+      final response = await _api.delete(
+        endpoint,
+        queryParameters: {
+          'userId': userId.toString(),
+        },
+        parser: (json) => OrderDeleteResponse.fromJson(json),
+      );
+
+      print('Response Success: ${response.success}');
+      print('Response Data: ${response.data}');
+
+      if (!response.success) {
+        print('❌ DELETE ORDER FAILED');
+        print('Error: ${response.error}');
+        print('Status Code: ${response.statusCode}');
+
+        // Handle specific errors
+        if (response.statusCode == 403 && response.error?.contains('KYC') == true) {
+          throw Exception('KYC_NOT_APPROVED');
+        }
+
+        if (response.statusCode == 404) {
+          throw Exception('ORDER_NOT_FOUND');
+        }
+
+        if (response.statusCode == 400) {
+          throw Exception('USER_ID_REQUIRED');
+        }
+
+        throw Exception(response.error ?? 'Failed to delete order');
+      } else {
+        print('✅ DELETE ORDER SUCCESS');
+      }
+
+      return response.success;
+    } catch (e, stackTrace) {
+      print('❌ DELETE ORDER EXCEPTION: $e');
+      print('Stack Trace: $stackTrace');
+      rethrow;
+    }
+  }
+
   // Search orders with vehicle and time_hours parameters
   // ✅ FIXED: Add userId parameter to searchOrders
   Future<List<Order>> searchOrders({

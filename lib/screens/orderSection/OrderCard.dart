@@ -1,4 +1,5 @@
-// Modern Sender Order Card - COMPACT VERSION with Click to Expand
+// Modern Sender Order Card - COMPACT VERSION with Click to Expand, Edit and Delete
+
 import 'package:flutter/material.dart';
 import 'YourOrders.dart';
 
@@ -8,7 +9,9 @@ class ModernSenderOrderCard extends StatelessWidget {
   final Function(TripRequestDisplay, int)? onAcceptRequest;
   final VoidCallback? onTrackOrder;
   final VoidCallback? onMarkReceived;
-  final VoidCallback? onCompleteOrder; // ✅ ADDED
+  final VoidCallback? onCompleteOrder;
+  final Function(OrderDisplay)? onUpdateOrder;
+  final Function(int)? onDeleteOrder; // ✅ NEW
 
   const ModernSenderOrderCard({
     Key? key,
@@ -17,7 +20,9 @@ class ModernSenderOrderCard extends StatelessWidget {
     this.onAcceptRequest,
     this.onTrackOrder,
     this.onMarkReceived,
-    this.onCompleteOrder, // ✅ ADDED
+    this.onCompleteOrder,
+    this.onUpdateOrder,
+    this.onDeleteOrder, // ✅ NEW
   }) : super(key: key);
 
   @override
@@ -54,7 +59,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                 children: [
                   // Order ID Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.blue[600],
                       borderRadius: BorderRadius.circular(12),
@@ -71,7 +77,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                   const Spacer(),
                   // Status Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: _getStatusColor(order.status),
                       borderRadius: BorderRadius.circular(12),
@@ -99,7 +106,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Route - Compact
                   Row(
                     children: [
-                      Icon(Icons.radio_button_checked, color: Colors.green[600], size: 14),
+                      Icon(Icons.radio_button_checked,
+                          color: Colors.green[600], size: 14),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -150,7 +158,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Quick Info Row
                   Row(
                     children: [
-                      _buildCompactChip(Icons.calendar_today, _formatDate(order.date)),
+                      _buildCompactChip(
+                          Icons.calendar_today, _formatDate(order.date)),
                       const SizedBox(width: 8),
                       _buildCompactChip(Icons.scale, '${order.weight} kg'),
                       const SizedBox(width: 8),
@@ -167,7 +176,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Trip Requests Indicator
                   if (tripRequests != null && tripRequests!.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.orange[50],
                         borderRadius: BorderRadius.circular(8),
@@ -176,7 +186,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.people_outline, color: Colors.orange[700], size: 14),
+                          Icon(Icons.people_outline,
+                              color: Colors.orange[700], size: 14),
                           const SizedBox(width: 6),
                           Text(
                             '${tripRequests!.length} Request${tripRequests!.length > 1 ? 's' : ''}',
@@ -204,7 +215,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_ios, size: 10, color: Colors.grey[400]),
+                      Icon(Icons.arrow_forward_ios,
+                          size: 10, color: Colors.grey[400]),
                     ],
                   ),
                 ],
@@ -251,6 +263,527 @@ class ModernSenderOrderCard extends StatelessWidget {
     }
   }
 
+  // ✅ NEW: DELETE CONFIRMATION DIALOG
+  Future<void> _showDeleteConfirmation(BuildContext context) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: MediaQuery.of(context).size.width * 0.8,
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.red[600]!, Colors.red[400]!],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_rounded,
+                        color: Colors.white, size: 28),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Delete Order?',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'This action cannot be undone',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red[200]!),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  color: Colors.red[700], size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Order #${order.id}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.red[900],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Deleting this order will also remove all related trip requests. Are you sure you want to continue?',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.red[800],
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              side: BorderSide(color: Colors.grey[300]!),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            print('🔴 DELETE BUTTON PRESSED'); // ✅ ADD THIS
+                            print(
+                                'Order ID to delete: ${order.id}'); // ✅ ADD THIS
+                            print(
+                                'onDeleteOrder callback is ${onDeleteOrder == null ? 'NULL' : 'NOT NULL'}'); // ✅ ADD THIS
+
+                            Navigator.pop(context); // Close confirmation dialog
+                            Navigator.pop(context); // Close details modal
+
+                            if (onDeleteOrder != null) {
+                              print('🔴 CALLING DELETE CALLBACK'); // ✅ ADD THIS
+                              onDeleteOrder!(order.id);
+                            } else {
+                              print('❌ DELETE CALLBACK IS NULL'); // ✅ ADD THIS
+                            }
+                          },
+                          icon: const Icon(Icons.delete_forever, size: 18),
+                          label: const Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red[600],
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // EDIT ORDER DIALOG
+  Future<void> _showEditOrderDialog(BuildContext context) async {
+    final formKey = GlobalKey<FormState>();
+
+    // Pre-populate with current order data
+    final originController = TextEditingController(text: order.origin);
+    final destinationController =
+        TextEditingController(text: order.destination);
+    final itemDescController =
+        TextEditingController(text: order.itemDescription);
+    final weightController =
+        TextEditingController(text: order.weight.toString());
+    final priceController =
+        TextEditingController(text: order.expectedPrice?.toString() ?? '');
+    final notesController = TextEditingController(text: order.notes ?? '');
+    DateTime selectedDate = DateTime.parse(order.date);
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: EdgeInsets.zero,
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 450, maxHeight: 600),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue[600]!, Colors.blue[400]!],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit, color: Colors.white, size: 24),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Edit Order',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Order #${order.id}',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Form Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Origin
+                          _buildEditField(
+                            controller: originController,
+                            label: 'Origin',
+                            icon: Icons.radio_button_checked,
+                            validator: (val) =>
+                                val?.isEmpty ?? true ? 'Origin required' : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Destination
+                          _buildEditField(
+                            controller: destinationController,
+                            label: 'Destination',
+                            icon: Icons.location_on,
+                            validator: (val) => val?.isEmpty ?? true
+                                ? 'Destination required'
+                                : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Delivery Date
+                          InkWell(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: selectedDate,
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now()
+                                    .add(const Duration(days: 365)),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  selectedDate = picked;
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.calendar_today,
+                                      size: 18, color: Colors.grey[600]),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Delivery Date',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _formatDate(selectedDate.toString()),
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.edit,
+                                      size: 16, color: Colors.blue[600]),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Item Description
+                          _buildEditField(
+                            controller: itemDescController,
+                            label: 'Item Description',
+                            icon: Icons.inventory_2_outlined,
+                            maxLines: 2,
+                            validator: (val) => val?.isEmpty ?? true
+                                ? 'Description required'
+                                : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Weight and Price Row
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildEditField(
+                                  controller: weightController,
+                                  label: 'Weight (kg)',
+                                  icon: Icons.scale,
+                                  keyboardType: TextInputType.number,
+                                  validator: (val) {
+                                    if (val?.isEmpty ?? true) return 'Required';
+                                    if (double.tryParse(val!) == null) {
+                                      return 'Invalid number';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildEditField(
+                                  controller: priceController,
+                                  label: 'Expected Price (₹)',
+                                  icon: Icons.currency_rupee,
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Notes
+                          _buildEditField(
+                            controller: notesController,
+                            label: 'Special Instructions (Optional)',
+                            icon: Icons.note_outlined,
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Action Buttons
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    border: Border(top: BorderSide(color: Colors.grey[200]!)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            if (formKey.currentState!.validate()) {
+                              // Create updated order object
+                              final updatedOrder = OrderDisplay(
+                                id: order.id,
+                                userId: order.userId,
+                                userName: order.userName,
+                                senderInitial: order.senderInitial,
+                                origin: originController.text.trim(),
+                                destination: destinationController.text.trim(),
+                                date: selectedDate.toIso8601String(),
+                                itemDescription: itemDescController.text.trim(),
+                                weight: double.parse(weightController.text),
+                                status: order.status,
+                                expectedPrice: priceController.text.isNotEmpty
+                                    ? int.parse(priceController.text)
+                                    : null,
+                                notes: notesController.text.trim().isNotEmpty
+                                    ? notesController.text.trim()
+                                    : null,
+                                originLatitude: order.originLatitude,
+                                originLongitude: order.originLongitude,
+                                destinationLatitude: order.destinationLatitude,
+                                destinationLongitude:
+                                    order.destinationLongitude,
+                                orderType: order.orderType,
+                                estimatedDistance: order.estimatedDistance,
+                                requestStatus: order.requestStatus,
+                                imageUrl: order.imageUrl,
+                                profileImageUrl: order.profileImageUrl,
+                                matchedTravellerId: order.matchedTravellerId,
+                              );
+
+                              Navigator.pop(context);
+                              onUpdateOrder?.call(updatedOrder);
+                            }
+                          },
+                          icon: const Icon(Icons.save, size: 18),
+                          label: const Text(
+                            'Save Changes',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[600],
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper method for form fields
+  Widget _buildEditField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? Function(String?)? validator,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, size: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.blue[600]!, width: 2),
+        ),
+        contentPadding: const EdgeInsets.all(12),
+      ),
+    );
+  }
+
   // FLOATING MODAL WITH FULL DETAILS
   void _showOrderDetailsModal(BuildContext context) {
     showModalBottomSheet(
@@ -284,7 +817,8 @@ class ModernSenderOrderCard extends StatelessWidget {
 
               // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
                   border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
@@ -292,14 +826,16 @@ class ModernSenderOrderCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.blue[600],
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.send_outlined, color: Colors.white, size: 16),
+                          const Icon(Icons.send_outlined,
+                              color: Colors.white, size: 16),
                           const SizedBox(width: 6),
                           Text(
                             'Order #${order.id}',
@@ -314,7 +850,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: _getStatusColor(order.status),
                         borderRadius: BorderRadius.circular(12),
@@ -381,7 +918,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                             ),
                             if (order.estimatedDistance != null) ...[
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
                                 child: Row(
                                   children: [
                                     const SizedBox(width: 12),
@@ -392,7 +930,10 @@ class ModernSenderOrderCard extends StatelessWidget {
                                         gradient: LinearGradient(
                                           begin: Alignment.topCenter,
                                           end: Alignment.bottomCenter,
-                                          colors: [Colors.green[400]!, Colors.red[400]!],
+                                          colors: [
+                                            Colors.green[400]!,
+                                            Colors.red[400]!
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -468,7 +1009,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 valueColor: Colors.green[700],
                               ),
                             ],
-                            if (order.notes != null && order.notes!.isNotEmpty) ...[
+                            if (order.notes != null &&
+                                order.notes!.isNotEmpty) ...[
                               const Divider(height: 24),
                               _buildDetailRow(
                                 Icons.note_outlined,
@@ -482,7 +1024,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                       const SizedBox(height: 20),
 
                       // Image if available
-                      if (order.imageUrl != null && order.imageUrl!.isNotEmpty) ...[
+                      if (order.imageUrl != null &&
+                          order.imageUrl!.isNotEmpty) ...[
                         const Text(
                           'Package Image',
                           style: TextStyle(
@@ -498,7 +1041,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                             height: 180,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
                               height: 180,
                               decoration: BoxDecoration(
                                 color: Colors.grey[200],
@@ -556,9 +1100,9 @@ class ModernSenderOrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         ...tripRequests!.map((request) => _buildTripRequestCard(
-                          context,
-                          request,
-                        )),
+                              context,
+                              request,
+                            )),
                         const SizedBox(height: 20),
                       ],
 
@@ -610,7 +1154,8 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildRoutePoint(IconData icon, String label, String location, Color color) {
+  Widget _buildRoutePoint(
+      IconData icon, String label, String location, Color color) {
     return Row(
       children: [
         Icon(icon, color: color, size: 18),
@@ -642,7 +1187,8 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTripRequestCard(BuildContext context, TripRequestDisplay request) {
+  Widget _buildTripRequestCard(
+      BuildContext context, TripRequestDisplay request) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -708,7 +1254,8 @@ class ModernSenderOrderCard extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildInfoRowCompact(Icons.directions_car, 'Vehicle', request.vehicleInfo),
+                _buildInfoRowCompact(
+                    Icons.directions_car, 'Vehicle', request.vehicleInfo),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -791,40 +1338,84 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  // ✅ UPDATED MODAL ACTIONS WITH COMPLETE ORDER BUTTON
+  // ✅ UPDATED MODAL ACTIONS WITH EDIT AND DELETE BUTTONS FOR PENDING ORDERS
   Widget _buildModalActions(BuildContext context) {
     switch (order.status.toLowerCase()) {
       case 'pending':
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.orange[50],
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.orange[200]!),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.schedule, color: Colors.orange[600], size: 20),
-              const SizedBox(width: 12),
-              Text(
-                'Waiting for Trip Requests',
-                style: TextStyle(
-                  color: Colors.orange[700],
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+        return Column(
+          children: [
+            // Edit Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showEditOrderDialog(context);
+                },
+                icon: const Icon(Icons.edit, size: 18),
+                label: const Text('Edit Order'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue[600],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+
+            // ✅ Delete Button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showDeleteConfirmation(context),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Delete Order'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red[600],
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  side: BorderSide(color: Colors.red[300]!),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.schedule, color: Colors.orange[600], size: 20),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Waiting for Trip Requests',
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
 
       case 'accepted':
       case 'matched':
         return Column(
           children: [
-            // Track Order Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -845,7 +1436,6 @@ class ModernSenderOrderCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            // ✅ Complete Order Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(

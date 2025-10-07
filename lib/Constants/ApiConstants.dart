@@ -17,6 +17,7 @@ class ApiConstants {
   static const String updateOrder = '$baseUrl/orders/update';
   static const String myOrders = '$baseUrl/orders/myorders';
   static const String completeOrder = '$baseUrl/orders/complete';
+  static const String deleteOrder = '$baseUrl/orders/delete'; // ✅ NEW\
 
 
   // Trip Requests

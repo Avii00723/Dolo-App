@@ -120,7 +120,88 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       }
     });
   }
+  Future<void> _deleteOrder(int orderId) async {
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User ID not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
+    try {
+      // Show loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Deleting order...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final success = await _orderService.deleteOrder(orderId, currentUserId!);
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Order deleted successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        // Refresh orders
+        await _loadAllData();
+      }
+    } catch (e) {
+      print('Error deleting order: $e');
+      if (mounted) {
+        String errorMessage = 'Delete failed: $e';
+
+        if (e.toString().contains('KYC_NOT_APPROVED')) {
+          errorMessage = 'KYC not approved. Cannot delete order.';
+        } else if (e.toString().contains('ORDER_NOT_FOUND')) {
+          errorMessage = 'Order not found or not owned by you.';
+        } else if (e.toString().contains('USER_ID_REQUIRED')) {
+          errorMessage = 'User ID is required.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(errorMessage)),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
   Future<void> _initializeUser() async {
     try {
       final userId = await AuthService.getUserId();
@@ -988,6 +1069,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             onTrackOrder: () => _openOrderTracking(order),
             onMarkReceived: () => _markOrderReceived(order),
             onCompleteOrder: () => _completeOrder(order), // ✅ RATING FLOW
+            onDeleteOrder: _deleteOrder, // ✅ MAKE SURE THIS IS ADDED
           );
         },
       ),

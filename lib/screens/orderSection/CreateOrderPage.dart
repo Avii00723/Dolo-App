@@ -48,7 +48,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   bool _isCreatingOrder = false;
 
   // User ID - Replace with actual user ID from auth
-  int userId = 1; // TODO: Get from auth service
+  int userId = 2; // TODO: Get from auth service
 
   @override
   void dispose() {

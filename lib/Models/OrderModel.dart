@@ -244,7 +244,28 @@ class OrderUpdateRequest {
     );
   }
 }
+class OrderDeleteRequest {
+  final int userId;
 
+  OrderDeleteRequest({required this.userId});
+
+  Map<String, dynamic> toJson() {
+    return {'userId': userId};
+  }
+}
+
+// ✅ NEW: Order Delete Response
+class OrderDeleteResponse {
+  final String message;
+
+  OrderDeleteResponse({required this.message});
+
+  factory OrderDeleteResponse.fromJson(Map<String, dynamic> json) {
+    return OrderDeleteResponse(
+      message: json['message'] ?? 'Order deleted successfully',
+    );
+  }
+}
 class OrderUpdateResponse {
   final String message;
 
