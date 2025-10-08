@@ -1,440 +1,281 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:intl/intl.dart';
+import '../../Controllers/AuthService.dart';
+import '../../Controllers/ChatService.dart';
 import 'ChatScreen.dart';
 
-enum OrderStatus {
-  pending,
-  priceNegotiated,
-  orderConfirmed,
-  pickedUp,
-  inTransit,
-  delivered,
-  completed
-}
-
-class InboxScreen extends StatelessWidget {
+class InboxScreen extends StatefulWidget {
   const InboxScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  State<InboxScreen> createState() => _InboxScreenState();
+}
 
-    if (currentUserId == null) {
-      return const Scaffold(
-        body: Center(child: Text("Please sign in to view your messages")),
-      );
+class _InboxScreenState extends State<InboxScreen> {
+  List<Map<String, dynamic>> _conversations = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  int? _currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAndLoadInbox();
+  }
+
+  Future<void> _initializeAndLoadInbox() async {
+    _currentUserId = await AuthService.getUserId();
+    await _loadInbox();
+  }
+
+  // ✅ UPDATED: Load only real inbox data, no dummy data
+  Future<void> _loadInbox() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // ✅ Call the API to get real inbox data
+      final result = await ChatService.getInbox();
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final apiInbox = result['inbox'] as List<dynamic>;
+
+        // ✅ Only use API data - no dummy data
+        final conversations = apiInbox.map((item) => item as Map<String, dynamic>).toList();
+
+        setState(() {
+          _conversations = conversations;
+          _isLoading = false;
+          _errorMessage = null;
+        });
+
+        print('✅ Loaded ${conversations.length} conversations from API');
+      } else {
+        // ✅ If API fails, show empty list with error message
+        setState(() {
+          _conversations = [];
+          _isLoading = false;
+          _errorMessage = result['error'] as String?;
+        });
+
+        print('⚠️ API failed: ${result['error']}');
+      }
+    } catch (e) {
+      // ✅ On exception, show empty list with error
+      if (!mounted) return;
+
+      setState(() {
+        _conversations = [];
+        _isLoading = false;
+        _errorMessage = 'Network error: $e';
+      });
+
+      print('❌ Exception loading inbox: $e');
     }
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0A1A2A),
-        foregroundColor: Colors.white,
         elevation: 0,
+        backgroundColor: Colors.white,
         title: const Text(
-          'Inbox',
+          'Messages',
           style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
           ),
         ),
+        centerTitle: false,
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            child: IconButton(
-              icon: const Icon(
-                Icons.chat_bubble_outline,
-                size: 24,
-              ),
-              onPressed: () {},
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black87),
+            onPressed: _loadInbox,
+            tooltip: 'Refresh',
           ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('chats')
-            .where('participants', arrayContains: currentUserId)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      body: _buildBody(),
+    );
+  }
 
-          if (snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.inbox, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    "No conversations yet",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    "Your accepted trip requests will appear here",
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
+  Widget _buildBody() {
+    if (_currentUserId == null) {
+      return _buildNotLoggedInState();
+    }
 
-          final chats = snapshot.data!.docs;
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
 
-          // Sort chats by lastMessageTime
-          chats.sort((a, b) {
-            final aData = a.data() as Map<String, dynamic>;
-            final bData = b.data() as Map<String, dynamic>;
-            final aTime = aData['lastMessageTime'] as Timestamp?;
-            final bTime = bData['lastMessageTime'] as Timestamp?;
+    // ✅ Show empty state when conversations list is empty
+    if (_conversations.isEmpty) {
+      // Show error state if there's an error, otherwise show empty state
+      if (_errorMessage != null) {
+        return _buildErrorState();
+      }
+      return _buildEmptyState();
+    }
 
-            if (aTime == null && bTime == null) return 0;
-            if (aTime == null) return 1;
-            if (bTime == null) return -1;
-
-            return bTime.compareTo(aTime);
-          });
-
-          return ListView.separated(
-            itemCount: chats.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, indent: 80),
-            itemBuilder: (context, index) {
-              final chatData = chats[index].data() as Map<String, dynamic>;
-              final chatId = chats[index].id;
-
-              // FIXED: Properly determine other user info
-              final participants = List<String>.from(chatData['participants'] ?? []);
-              final otherUserId = participants.firstWhere(
-                    (id) => id != currentUserId,
-                orElse: () => '',
-              );
-
-              // Get proper user info based on current user role
-              String name = 'Unknown User';
-              String? profileImage;
-              String userRole = '';
-
-              if (currentUserId == chatData['buyerId']) {
-                // Current user is sender/buyer, show traveller info
-                name = chatData['travelerName'] ?? 'Traveller';
-                userRole = 'Traveller';
-                // Fetch traveller's profile image from users collection or use stored data
-                profileImage = chatData['travelerImage'] ?? chatData['otherUserImage'];
-              } else if (currentUserId == chatData['travelerId']) {
-                // Current user is traveller, show sender/buyer info
-                name = chatData['buyerName'] ?? 'Sender';
-                userRole = 'Sender';
-                // Fetch sender's profile image from users collection or use stored data
-                profileImage = chatData['buyerImage'] ?? chatData['otherUserImage'];
-              }
-
-              final String route = chatData['route'] ?? '';
-              final lastMessage = chatData['lastMessage'] ?? '';
-              final timestamp = chatData['lastMessageTime'] as Timestamp?;
-              final timeStr = timestamp != null
-                  ? _formatTime(timestamp.toDate())
-                  : '';
-
-              // Get order status - Updated for new enum
-              final orderStatusStr = chatData['orderStatus'] ?? 'pending';
-              final orderStatus = OrderStatus.values.firstWhere(
-                    (e) => e.toString() == orderStatusStr,
-                orElse: () => OrderStatus.pending,
-              );
-
-              final negotiatedPrice = chatData['negotiatedPrice'] ?? '';
-              final deliveryId = chatData['deliveryId'] ?? '';
-              final productName = chatData['productName'] ?? '';
-
-              return _buildMessageItem(
-                context: context,
-                profileImage: profileImage,
-                name: name,
-                userRole: userRole,
-                time: timeStr,
-                route: route,
-                message: lastMessage,
-                productName: productName,
-                chatId: chatId,
-                orderStatus: orderStatus,
-                negotiatedPrice: negotiatedPrice,
-                deliveryId: deliveryId,
-              );
-            },
+    return RefreshIndicator(
+      onRefresh: _loadInbox,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: _conversations.length,
+        itemBuilder: (context, index) {
+          final conversation = _conversations[index];
+          return ModernChatCard(
+            conversation: conversation,
+            currentUserId: _currentUserId!,
+            onTap: () => _openChat(conversation),
           );
         },
       ),
     );
   }
 
-  String _formatTime(DateTime dateTime) {
-    final now = DateTime.now();
-    if (now.difference(dateTime).inDays == 0) {
-      final hour = dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour;
-      final period = dateTime.hour >= 12 ? 'PM' : 'AM';
-      return "${hour == 0 ? 12 : hour}:${dateTime.minute.toString().padLeft(2, '0')} $period";
-    } else if (now.difference(dateTime).inDays == 1) {
-      return "Yesterday";
-    } else {
-      return "${dateTime.day}/${dateTime.month}/${dateTime.year}";
-    }
-  }
-
-  String _getOrderStatusText(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.pending:
-        return 'New Chat';
-      case OrderStatus.priceNegotiated:
-        return 'Price Agreed';
-      case OrderStatus.orderConfirmed:
-        return 'Order Confirmed';
-      case OrderStatus.pickedUp:
-        return 'Picked Up';
-      case OrderStatus.inTransit:
-        return 'In Transit';
-      case OrderStatus.delivered:
-        return 'Delivered';
-      case OrderStatus.completed:
-        return 'Completed';
-    }
-  }
-
-  Color _getOrderStatusColor(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.pending:
-        return Colors.blue;
-      case OrderStatus.priceNegotiated:
-        return Colors.green;
-      case OrderStatus.orderConfirmed:
-        return Colors.blue;
-      case OrderStatus.pickedUp:
-        return Colors.orange;
-      case OrderStatus.inTransit:
-        return Colors.purple;
-      case OrderStatus.delivered:
-        return Colors.teal;
-      case OrderStatus.completed:
-        return Colors.green;
-    }
-  }
-
-  Widget _buildOrderStatusChip(OrderStatus status, String negotiatedPrice, String deliveryId) {
-    String displayText = _getOrderStatusText(status);
-
-    if (status == OrderStatus.priceNegotiated && negotiatedPrice.isNotEmpty) {
-      displayText += ' • $negotiatedPrice';
-    } else if ((status == OrderStatus.orderConfirmed ||
-        status == OrderStatus.pickedUp ||
-        status == OrderStatus.inTransit ||
-        status == OrderStatus.delivered ||
-        status == OrderStatus.completed) && deliveryId.isNotEmpty) {
-      displayText += ' • #${deliveryId.substring(deliveryId.length - 6)}';
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(top: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: _getOrderStatusColor(status).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _getOrderStatusColor(status),
-          width: 1,
-        ),
-      ),
-      child: Text(
-        displayText,
-        style: TextStyle(
-          fontSize: 11,
-          color: _getOrderStatusColor(status),
-          fontWeight: FontWeight.w600,
-        ),
+  Widget _buildNotLoggedInState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.login,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Please log in to view messages',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildMessageItem({
-    required BuildContext context,
-    String? profileImage,
-    required String name,
-    required String userRole,
-    required String time,
-    required String route,
-    required String message,
-    required String productName,
-    required String chatId,
-    required OrderStatus orderStatus,
-    required String negotiatedPrice,
-    required String deliveryId,
-  }) {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatScreen(chatId: chatId),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundImage: (profileImage != null && profileImage.isNotEmpty)
-                      ? NetworkImage(profileImage)
-                      : null,
-                  backgroundColor: Colors.blue[100],
-                  child: (profileImage == null || profileImage.isEmpty)
-                      ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: Colors.blue[700],
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                      : null,
-                ),
-                // Order status indicator
-                if (orderStatus != OrderStatus.pending)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: _getOrderStatusColor(orderStatus),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: Icon(
-                        _getOrderStatusIcon(orderStatus),
-                        size: 10,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-              ],
+  // ✅ UPDATED: Better empty state design
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              userRole,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        time,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
-                  ),
+            child: Icon(
+              Icons.chat_bubble_outline,
+              size: 60,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No Chats Available',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Start chatting by accepting trip requests or sending messages',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 24),
+          // ✅ ADD: Refresh button in empty state
+          ElevatedButton.icon(
+            onPressed: _loadInbox,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                  // Route information
-                  if (route.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.route, size: 14, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              route,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[700],
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  // Product name
-                  if (productName.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.inventory_2, size: 14, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            productName,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-
-                  const SizedBox(height: 6),
-
-                  // Last message
-                  Text(
-                    message.isNotEmpty ? message : 'No messages yet',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: message.isNotEmpty ? Colors.black87 : Colors.grey[500],
-                      fontStyle: message.isEmpty ? FontStyle.italic : FontStyle.normal,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-
-                  // Order status chip
-                  _buildOrderStatusChip(orderStatus, negotiatedPrice, deliveryId),
-                ],
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to Load Messages',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'Unknown error occurred',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadInbox,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade600,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ],
@@ -443,22 +284,271 @@ class InboxScreen extends StatelessWidget {
     );
   }
 
-  IconData _getOrderStatusIcon(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.pending:
-        return Icons.chat;
-      case OrderStatus.priceNegotiated:
-        return Icons.handshake;
-      case OrderStatus.orderConfirmed:
-        return Icons.check_circle;
-      case OrderStatus.pickedUp:
-        return Icons.inventory;
-      case OrderStatus.inTransit:
-        return Icons.local_shipping;
-      case OrderStatus.delivered:
-        return Icons.done_all;
-      case OrderStatus.completed:
-        return Icons.star;
+  void _openChat(Map<String, dynamic> conversation) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          chatId: conversation['chat_id'].toString(),
+          orderId: conversation['order_id'].toString(),
+          otherUserName: conversation['other_user_name'],
+        ),
+      ),
+    ).then((_) {
+      // Refresh inbox when returning from chat
+      _loadInbox();
+    });
+  }
+}
+
+// ModernChatCard widget remains the same
+class ModernChatCard extends StatelessWidget {
+  final Map<String, dynamic> conversation;
+  final int currentUserId;
+  final VoidCallback onTap;
+
+  const ModernChatCard({
+    Key? key,
+    required this.conversation,
+    required this.currentUserId,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final otherUserName = conversation['other_user_name'] ?? 'Unknown User';
+    final otherUserPhoto = conversation['other_user_photo'];
+    final origin = conversation['origin'] ?? 'Unknown';
+    final destination = conversation['destination'] ?? 'Unknown';
+    final lastMessage = conversation['lastMessage'] ?? 'No messages yet';
+    final lastMessageTime = conversation['lastMessageTime'];
+    final acceptedBy = conversation['accepted_by'];
+    final orderId = conversation['order_id'];
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Profile Avatar
+                _buildAvatar(otherUserPhoto, otherUserName),
+                const SizedBox(width: 16),
+                // Chat Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Name and Time Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              otherUserName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            _formatTime(lastMessageTime),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      // Order Info Chip
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.local_shipping,
+                              size: 12,
+                              color: Colors.blue.shade700,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                '$origin → $destination',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.blue.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '#$orderId',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.blue.shade600,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Last Message
+                      Text(
+                        lastMessage,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      // Status indicator if accepted
+                      if (acceptedBy != null) ...[
+                        const SizedBox(height: 8),
+                        _buildStatusChip(
+                          acceptedBy == currentUserId
+                              ? 'Accepted by you'
+                              : 'Accepted',
+                          acceptedBy == currentUserId,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                // Arrow indicator
+                Icon(
+                  Icons.chevron_right,
+                  color: Colors.grey.shade400,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar(String? photoUrl, String name) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [Colors.blue.shade400, Colors.blue.shade600],
+        ),
+      ),
+      child: photoUrl != null && photoUrl.isNotEmpty
+          ? ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: Image.network(
+          photoUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) =>
+              _buildAvatarFallback(name),
+        ),
+      )
+          : _buildAvatarFallback(name),
+    );
+  }
+
+  Widget _buildAvatarFallback(String name) {
+    return Center(
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : 'U',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String text, bool isCurrentUser) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isCurrentUser ? Colors.green.shade50 : Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isCurrentUser ? Colors.green.shade200 : Colors.blue.shade200,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isCurrentUser ? Icons.check_circle : Icons.handshake,
+            size: 12,
+            color: isCurrentUser ? Colors.green.shade700 : Colors.blue.shade700,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 10,
+              color:
+              isCurrentUser ? Colors.green.shade700 : Colors.blue.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(dynamic timestamp) {
+    if (timestamp == null) return '';
+
+    try {
+      final time = DateTime.parse(timestamp.toString());
+      final now = DateTime.now();
+      final difference = now.difference(time);
+
+      if (difference.inDays == 0) {
+        return DateFormat('HH:mm').format(time);
+      } else if (difference.inDays == 1) {
+        return 'Yesterday';
+      } else if (difference.inDays < 7) {
+        return DateFormat('EEE').format(time);
+      } else {
+        return DateFormat('MMM dd').format(time);
+      }
+    } catch (e) {
+      return '';
     }
   }
 }

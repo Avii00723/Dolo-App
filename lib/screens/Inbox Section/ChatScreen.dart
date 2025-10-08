@@ -1,882 +1,984 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  // for demo purposes, sign in anonymously
-  await FirebaseAuth.instance.signInAnonymously();
-
-  runApp(const MarketplaceApp());
-}
-
-class MarketplaceApp extends StatelessWidget {
-  const MarketplaceApp({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 1,
-        ),
-      ),
-      home: const ChatScreen(chatId: 'chat_demo_1'),
-    );
-  }
-}
-
-enum OrderStatus {
-  pending,
-  priceNegotiated,
-  orderConfirmed,
-  pickedUp,
-  inTransit,
-  delivered,
-  completed
-}
-
-enum UserRole {
-  sender,
-  traveller, // traveler who will deliver
-}
+import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../Controllers/AuthService.dart';
+import '../../Controllers/ChatService.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
-  final UserRole? userRole;
+  final String orderId;
+  final String? otherUserName;
 
-  const ChatScreen({Key? key, required this.chatId, this.userRole}) : super(key: key);
+  const ChatScreen({
+    Key? key,
+    required this.chatId,
+    required this.orderId,
+    this.otherUserName,
+  }) : super(key: key);
 
   @override
-  _ChatScreenState createState() => _ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMixin {
+class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
-  bool _isPriceMode = false;
-  late TabController _tabController;
-  OrderStatus _currentOrderStatus = OrderStatus.pending;
-  String _negotiatedPrice = '';
-  String _deliveryId = '';
-  UserRole _currentUserRole = UserRole.sender;
-  String _otherUserName = '';
-  String _itemDescription = '';
-  String _route = '';
-  String _weight = '';
-  String _deliveryDate = '';
+  final ScrollController _scrollController = ScrollController();
 
-  final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  int? _currentUserId;
+  Map<String, dynamic> otherUserData = {};
+  List<Map<String, dynamic>> messages = [];
+  bool isLoading = true;
+  String? _errorMessage;
+  String? replyingToMessageId;
+  Map<String, dynamic>? replyingToMessage;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      setState(() {
-        _isPriceMode = _tabController.index == 1;
-      });
-    });
-    _loadChatData();
+    _initializeChat();
   }
 
-  Future<void> _loadChatData() async {
+  Future<void> _initializeChat() async {
+    _currentUserId = await AuthService.getUserId();
+
+    if (_currentUserId == null) {
+      setState(() {
+        isLoading = false;
+        _errorMessage = 'User not authenticated';
+      });
+      return;
+    }
+
+    print('🔑 Current User ID: $_currentUserId');
+    await _loadMessages();
+  }
+
+  Future<void> _loadMessages({bool silent = false}) async {
+    if (!mounted) return;
+
+    if (!silent) {
+      setState(() {
+        isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
     try {
-      final chatDoc = await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(widget.chatId)
-          .get();
+      final chatIdInt = int.tryParse(widget.chatId);
 
-      if (chatDoc.exists) {
-        final data = chatDoc.data() as Map<String, dynamic>;
+      if (chatIdInt == null) {
+        if (!silent) {
+          setState(() {
+            isLoading = false;
+            _errorMessage = 'Invalid chat ID';
+          });
+        }
+        return;
+      }
 
-        final buyerId = data['buyerId'] ?? ''; // Sender
-        final travelerId = data['travelerId'] ?? ''; // Traveller
+      final result = await ChatService.getChatMessages(chatId: chatIdInt);
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final apiMessages = result['messages'] as List<dynamic>;
+
+        final convertedMessages = apiMessages.map((msg) {
+          final senderId = msg['sender_id']; // ✅ Keep as int for proper comparison
+          final senderName = msg['sender_name'] ?? 'Unknown';
+
+          // ✅ Debug print to verify IDs
+          print('📨 Message: senderId=$senderId (type: ${senderId.runtimeType}), currentUserId=$_currentUserId (type: ${_currentUserId.runtimeType}), isMe=${senderId == _currentUserId}');
+
+          return {
+            'messageId': msg['id'].toString(),
+            'message': msg['message'] ?? '',
+            'senderId': senderId, // ✅ Store as int for proper comparison
+            'senderName': senderName,
+            'timestamp': DateTime.parse(msg['created_at']),
+            'type': 'text',
+          };
+        }).toList();
+
+        final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+        final wasAtBottom = scrollOffset < 50;
 
         setState(() {
-          _currentOrderStatus = OrderStatus.values.firstWhere(
-                (e) => e.toString() == data['orderStatus'],
-            orElse: () => OrderStatus.pending,
-          );
-          _negotiatedPrice = data['negotiatedPrice'] ?? '';
-          _deliveryId = data['deliveryId'] ?? '';
+          messages = convertedMessages;
 
-          // Determine current user's role
-          if (currentUserId == travelerId) {
-            _currentUserRole = UserRole.traveller;
-            _otherUserName = data['buyerName'] ?? 'Sender';
+          if (convertedMessages.isNotEmpty) {
+            final firstOtherMessage = convertedMessages.firstWhere(
+                  (msg) => msg['senderId'] != _currentUserId,
+              orElse: () => {},
+            );
+
+            if (firstOtherMessage.isNotEmpty) {
+              otherUserData = {
+                'name': firstOtherMessage['senderName'] ?? widget.otherUserName ?? 'Unknown User',
+                'profileUrl': '',
+              };
+            } else {
+              otherUserData = {
+                'name': widget.otherUserName ?? 'Unknown User',
+                'profileUrl': '',
+              };
+            }
           } else {
-            _currentUserRole = UserRole.sender;
-            _otherUserName = data['travelerName'] ?? 'Traveller';
+            otherUserData = {
+              'name': widget.otherUserName ?? 'Unknown User',
+              'profileUrl': '',
+            };
           }
 
-          _itemDescription = data['productName'] ?? 'Package';
-          _route = data['route'] ?? '';
-          _weight = data['weight'] ?? '';
-          _deliveryDate = data['deliveryDate'] ?? '';
+          isLoading = false;
+          _errorMessage = null;
+        });
+
+        if (silent || wasAtBottom) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        }
+
+        if (!silent) {
+          print('✅ Loaded ${messages.length} messages from API');
+        }
+      } else {
+        if (!silent) {
+          setState(() {
+            isLoading = false;
+            _errorMessage = result['error'] as String?;
+            otherUserData = {
+              'name': widget.otherUserName ?? 'Unknown User',
+              'profileUrl': '',
+            };
+          });
+        }
+
+        print('⚠️ Failed to load messages: ${result['error']}');
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      if (!silent) {
+        setState(() {
+          isLoading = false;
+          _errorMessage = 'Failed to load messages: $e';
+          otherUserData = {
+            'name': widget.otherUserName ?? 'Unknown User',
+            'profileUrl': '',
+          };
         });
       }
-    } catch (e) {
-      print('Error loading chat data: $e');
+
+      print('❌ Exception loading messages: $e');
     }
-  }
-
-  Future<void> _updateOrderStatus(OrderStatus newStatus, {String? additionalData}) async {
-    try {
-      final updateData = {
-        'orderStatus': newStatus.toString(),
-        'lastUpdated': FieldValue.serverTimestamp(),
-        'lastMessage': _getStatusMessage(newStatus),
-        'lastMessageTime': FieldValue.serverTimestamp(),
-      };
-
-      if (additionalData != null) {
-        if (newStatus == OrderStatus.orderConfirmed) {
-          updateData['deliveryId'] = additionalData;
-          _deliveryId = additionalData;
-        } else if (newStatus == OrderStatus.priceNegotiated) {
-          updateData['negotiatedPrice'] = additionalData;
-          _negotiatedPrice = additionalData;
-        }
-      }
-
-      await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(widget.chatId)
-          .update(updateData);
-
-      setState(() {
-        _currentOrderStatus = newStatus;
-      });
-
-      // Send system message about status change
-      await _sendSystemMessage(_getStatusMessage(newStatus));
-    } catch (e) {
-      print('Error updating order status: $e');
-    }
-  }
-
-  String _getStatusMessage(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.priceNegotiated:
-        return _currentUserRole == UserRole.sender
-            ? 'Price agreed: $_negotiatedPrice - Please confirm the delivery'
-            : 'Price agreed: $_negotiatedPrice - Waiting for sender to confirm';
-      case OrderStatus.orderConfirmed:
-        return _currentUserRole == UserRole.sender
-            ? 'Delivery confirmed! Tracking ID: $_deliveryId'
-            : 'New delivery confirmed! Tracking ID: $_deliveryId - Please prepare for pickup';
-      case OrderStatus.pickedUp:
-        return _currentUserRole == UserRole.traveller
-            ? 'You picked up the package'
-            : 'Package has been picked up by the traveller';
-      case OrderStatus.inTransit:
-        return _currentUserRole == UserRole.traveller
-            ? 'Package is now in transit'
-            : 'Your package is now in transit';
-      case OrderStatus.delivered:
-        return _currentUserRole == UserRole.traveller
-            ? 'Package delivered successfully'
-            : 'Package has been delivered! Please confirm receipt';
-      case OrderStatus.completed:
-        return 'Delivery completed successfully. Thank you for using our service!';
-      default:
-        return 'Status updated.';
-    }
-  }
-
-  Future<void> _sendMessage({String? text, String? priceOffer}) async {
-    if ((text == null || text.trim().isEmpty) && priceOffer == null) return;
-
-    final messageData = {
-      'sender_id': currentUserId,
-      'text': text ?? '',
-      'priceOffer': priceOffer ?? '',
-      'timestamp': FieldValue.serverTimestamp(),
-      'messageType': priceOffer != null ? 'price_offer' : 'text',
-    };
-
-    await FirebaseFirestore.instance
-        .collection('chats')
-        .doc(widget.chatId)
-        .collection('messages')
-        .add(messageData);
-
-    // Update last message in chat document
-    await FirebaseFirestore.instance
-        .collection('chats')
-        .doc(widget.chatId)
-        .update({
-      'lastMessage': priceOffer != null ? 'Price offer: $priceOffer' : text,
-      'lastMessageTime': FieldValue.serverTimestamp(),
-    });
-
-    _messageController.clear();
-    _priceController.clear();
-  }
-
-  Future<void> _sendSystemMessage(String message) async {
-    await FirebaseFirestore.instance
-        .collection('chats')
-        .doc(widget.chatId)
-        .collection('messages')
-        .add({
-      'sender_id': 'system',
-      'text': message,
-      'timestamp': FieldValue.serverTimestamp(),
-      'messageType': 'system',
-    });
-  }
-
-  Future<void> _acceptPrice(String price) async {
-    // Both users can accept price, but typically traveller accepts sender's offer
-    await _updateOrderStatus(OrderStatus.priceNegotiated, additionalData: price);
-  }
-
-  Future<void> _confirmDelivery() async {
-    // Generate delivery tracking ID
-    final deliveryId = 'DEL${DateTime.now().millisecondsSinceEpoch}';
-
-    // Create delivery document
-    await FirebaseFirestore.instance
-        .collection('deliveries')
-        .doc(deliveryId)
-        .set({
-      'deliveryId': deliveryId,
-      'chatId': widget.chatId,
-      'senderId': _currentUserRole == UserRole.sender ? currentUserId : _otherUserName,
-      'travellerId': _currentUserRole == UserRole.traveller ? currentUserId : _otherUserName,
-      'price': _negotiatedPrice,
-      'status': 'confirmed',
-      'itemDescription': _itemDescription,
-      'route': _route,
-      'weight': _weight,
-      'deliveryDate': _deliveryDate,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    await _updateOrderStatus(OrderStatus.orderConfirmed, additionalData: deliveryId);
-  }
-
-  Future<void> _markAsPickedUp() async {
-    await _updateOrderStatus(OrderStatus.pickedUp);
-
-    // Update delivery document
-    if (_deliveryId.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('deliveries')
-          .doc(_deliveryId)
-          .update({
-        'status': 'picked_up',
-        'pickedUpAt': FieldValue.serverTimestamp(),
-      });
-    }
-  }
-
-  Future<void> _markAsInTransit() async {
-    await _updateOrderStatus(OrderStatus.inTransit);
-
-    // Update delivery document
-    if (_deliveryId.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('deliveries')
-          .doc(_deliveryId)
-          .update({
-        'status': 'in_transit',
-        'transitStartedAt': FieldValue.serverTimestamp(),
-      });
-    }
-  }
-
-  Future<void> _markAsDelivered() async {
-    await _updateOrderStatus(OrderStatus.delivered);
-
-    // Update delivery document
-    if (_deliveryId.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('deliveries')
-          .doc(_deliveryId)
-          .update({
-        'status': 'delivered',
-        'deliveredAt': FieldValue.serverTimestamp(),
-      });
-    }
-  }
-
-  Future<void> _completeDelivery() async {
-    await _updateOrderStatus(OrderStatus.completed);
-
-    // Update delivery document
-    if (_deliveryId.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('deliveries')
-          .doc(_deliveryId)
-          .update({
-        'status': 'completed',
-        'completedAt': FieldValue.serverTimestamp(),
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _priceController.dispose();
-    _tabController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_errorMessage != null && messages.isEmpty) {
+      return Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        appBar: _buildModernAppBar(),
+        body: _buildErrorState(),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0A1A2A),
-        foregroundColor: Colors.white,
-        leading: const BackButton(),
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Colors.blue[100],
-              radius: 16,
-              child: Text(
-                _otherUserName.isNotEmpty ? _otherUserName[0].toUpperCase() : '?',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[700],
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _otherUserName.isNotEmpty ? _otherUserName : 'Chat Partner',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (_route.isNotEmpty)
-                    Text(
-                      _route,
-                      style: const TextStyle(fontSize: 11, color: Colors.white70),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  Text(
-                    _currentUserRole == UserRole.traveller ? '🚚 You are the Traveller' : '📦 You are the Sender',
-                    style: const TextStyle(fontSize: 9, color: Colors.white60),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(icon: const Icon(Icons.info_outline), onPressed: _showDeliveryInfo),
-        ],
-      ),
+      backgroundColor: Colors.grey.shade50,
+      appBar: _buildModernAppBar(),
       body: Column(
         children: [
-          // Status Banner
-          if (_currentOrderStatus != OrderStatus.pending) _buildStatusBanner(),
-
-          // Chat Messages
-          Expanded(child: _isPriceMode ? _buildPriceNegotiationView() : _buildChatView()),
-          const Divider(height: 1),
-
-          // Action Buttons
-          _buildActionButtons(),
-
-          // Tab Bar
-          Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: const Color(0xFF0A1A2A),
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: const Color(0xFF0A1A2A),
-              tabs: const [
-                Tab(icon: Icon(Icons.chat_bubble_outline), text: 'CHAT'),
-                Tab(icon: Icon(Icons.attach_money), text: 'PRICE'),
-              ],
-            ),
-          ),
-
-          // Message Input
-          if (!_isPriceMode) _buildMessageInput(),
+          Expanded(child: _buildMessagesList()),
+          if (replyingToMessage != null) _buildReplyPreview(),
+          _buildMessageInput(),
         ],
       ),
     );
   }
 
-  Widget _buildStatusBanner() {
-    Color backgroundColor;
-    IconData icon;
-    String statusText;
+  PreferredSizeWidget _buildModernAppBar() {
+    return AppBar(
+      elevation: 0,
+      backgroundColor: Colors.white,
+      systemOverlayStyle: SystemUiOverlayStyle.dark,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios, color: Colors.black87, size: 20),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [Colors.blue.shade400, Colors.blue.shade600],
+              ),
+            ),
+            child: _buildAvatarFallback(),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  otherUserData['name'] ?? 'Unknown User',
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  'Order #${widget.orderId}',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh, color: Colors.black87),
+          onPressed: () => _loadMessages(silent: false),
+          tooltip: 'Refresh',
+        ),
+      ],
+    );
+  }
 
-    switch (_currentOrderStatus) {
-      case OrderStatus.priceNegotiated:
-        backgroundColor = Colors.green.shade100;
-        icon = Icons.handshake;
-        statusText = 'Price agreed: $_negotiatedPrice';
-        break;
-      case OrderStatus.orderConfirmed:
-        backgroundColor = Colors.blue.shade100;
-        icon = Icons.check_circle;
-        statusText = 'Delivery confirmed - $_deliveryId';
-        break;
-      case OrderStatus.pickedUp:
-        backgroundColor = Colors.orange.shade100;
-        icon = Icons.inventory;
-        statusText = 'Package picked up';
-        break;
-      case OrderStatus.inTransit:
-        backgroundColor = Colors.purple.shade100;
-        icon = Icons.local_shipping;
-        statusText = 'In transit';
-        break;
-      case OrderStatus.delivered:
-        backgroundColor = Colors.teal.shade100;
-        icon = Icons.done_all;
-        statusText = 'Delivered successfully';
-        break;
-      case OrderStatus.completed:
-        backgroundColor = Colors.green.shade200;
-        icon = Icons.star;
-        statusText = 'Delivery completed';
-        break;
-      default:
-        backgroundColor = Colors.grey.shade100;
-        icon = Icons.info;
-        statusText = 'Negotiating';
+  Widget _buildAvatarFallback() {
+    final name = otherUserData['name'] ?? 'U';
+    return Center(
+      child: Text(
+        name[0].toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessagesList() {
+    if (messages.isEmpty) {
+      return _buildEmptyMessages();
     }
 
+    return RefreshIndicator(
+      onRefresh: () => _loadMessages(silent: false),
+      child: ListView.builder(
+        controller: _scrollController,
+        reverse: true,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: messages.length,
+        itemBuilder: (context, index) {
+          final message = messages[messages.length - 1 - index];
+          // ✅ Compare senderId (int) with current user ID (int)
+          final isMe = message['senderId'] == _currentUserId;
+
+          print('💬 Rendering message: senderId=${message['senderId']}, currentUserId=$_currentUserId, isMe=$isMe');
+
+          return ModernMessageBubble(
+            message: message,
+            messageId: message['messageId'],
+            isMe: isMe,
+            onReply: (messageData) => _setReplyMessage(message['messageId'], messageData),
+            onCopy: _copyMessage,
+            onLaunchUrl: _launchUrl,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyMessages() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.chat_bubble_outline,
+              size: 40,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Start the conversation',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Send a message to get started',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load messages',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'Unknown error occurred',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => _loadMessages(silent: false),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReplyPreview() {
+    if (replyingToMessage == null) return const SizedBox.shrink();
+
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: backgroundColor,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          left: BorderSide(color: Colors.blue.shade600, width: 3),
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 20),
+          Icon(Icons.reply, color: Colors.blue.shade600, size: 16),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              statusText,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    if (_currentUserRole == UserRole.sender && _currentOrderStatus == OrderStatus.priceNegotiated) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _confirmDelivery,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: Text(
-              'Confirm Delivery - $_negotiatedPrice',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_currentUserRole == UserRole.traveller && _currentOrderStatus == OrderStatus.orderConfirmed) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _markAsPickedUp,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text(
-              'Mark as Picked Up',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_currentUserRole == UserRole.traveller && _currentOrderStatus == OrderStatus.pickedUp) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _markAsInTransit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text(
-              'Start Transit',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_currentUserRole == UserRole.traveller && _currentOrderStatus == OrderStatus.inTransit) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _markAsDelivered,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text(
-              'Mark as Delivered',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_currentUserRole == UserRole.sender && _currentOrderStatus == OrderStatus.delivered) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _completeDelivery,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text(
-              'Confirm Receipt & Complete',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildChatView() {
-    final messagesStream = FirebaseFirestore.instance
-        .collection('chats')
-        .doc(widget.chatId)
-        .collection('messages')
-        .orderBy('timestamp', descending: true)
-        .snapshots();
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: messagesStream,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-
-        final messages = snapshot.data!.docs;
-        if (messages.isEmpty) {
-          return const Center(
-            child: Text(
-              'Start the conversation!\nDiscuss pickup location, delivery details, and price.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          );
-        }
-
-        return ListView.builder(
-          reverse: true,
-          padding: const EdgeInsets.all(8),
-          itemCount: messages.length,
-          itemBuilder: (context, index) {
-            final data = messages[index].data() as Map<String, dynamic>;
-            final senderId = data['sender_id'] ?? '';
-            final messageType = data['messageType'] ?? 'text';
-            final isMe = senderId == currentUserId;
-            final isSystem = senderId == 'system';
-            final text = data['text'] ?? '';
-            final priceOffer = data['priceOffer'] ?? '';
-
-            if (isSystem) {
-              return Container(
-                margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Text(
-                  text,
-                  style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
-                  textAlign: TextAlign.center,
-                ),
-              );
-            }
-
-            if (messageType == 'price_offer') {
-              return _buildPriceOfferMessage(priceOffer, isMe);
-            }
-
-            return Align(
-              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.75,
-                ),
-                decoration: BoxDecoration(
-                  color: isMe ? const Color(0xFF0A1A2A) : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  text,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isMe ? Colors.white : Colors.black,
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildPriceOfferMessage(String price, bool isMe) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: const EdgeInsets.all(12),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        decoration: BoxDecoration(
-          color: isMe ? Colors.green[100] : Colors.orange[100],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isMe ? Colors.green : Colors.orange,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '💰 Price Offer: $price',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            if (!isMe && _currentOrderStatus == OrderStatus.pending) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => _acceptPrice(price),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                  ),
-                  child: const Text('Accept Price', style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPriceNegotiationView() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          const Spacer(),
-
-          // Price input section
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-            ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '💰 Suggest Your Price',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _priceController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    prefixText: '₹ ',
-                    labelText: 'Enter amount',
-                    border: OutlineInputBorder(),
-                    hintText: '1500',
+                Text(
+                  'Replying to',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.blue.shade700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (_priceController.text.isNotEmpty) {
-                        _sendMessage(priceOffer: '₹${_priceController.text}');
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0A1A2A),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text(
-                      'Send Price Offer',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
+                const SizedBox(height: 2),
+                Text(
+                  replyingToMessage!['message'] ?? '',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 20),
-
-          // Quick price suggestions
-          const Text('Quick Suggestions:', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildQuickPriceChip('₹500'),
-              _buildQuickPriceChip('₹1000'),
-              _buildQuickPriceChip('₹1500'),
-              _buildQuickPriceChip('₹2000'),
-              _buildQuickPriceChip('₹2500'),
-              _buildQuickPriceChip('₹3000'),
-            ],
+          IconButton(
+            icon: Icon(Icons.close, color: Colors.grey.shade600, size: 18),
+            onPressed: _clearReply,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
-
-          const Spacer(),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuickPriceChip(String price) {
-    return InkWell(
-      onTap: () => _sendMessage(priceOffer: price),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade400),
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
-        ),
-        child: Text(
-          price,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
       ),
     );
   }
 
   Widget _buildMessageInput() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade300)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: TextField(
+                  controller: _messageController,
+                  maxLines: null,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    hintText: replyingToMessage != null
+                        ? 'Reply to message...'
+                        : 'Type a message...',
+                    hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.blue.shade600,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                onPressed: _sendMessage,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _sendMessage() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) return;
+
+    final chatIdInt = int.tryParse(widget.chatId);
+    if (chatIdInt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid chat ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    _messageController.clear();
+    _clearReply();
+
+    final tempMessage = {
+      'messageId': 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      'message': message,
+      'senderId': _currentUserId, // ✅ Store as int
+      'senderName': 'You',
+      'timestamp': DateTime.now(),
+      'type': 'text',
+      'sending': true,
+    };
+
+    setState(() {
+      messages.add(tempMessage);
+    });
+
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+
+    try {
+      final result = await ChatService.sendMessage(
+        chatId: chatIdInt,
+        message: message,
+      );
+
+      if (result['success'] == true) {
+        print('✅ Message sent successfully');
+        await _loadMessages(silent: true);
+      } else {
+        setState(() {
+          messages.removeWhere((msg) => msg['messageId'] == tempMessage['messageId']);
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Failed to send message'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+
+        print('❌ Failed to send message: ${result['error']}');
+      }
+    } catch (e) {
+      setState(() {
+        messages.removeWhere((msg) => msg['messageId'] == tempMessage['messageId']);
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      print('❌ Exception sending message: $e');
+    }
+  }
+
+  void _setReplyMessage(String messageId, Map<String, dynamic> messageData) {
+    setState(() {
+      replyingToMessageId = messageId;
+      replyingToMessage = messageData;
+    });
+  }
+
+  void _clearReply() {
+    setState(() {
+      replyingToMessageId = null;
+      replyingToMessage = null;
+    });
+  }
+
+  void _copyMessage(String message) {
+    Clipboard.setData(ClipboardData(text: message));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Message copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open link'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+}
+
+// ✅ FIXED: Reversed color scheme - Your messages = WHITE, Other = BLUE
+class ModernMessageBubble extends StatelessWidget {
+  final Map<String, dynamic> message;
+  final String messageId;
+  final bool isMe;
+  final Function(Map<String, dynamic>) onReply;
+  final Function(String) onCopy;
+  final Function(String) onLaunchUrl;
+
+  const ModernMessageBubble({
+    Key? key,
+    required this.message,
+    required this.messageId,
+    required this.isMe,
+    required this.onReply,
+    required this.onCopy,
+    required this.onLaunchUrl,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isSystem = message['senderId'] == 'system';
+    final isSending = message['sending'] == true;
+
+    if (isSystem) {
+      return _buildSystemMessage();
+    }
+
+    return GestureDetector(
+      onLongPress: isSending ? null : () => _showMessageOptions(context),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // ✅ Other person's avatar on LEFT (BLUE messages)
+            if (!isMe) ...[
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade400, Colors.blue.shade600],
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(Icons.person, color: Colors.white, size: 16),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.75,
+                ),
+                child: Column(
+                  crossAxisAlignment: isMe
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [
+                    if (message['replyMessage'] != null) _buildReplyPreview(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        // ✅ REVERSED: Your messages = WHITE, Other person = BLUE
+                        color: isMe ? Colors.white : Colors.blue.shade600,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(20),
+                          topRight: const Radius.circular(20),
+                          bottomLeft: Radius.circular(isMe ? 4 : 20),
+                          bottomRight: Radius.circular(isMe ? 20 : 4),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(child: _buildMessageContent()),
+                          if (isSending) ...[
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  isMe ? Colors.grey : Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatTime(message['timestamp']),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // ✅ Your avatar on RIGHT (WHITE messages)
+            if (isMe) ...[
+              const SizedBox(width: 8),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade400,
+                ),
+                child: const Center(
+                  child: Icon(Icons.person, color: Colors.white, size: 16),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSystemMessage() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            message['message'] ?? '',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReplyPreview() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: isMe ? Colors.grey.shade100 : Colors.blue.shade700,
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: const Icon(Icons.attach_file),
-            color: Colors.grey,
-            onPressed: () {},
-          ),
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: const InputDecoration(
-                hintText: 'Type your message...',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              onSubmitted: (val) => _sendMessage(text: val),
-              maxLines: null,
+          Container(
+            width: 3,
+            height: 20,
+            decoration: BoxDecoration(
+              color: isMe ? Colors.blue.shade600 : Colors.white,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.send),
-            color: const Color(0xFF0A1A2A),
-            onPressed: () => _sendMessage(text: _messageController.text),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              message['replyMessage'] ?? '',
+              style: TextStyle(
+                fontSize: 12,
+                color: isMe ? Colors.grey.shade600 : Colors.white70,
+                fontStyle: FontStyle.italic,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _showDeliveryInfo() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delivery Information'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Item: $_itemDescription'),
-            Text('Route: $_route'),
-            if (_weight.isNotEmpty) Text('Weight: $_weight'),
-            if (_deliveryDate.isNotEmpty) Text('Expected Date: $_deliveryDate'),
-            if (_deliveryId.isNotEmpty) Text('Tracking ID: $_deliveryId'),
-            if (_negotiatedPrice.isNotEmpty) Text('Price: $_negotiatedPrice'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
+  Widget _buildMessageContent() {
+    final messageText = message['message'] ?? '';
+    final urlRegex = RegExp(
+      r'https?://(?:[-\w.])+(?::[0-9]+)?(?:/(?:[\w/_.])*(?:\?[-\w&=%.]*)?)?#?(?:[\w]*)?',
+      caseSensitive: false,
+    );
+
+    if (urlRegex.hasMatch(messageText)) {
+      return _buildTextWithLinks(messageText, urlRegex);
+    }
+
+    return Text(
+      messageText,
+      style: TextStyle(
+        fontSize: 15,
+        // ✅ REVERSED: White bubbles (your messages) = black text, Blue bubbles (other) = white text
+        color: isMe ? Colors.black87 : Colors.white,
+        height: 1.3,
       ),
     );
+  }
+
+  Widget _buildTextWithLinks(String text, RegExp urlRegex) {
+    final spans = <TextSpan>[];
+    final matches = urlRegex.allMatches(text);
+    int lastMatchEnd = 0;
+
+    for (final match in matches) {
+      if (match.start > lastMatchEnd) {
+        spans.add(TextSpan(
+          text: text.substring(lastMatchEnd, match.start),
+          style: TextStyle(
+            fontSize: 15,
+            color: isMe ? Colors.black87 : Colors.white,
+          ),
+        ));
+      }
+
+      final url = match.group(0)!;
+      spans.add(TextSpan(
+        text: url,
+        style: TextStyle(
+          fontSize: 15,
+          color: isMe ? Colors.blue.shade600 : Colors.white,
+          decoration: TextDecoration.underline,
+          fontWeight: FontWeight.w500,
+        ),
+        recognizer: TapGestureRecognizer()..onTap = () => onLaunchUrl(url),
+      ));
+
+      lastMatchEnd = match.end;
+    }
+
+    if (lastMatchEnd < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastMatchEnd),
+        style: TextStyle(
+          fontSize: 15,
+          color: isMe ? Colors.black87 : Colors.white,
+        ),
+      ));
+    }
+
+    return RichText(
+      text: TextSpan(children: spans),
+    );
+  }
+
+  void _showMessageOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: Icon(Icons.reply, color: Colors.blue.shade600),
+              title: const Text('Reply'),
+              onTap: () {
+                Navigator.pop(context);
+                onReply(message);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.copy, color: Colors.grey.shade600),
+              title: const Text('Copy'),
+              onTap: () {
+                Navigator.pop(context);
+                onCopy(message['message'] ?? '');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(dynamic timestamp) {
+    if (timestamp == null) return '';
+
+    DateTime time;
+    if (timestamp is DateTime) {
+      time = timestamp;
+    } else {
+      time = DateTime.parse(timestamp.toString());
+    }
+
+    final now = DateTime.now();
+    final difference = now.difference(time);
+
+    if (difference.inDays == 0) {
+      return DateFormat('HH:mm').format(time);
+    } else if (difference.inDays == 1) {
+      return 'Yesterday ${DateFormat('HH:mm').format(time)}';
+    } else {
+      return DateFormat('MMM dd, HH:mm').format(time);
+    }
   }
 }

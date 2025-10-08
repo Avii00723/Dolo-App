@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:dolo/screens/Inbox%20Section/indoxscreen.dart';
 import 'package:dolo/screens/ProfileSection/profilescreen.dart';
 import 'package:dolo/screens/orderSection/CreateOrderPage.dart';
@@ -32,14 +31,21 @@ class _HomePageWithNavState extends State<HomePageWithNav> with WidgetsBindingOb
     super.dispose();
   }
 
-  // Fixed pages list - same for all users, including search tab
+  // Method to switch to Orders tab (called by CreateOrderPage)
+  void switchToOrdersTab() {
+    setState(() {
+      _selectedIndex = 2; // Your Orders is at index 2
+    });
+  }
+
+  // Fixed pages list with callback
   List<Widget> get _pages {
     return [
-      const CreateOrderPage(),    // Create (index 0)
-      const SendPage(),           // Search (index 1)
-      const YourOrdersPage(),     // Your Orders (index 2)
-      const InboxScreen(),        // Inbox (index 3)
-      const ProfilePage(),        // Profile (index 4)
+      CreateOrderPage(onOrderCreated: switchToOrdersTab), // Pass callback
+      const SendPage(), // Search (index 1)
+      const YourOrdersPage(), // Your Orders (index 2)
+      const InboxScreen(), // Inbox (index 3)
+      const ProfilePage(), // Profile (index 4)
     ];
   }
 
@@ -77,7 +83,6 @@ class _HomePageWithNavState extends State<HomePageWithNav> with WidgetsBindingOb
   void _onItemTapped(int index) {
     // Ensure index is within valid range
     if (index >= _pages.length || index < 0) return;
-
     setState(() {
       _selectedIndex = index;
     });
@@ -91,7 +96,7 @@ class _HomePageWithNavState extends State<HomePageWithNav> with WidgetsBindingOb
     }
 
     return Scaffold(
-      extendBody: true,
+      extendBody: false, // CHANGED: Set to false to prevent overlap
       backgroundColor: Colors.grey[50],
       body: IndexedStack(
         index: _selectedIndex,

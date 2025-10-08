@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../home/homepage.dart';
-import 'OTPScreen.dart'; // Import your home page
+import 'OTPScreen.dart';
+import '../../Controllers/LoginService.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,7 +12,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController phoneController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final LoginService _loginService = LoginService();
   bool isLoading = false;
 
   void sendOTP() async {
@@ -37,74 +37,37 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await _auth.verifyPhoneNumber(
-        phoneNumber: '+91$phoneNumber',
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          // Auto-verification completed (usually on same device)
-          await _auth.signInWithCredential(credential);
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomePageWithNav()),
-            );
-          }
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          setState(() {
-            isLoading = false;
-          });
-
-          String errorMessage = 'Verification failed';
-          if (e.code == 'invalid-phone-number') {
-            errorMessage = 'Invalid phone number format';
-          } else if (e.code == 'too-many-requests') {
-            errorMessage = 'Too many requests. Please try again later';
-          } else if (e.code == 'quota-exceeded') {
-            errorMessage = 'SMS quota exceeded. Please try again later';
-          }
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(errorMessage)),
-            );
-          }
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          setState(() {
-            isLoading = false;
-          });
-
-          if (mounted) {
-            // Navigate to OTP screen with verification ID
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => OTPScreen(
-                  verificationId: verificationId,
-                  phoneNumber: '+91$phoneNumber',
-                ),
+      final response = await _loginService.sendOtp(phoneNumber);
+      if (response != null && response.userId > 0) {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OTPScreen(
+                phoneNumber: phoneNumber,
+                userId: response.userId,
+                // You can pass OTP for debugging if needed: otp: response.otp,
               ),
-            );
-          }
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          // Auto-retrieval timeout
-          setState(() {
-            isLoading = false;
-          });
-        },
-        timeout: const Duration(seconds: 60),
-      );
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to send OTP')),
+          );
+        }
+      }
     } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
       setState(() {
         isLoading = false;
       });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
-      }
     }
   }
 
@@ -119,7 +82,6 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 50),
-
               Column(
                 children: [
                   Center(
@@ -128,7 +90,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       height: 190,
                       width: 190,
                       errorBuilder: (context, error, stackTrace) {
-                        // Fallback if image doesn't exist
                         return Container(
                           width: 80,
                           height: 80,
@@ -163,17 +124,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // const Center(
-                  //   child: Text(
-                  //     'DOLO',
-                  //     style: TextStyle(
-                  //       fontSize: 32,
-                  //       fontWeight: FontWeight.bold,
-                  //       color: Colors.black,
-                  //       letterSpacing: 2,
-                  //     ),
-                  //   ),
-                  // ),
                   const SizedBox(height: 24),
                   const Center(
                     child: Text(
@@ -245,7 +195,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 280),
 
-              // Terms and Privacy
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8.0),
                 child: Text(

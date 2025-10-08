@@ -1,11 +1,11 @@
-import 'package:dolo/screens/LoginScreens/login_page.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
 import '../../Constants/colorconstant.dart';
+import '../../Controllers/ProfileService.dart';
+import '../../Controllers/AuthService.dart';
+import '../LoginScreens/LoginSignupScreen.dart';
 import '../LoginScreens/signup_page.dart';
 import 'ProfileDetailPage.dart';
+import '../../Models/LoginModel.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -15,13 +15,11 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  Map<String, dynamic>? userData;
+  final ProfileService _profileService = ProfileService();
+  UserProfile? userProfile;
+  int? userId;
   bool isLoading = true;
   bool profileExists = false;
-  bool isUpdatingUserType = false;
   bool notificationsEnabled = true;
   late AnimationController _animationController;
   late Animation<double> _animation;
@@ -46,38 +44,51 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     super.dispose();
   }
 
+  // ✅ MODIFIED: Enhanced user data loading with navigation to login if user doesn't exist
   Future<void> _loadUserData() async {
     try {
       setState(() {
         isLoading = true;
       });
 
-      final String? userId = _auth.currentUser?.uid;
-      if (userId != null) {
-        final DocumentSnapshot doc =
-        await _firestore.collection('users').doc(userId).get();
+      // ✅ Get userId from AuthService (Secure Storage)
+      userId = await AuthService.getUserId();
 
-        if (doc.exists) {
-          setState(() {
-            userData = doc.data() as Map<String, dynamic>;
-            profileExists = true;
-            isLoading = false;
-            notificationsEnabled = userData!['notificationsEnabled'] ?? true;
-          });
-          _animationController.forward();
+      if (userId == null) {
+        print('⚠️ No userId found - navigating to login');
+        await _navigateToLogin('Session expired. Please login again.');
+        return;
+      }
+
+      // ✅ Fetch user profile
+      final profile = await _profileService.getUserProfile(userId!);
+
+      if (profile != null) {
+        setState(() {
+          userProfile = profile;
+          profileExists = true;
+          isLoading = false;
+          notificationsEnabled = true;
+        });
+        _animationController.forward();
+      } else {
+        // ✅ Profile is null - could mean user doesn't exist
+        // Check if session was cleared (indicates user doesn't exist)
+        final stillLoggedIn = await AuthService.isLoggedIn();
+
+        if (!stillLoggedIn) {
+          print('🚨 User session cleared - user does not exist in database');
+          await _navigateToLogin('User account not found. Please login again.');
         } else {
+          // Profile just doesn't exist yet, but user is valid
           setState(() {
             profileExists = false;
             isLoading = false;
           });
         }
-      } else {
-        setState(() {
-          isLoading = false;
-        });
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      print('❌ Error loading user data: $e');
       setState(() {
         isLoading = false;
       });
@@ -85,55 +96,70 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     }
   }
 
-  Future<void> _updateUserType(String newUserType) async {
-    if (isUpdatingUserType) return;
+  // ✅ NEW: Navigate to login screen and clear all routes
+  Future<void> _navigateToLogin(String message) async {
+    // Ensure session is cleared
+    await AuthService.clearUserSession();
 
-    setState(() {
-      isUpdatingUserType = true;
-    });
+    if (!mounted) return;
 
-    try {
-      final String? userId = _auth.currentUser?.uid;
-      if (userId != null) {
-        await _firestore.collection('users').doc(userId).update({
-          'userType': newUserType,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+    // Show message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.info_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
 
-        setState(() {
-          if (userData != null) {
-            userData!['userType'] = newUserType;
-          }
-        });
+    // Small delay to show message
+    await Future.delayed(const Duration(milliseconds: 500));
 
-        _showSuccessSnackBar('Switched to ${newUserType.toUpperCase()} mode');
-      }
-    } catch (e) {
-      _showErrorSnackBar('Failed to update user type: $e');
-    } finally {
-      setState(() {
-        isUpdatingUserType = false;
-      });
-    }
+    if (!mounted) return;
+
+    // Navigate to login and remove all previous routes
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => const LoginSignupScreen(),
+      ),
+          (Route<dynamic> route) => false,
+    );
   }
 
+  // ✅ MODIFIED: Update notification preference with user existence check
   Future<void> _updateNotificationPreference(bool enabled) async {
     try {
-      final String? userId = _auth.currentUser?.uid;
       if (userId != null) {
-        await _firestore.collection('users').doc(userId).update({
-          'notificationsEnabled': enabled,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+        final success = await _profileService.updateUserProfile(
+          userId!,
+          {'notificationsEnabled': enabled},
+        );
 
-        setState(() {
-          notificationsEnabled = enabled;
-          if (userData != null) {
-            userData!['notificationsEnabled'] = enabled;
+        if (success) {
+          setState(() {
+            notificationsEnabled = enabled;
+          });
+          _showSuccessSnackBar(
+              enabled ? 'Notifications enabled' : 'Notifications disabled'
+          );
+        } else {
+          // Check if session was cleared (user doesn't exist)
+          final stillLoggedIn = await AuthService.isLoggedIn();
+          if (!stillLoggedIn) {
+            print('🚨 User session cleared during update - user does not exist');
+            await _navigateToLogin('User account not found. Please login again.');
+          } else {
+            _showErrorSnackBar('Failed to update notification preference');
           }
-        });
-
-        _showSuccessSnackBar(enabled ? 'Notifications enabled' : 'Notifications disabled');
+        }
       }
     } catch (e) {
       _showErrorSnackBar('Failed to update notification preference');
@@ -141,41 +167,24 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   }
 
   String _getDisplayName() {
-    if (userData != null && userData!['name'] != null) {
-      return userData!['name'];
-    }
-    return 'Complete Profile';
+    return userProfile?.name ?? 'Complete Profile';
   }
 
   String _getPhoneNumber() {
-    if (userData != null && userData!['phone'] != null) {
-      return userData!['phone'];
-    }
-    return _auth.currentUser?.phoneNumber ?? 'Not available';
+    return userProfile?.phone ?? 'Not available';
   }
 
   String _getKycStatus() {
-    if (userData != null && userData!['kycStatus'] != null) {
-      return userData!['kycStatus'];
-    }
-    return 'not_required';
-  }
-
-  String _getUserType() {
-    if (userData != null && userData!['userType'] != null) {
-      return userData!['userType'];
-    }
-    return 'sender';
+    return userProfile?.kycStatus ?? 'not_required';
   }
 
   bool _isProfileComplete() {
-    return userData != null && (userData!['profileCompleted'] ?? false);
+    return userProfile != null && userProfile!.name.isNotEmpty;
   }
 
   String _getUserInitials() {
     String name = _getDisplayName();
     if (name == 'Complete Profile') return 'U';
-
     List<String> nameParts = name.split(' ');
     if (nameParts.length >= 2) {
       return '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
@@ -183,205 +192,272 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     return name[0].toUpperCase();
   }
 
-  // Theme Toggle Style User Type Selector
-  Widget _buildUserTypeToggle() {
-    if (!_isProfileComplete()) return const SizedBox.shrink();
+  // ✅ Logout dialog method
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.logout, color: Colors.red[700]),
+              const SizedBox(width: 12),
+              const Text('Logout'),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Are you sure you want to logout?'),
+              SizedBox(height: 8),
+              Text(
+                'You will need to login again to access your account.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // Close confirmation dialog first
+                Navigator.of(dialogContext).pop();
 
-    String currentUserType = _getUserType();
-    bool isTraveller = currentUserType.toLowerCase() == 'traveller';
+                // Show loading dialog
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext loadingContext) {
+                    return WillPopScope(
+                      onWillPop: () async => false,
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  },
+                );
 
+                try {
+                  // Clear secure storage
+                  await AuthService.clearUserSession();
+
+                  // Small delay to ensure storage is cleared
+                  await Future.delayed(const Duration(milliseconds: 300));
+
+                  // Close loading dialog - Use rootNavigator
+                  if (context.mounted) {
+                    Navigator.of(context, rootNavigator: true).pop();
+                  }
+
+                  // Small delay before navigation
+                  await Future.delayed(const Duration(milliseconds: 100));
+
+                  // Navigate to login screen and remove all previous routes
+                  if (context.mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (context) => const LoginSignupScreen(),
+                      ),
+                          (Route<dynamic> route) => false,
+                    );
+                  }
+                } catch (e) {
+                  print('❌ Logout error: $e');
+                  // Close loading dialog on error
+                  if (context.mounted) {
+                    Navigator.of(context, rootNavigator: true).pop();
+                  }
+
+                  // Show error message
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Logout failed: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileCard() {
     return FadeTransition(
       opacity: _animation,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.2),
-          end: Offset.zero,
-        ).animate(_animation),
+      child: InkWell(
+        onTap: () {
+          if (profileExists && userProfile != null && userId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ProfileDetailsPage(
+                  userProfile: userProfile!,
+                  userId: userId!,
+                ),
+              ),
+            ).then((result) {
+              if (result == true) {
+                _loadUserData();
+              }
+            });
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SignupScreen(
+                  isKycRequired: false,
+                  userId: userId,
+                ),
+              ),
+            ).then((result) {
+              if (result == true) {
+                _loadUserData();
+              }
+            });
+          }
+        },
         child: Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 2,
           shadowColor: Colors.black12,
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.swap_horiz,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'User Mode',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Main Toggle Section
-                Row(
-                  children: [
-                    // Left Label (Active Mode)
-                    Text(
-                      isTraveller ? 'TRAVELLER' : 'SENDER',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const Spacer(),
-
-                    // Toggle Switch Container
-                    GestureDetector(
-                      onTap: isUpdatingUserType ? null : () {
-                        _updateUserType(isTraveller ? 'sender' : 'traveller');
-                      },
-                      child: Container(
-                        width: 80,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(25),
-                          border: Border.all(
-                            color: Colors.grey[400]!,
-                            width: 1,
-                          ),
+                    Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        CircleAvatar(
+                          radius: 35,
+                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                          backgroundImage: userProfile?.photoURL != null &&
+                              userProfile!.photoURL.isNotEmpty
+                              ? NetworkImage(userProfile!.photoURL)
+                              : null,
+                          child: userProfile?.photoURL == null ||
+                              userProfile!.photoURL.isEmpty
+                              ? Text(
+                            _getUserInitials(),
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                              : null,
                         ),
-                        child: Stack(
-                          children: [
-                            // Animated toggle button
-                            AnimatedAlign(
-                              duration: const Duration(milliseconds: 200),
-                              curve: Curves.easeInOut,
-                              alignment: isTraveller
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                margin: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 150),
-                                    child: Icon(
-                                      isTraveller
-                                          ? Icons.local_shipping
-                                          : Icons.inventory_2,
-                                      key: ValueKey(isTraveller),
-                                      size: 18,
-                                      color: AppColors.primary,
-                                    ),
+                        if (_isProfileComplete())
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.verified_user,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ✅ Name with Rating in same row
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _getDisplayName(),
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: profileExists ? Colors.black : Colors.grey[600],
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              // ✅ Show rating only if profile is complete
+                              if (_isProfileComplete()) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.lightBlue[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.lightBlue[200]!,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.star,
+                                        color: Colors.lightBlue[700],
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        '4.6',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.lightBlue[900],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _getPhoneNumber(),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildProfileStatusChip(),
+                        ],
                       ),
                     ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: Colors.grey[400],
+                    ),
                   ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // Description Text
-                Text(
-                  isTraveller
-                      ? 'Tap to switch to SENDER mode'
-                      : 'Tap to switch to TRAVELLER mode',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-
-                // Loading indicator
-                if (isUpdatingUserType) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Updating user mode...',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-
-                const SizedBox(height: 16),
-
-                // Feature description
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isTraveller ? Icons.local_shipping : Icons.inventory_2,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          isTraveller
-                              ? 'Deliver packages on your travel routes and earn money'
-                              : 'Send packages through trusted travellers safely',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[700],
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),
@@ -391,158 +467,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildProfileCard() {
-    return FadeTransition(
-      opacity: _animation,
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        elevation: 2,
-        shadowColor: Colors.black12,
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              // User Avatar and Basic Info
-              Row(
-                children: [
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 35,
-                        backgroundColor: AppColors.primary.withOpacity(0.1),
-                        backgroundImage: userData?['profileUrl'] != null &&
-                            userData!['profileUrl'].isNotEmpty
-                            ? NetworkImage(userData!['profileUrl'])
-                            : null,
-                        child: userData?['profileUrl'] == null || userData!['profileUrl'].isEmpty
-                            ? Text(
-                          _getUserInitials(),
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
-                            : null,
-                      ),
-                      if (_isProfileComplete())
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _getUserType().toLowerCase() == 'traveller'
-                                ? Icons.local_shipping
-                                : Icons.inventory_2,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _getDisplayName(),
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: profileExists ? Colors.black : Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _getPhoneNumber(),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildProfileStatusChip(),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      if (profileExists) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ProfileDetailsPage(userData: userData!),
-                          ),
-                        ).then((result) {
-                          if (result == true) {
-                            _loadUserData();
-                          }
-                        });
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.edit, size: 16),
-                    ),
-                  ),
-                ],
-              ),
-
-              // Complete Profile Button
-              if (!_isProfileComplete()) ...[
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SignupScreen(isKycRequired: false),
-                        ),
-                      ).then((result) {
-                        if (result == true) {
-                          _loadUserData();
-                        }
-                      });
-                    },
-                    icon: const Icon(Icons.person_add),
-                    label: const Text('Complete Profile'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-
-              // KYC Information
-              if (_isProfileComplete()) ...[
-                const SizedBox(height: 20),
-                Divider(color: Colors.grey[300]),
-                const SizedBox(height: 16),
-                _buildKycSection(),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildProfileStatusChip() {
     if (!_isProfileComplete()) {
@@ -577,14 +501,14 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.green[200]!),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 12),
-            const SizedBox(width: 4),
+            Icon(Icons.check_circle, color: Colors.green, size: 12),
+            SizedBox(width: 4),
             Text(
-              _getUserType().toUpperCase(),
-              style: const TextStyle(
+              'VERIFIED',
+              style: TextStyle(
                 color: Colors.green,
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -594,82 +518,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ),
       );
     }
-  }
-
-  Widget _buildKycSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Verification Status',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[800],
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildKycItem('KYC Status', _getKycStatusText(), _getKycStatusIcon(), _getKycStatusColor()[0]),
-        if (userData?['aadhaar'] != null)
-          _buildKycItem('Aadhaar', '****${userData!['aadhaar'].toString().substring(8)}', Icons.credit_card, Colors.blue),
-        if (userData?['licenseStatus'] != null)
-          _buildKycItem('License', userData!['licenseStatus'] == 'uploaded' ? 'Uploaded' : 'Not Uploaded', Icons.drive_eta, Colors.purple),
-      ],
-    );
-  }
-
-  Widget _buildKycItem(String title, String value, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[700],
-            ),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMenuSection(String title, List<Widget> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 1,
-          child: Column(children: items),
-        ),
-      ],
-    );
   }
 
   Widget _buildMenuItem({
@@ -700,13 +548,15 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           fontWeight: FontWeight.w500,
         ),
       ),
-      subtitle: subtitle != null ? Text(
+      subtitle: subtitle != null
+          ? Text(
         subtitle,
         style: TextStyle(
           color: Colors.grey[600],
           fontSize: 12,
         ),
-      ) : null,
+      )
+          : null,
       trailing: trailing ?? const Icon(Icons.chevron_right, size: 16),
       onTap: onTap,
       shape: RoundedRectangleBorder(
@@ -715,43 +565,30 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  List<dynamic> _getKycStatusColor() {
-    switch (_getKycStatus()) {
-      case 'verified':
-        return [Colors.green, Colors.green[50]];
-      case 'pending':
-        return [Colors.orange, Colors.orange[50]];
-      case 'not_required':
-        return [Colors.blue, Colors.blue[50]];
-      default:
-        return [Colors.grey, Colors.grey[50]];
-    }
-  }
-
-  IconData _getKycStatusIcon() {
-    switch (_getKycStatus()) {
-      case 'verified':
-        return Icons.verified;
-      case 'pending':
-        return Icons.pending;
-      case 'not_required':
-        return Icons.info;
-      default:
-        return Icons.help;
-    }
-  }
-
-  String _getKycStatusText() {
-    switch (_getKycStatus()) {
-      case 'verified':
-        return 'Verified';
-      case 'pending':
-        return 'Pending';
-      case 'not_required':
-        return 'Not Required';
-      default:
-        return 'Unknown';
-    }
+  Widget _buildMenuSection(String title, List<Widget> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 1,
+          child: Column(children: items),
+        ),
+      ],
+    );
   }
 
   void _showErrorSnackBar(String message) {
@@ -798,12 +635,8 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         elevation: 0,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: const Text(
-          'DOLO',
+          'Profile',
           style: TextStyle(
             color: AppColors.primary,
             fontWeight: FontWeight.bold,
@@ -849,15 +682,8 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  // User Profile Card
                   _buildProfileCard(),
                   const SizedBox(height: 16),
-                  //
-                  // // User Type Toggle
-                  // _buildUserTypeToggle(),
-                  // const SizedBox(height: 16),
-
-                  // Settings Menu
                   _buildMenuSection(
                     'Preferences',
                     [
@@ -866,20 +692,9 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         title: 'Language',
                         subtitle: 'English',
                         onTap: () {
-                          // TODO: Implement language selection
                           _showSuccessSnackBar('Language selection coming soon!');
                         },
                         iconColor: Colors.blue,
-                      ),
-                      _buildMenuItem(
-                        icon: Icons.lock_outline,
-                        title: 'Change Password',
-                        subtitle: 'Update your password',
-                        onTap: () {
-                          // TODO: Implement password change
-                          _showSuccessSnackBar('Password change coming soon!');
-                        },
-                        iconColor: Colors.orange,
                       ),
                       _buildMenuItem(
                         icon: Icons.notifications_outlined,
@@ -896,7 +711,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                     ],
                   ),
                   const SizedBox(height: 16),
-
                   _buildMenuSection(
                     'Support & Info',
                     [
@@ -905,7 +719,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         title: 'Support',
                         subtitle: 'Get help and contact us',
                         onTap: () {
-                          // TODO: Implement support
                           _showSuccessSnackBar('Support page coming soon!');
                         },
                         iconColor: Colors.cyan,
@@ -915,7 +728,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         title: 'Send Feedback',
                         subtitle: 'Help us improve',
                         onTap: () {
-                          // TODO: Implement feedback
                           _showSuccessSnackBar('Feedback form coming soon!');
                         },
                         iconColor: Colors.green,
@@ -923,8 +735,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                     ],
                   ),
                   const SizedBox(height: 24),
-
-                  // Log Out Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -949,47 +759,5 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ),
       ),
     );
-  }
-
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Logout'),
-          content: const Text('Are you sure you want to logout?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _performLogout(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Logout'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _performLogout(BuildContext context) async {
-    try {
-      await _auth.signOut();
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-            (Route<dynamic> route) => false,
-      );
-    } catch (e) {
-      _showErrorSnackBar('Error signing out: $e');
-    }
   }
 }
