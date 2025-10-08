@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../Controllers/AuthService.dart';
-import '../../Controllers/ChatService.dart';
+import '../../Controllers/ChatService.dart'; // ✅ Import ChatService
 import 'ChatScreen.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -25,10 +25,10 @@ class _InboxScreenState extends State<InboxScreen> {
 
   Future<void> _initializeAndLoadInbox() async {
     _currentUserId = await AuthService.getUserId();
-    await _loadInbox();
+    await _loadInbox(); // ✅ Changed to call API method
   }
 
-  // ✅ UPDATED: Load only real inbox data, no dummy data
+  // ✅ NEW: Load inbox from API and append below dummy data
   Future<void> _loadInbox() async {
     if (!mounted) return;
 
@@ -38,6 +38,22 @@ class _InboxScreenState extends State<InboxScreen> {
     });
 
     try {
+      // First, load dummy data
+      final dummyConversations = [
+        {
+          'transaction_id': 1,
+          'other_user_id': 2,
+          'other_user_name': 'Rajesh Kumar',
+          'other_user_photo': '', // Empty means will use avatar fallback
+          'order_id': 101,
+          'origin': 'Mumbai Central',
+          'destination': 'Pune Station',
+          'lastMessage': 'Hi, I can deliver your package tomorrow morning',
+          'lastMessageTime': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
+          'accepted_by': null, // Not yet accepted
+        },
+      ];
+
       // ✅ Call the API to get real inbox data
       final result = await ChatService.getInbox();
 
@@ -46,32 +62,48 @@ class _InboxScreenState extends State<InboxScreen> {
       if (result['success'] == true) {
         final apiInbox = result['inbox'] as List<dynamic>;
 
-        // ✅ Only use API data - no dummy data
-        final conversations = apiInbox.map((item) => item as Map<String, dynamic>).toList();
+        // ✅ Combine dummy data with API data
+        final combinedConversations = [
+          ...dummyConversations,
+          ...apiInbox.map((item) => item as Map<String, dynamic>).toList(),
+        ];
 
         setState(() {
-          _conversations = conversations;
+          _conversations = combinedConversations;
           _isLoading = false;
           _errorMessage = null;
         });
 
-        print('✅ Loaded ${conversations.length} conversations from API');
+        print('✅ Loaded ${dummyConversations.length} dummy + ${apiInbox.length} API conversations = ${_conversations.length} total');
       } else {
-        // ✅ If API fails, show empty list with error message
+        // If API fails, still show dummy data
         setState(() {
-          _conversations = [];
+          _conversations = dummyConversations;
           _isLoading = false;
           _errorMessage = result['error'] as String?;
         });
 
-        print('⚠️ API failed: ${result['error']}');
+        print('⚠️ API failed, showing dummy data only: ${result['error']}');
       }
     } catch (e) {
-      // ✅ On exception, show empty list with error
+      // On exception, show dummy data
       if (!mounted) return;
 
       setState(() {
-        _conversations = [];
+        _conversations = [
+          {
+            'transaction_id': 1,
+            'other_user_id': 2,
+            'other_user_name': 'Rajesh Kumar',
+            'other_user_photo': '',
+            'order_id': 101,
+            'origin': 'Mumbai Central',
+            'destination': 'Pune Station',
+            'lastMessage': 'Hi, I can deliver your package tomorrow morning',
+            'lastMessageTime': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
+            'accepted_by': null,
+          },
+        ];
         _isLoading = false;
         _errorMessage = 'Network error: $e';
       });
@@ -99,7 +131,7 @@ class _InboxScreenState extends State<InboxScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: _loadInbox,
+            onPressed: _loadInbox, // ✅ Updated refresh method
             tooltip: 'Refresh',
           ),
         ],
@@ -119,17 +151,13 @@ class _InboxScreenState extends State<InboxScreen> {
       );
     }
 
-    // ✅ Show empty state when conversations list is empty
+    // Show empty state when conversations list is empty
     if (_conversations.isEmpty) {
-      // Show error state if there's an error, otherwise show empty state
-      if (_errorMessage != null) {
-        return _buildErrorState();
-      }
       return _buildEmptyState();
     }
 
     return RefreshIndicator(
-      onRefresh: _loadInbox,
+      onRefresh: _loadInbox, // ✅ Updated refresh method
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _conversations.length,
@@ -168,7 +196,6 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
-  // ✅ UPDATED: Better empty state design
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -189,7 +216,7 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'No Chats Available',
+            'No recent chats found',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -200,30 +227,12 @@ class _InboxScreenState extends State<InboxScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'Start chatting by accepting trip requests or sending messages',
+              'Start chatting by sending a trip request',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade500,
               ),
               textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 24),
-          // ✅ ADD: Refresh button in empty state
-          ElevatedButton.icon(
-            onPressed: _loadInbox,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
             ),
           ),
         ],
@@ -245,7 +254,7 @@ class _InboxScreenState extends State<InboxScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Failed to Load Messages',
+              'Failed to load messages',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -263,18 +272,13 @@ class _InboxScreenState extends State<InboxScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _loadInbox,
+              onPressed: _loadInbox, // ✅ Updated retry method
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade600,
-                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
@@ -289,15 +293,12 @@ class _InboxScreenState extends State<InboxScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          chatId: conversation['chat_id'].toString(),
+          chatId: conversation['chat_id'].toString(), // ✅ Use chat_id from inbox
           orderId: conversation['order_id'].toString(),
-          otherUserName: conversation['other_user_name'],
+          otherUserName: conversation['other_user_name'], // Optional
         ),
       ),
-    ).then((_) {
-      // Refresh inbox when returning from chat
-      _loadInbox();
-    });
+    );
   }
 }
 
