@@ -3,15 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../Controllers/AuthService.dart';
+import '../../Controllers/ChatService.dart';
 
 class ChatScreen extends StatefulWidget {
-  final String otherUserId;
+  final String chatId;
   final String orderId;
+  final String? otherUserName;
 
   const ChatScreen({
     Key? key,
-    required this.otherUserId,
+    required this.chatId,
     required this.orderId,
+    this.otherUserName,
   }) : super(key: key);
 
   @override
@@ -22,242 +26,161 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  final String currentUserId = '1';
-  late Map<String, dynamic> otherUserData;
+  int? _currentUserId;
+  Map<String, dynamic> otherUserData = {};
   List<Map<String, dynamic>> messages = [];
-
   bool isLoading = true;
+  String? _errorMessage;
   String? replyingToMessageId;
   Map<String, dynamic>? replyingToMessage;
 
   @override
   void initState() {
     super.initState();
-    _initializeDummyData();
+    _initializeChat();
   }
 
-  void _initializeDummyData() {
-    setState(() {
-      otherUserData = {
-        'name': 'Rajesh Kumar',
-        'profileUrl': '',
-      };
+  Future<void> _initializeChat() async {
+    _currentUserId = await AuthService.getUserId();
 
-      messages = [
-        {
-          'messageId': '1',
-          'message': 'Hi! I saw your delivery request from Mumbai to Pune. I am traveling on the same route tomorrow.',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 10)),
-          'type': 'text',
-        },
-        {
-          'messageId': '2',
-          'message': 'Great! What time are you planning to travel?',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 45)),
-          'type': 'text',
-        },
-        {
-          'messageId': '3',
-          'message': 'I will be leaving Mumbai at 10 AM tomorrow and should reach Pune by 1 PM.',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 30)),
-          'type': 'text',
-        },
-        {
-          'messageId': '4',
-          'message': 'Perfect timing! Can you handle a 5.5kg electronics package?',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 20)),
-          'type': 'text',
-        },
-        {
-          'messageId': '5',
-          'message': 'Yes, definitely! I have enough space in my car and I\'ll handle it carefully.',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 10)),
-          'type': 'text',
-        },
-        {
-          'messageId': '6',
-          'message': 'Where exactly will you pick it up from?',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9, minutes: 5)),
-          'type': 'text',
-        },
-        {
-          'messageId': '7',
-          'message': 'I\'m near Mumbai Central station. Can you come there around 9:30 AM?',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 9)),
-          'type': 'text',
-        },
-        {
-          'messageId': '8',
-          'message': 'Sure, I can reach there by 9:30 AM. Please share the exact pickup address.',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 50)),
-          'type': 'text',
-        },
-        {
-          'messageId': '9',
-          'message': '📨 Trip request sent',
-          'senderId': 'system',
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 45)),
-          'type': 'system',
-        },
-        {
-          'messageId': '10',
-          'message': 'I\'ve sent you a trip request. Please check!',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 40)),
-          'type': 'text',
-        },
-        {
-          'messageId': '11',
-          'message': '✅ Trip request accepted',
-          'senderId': 'system',
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 30)),
-          'type': 'system',
-        },
-        {
-          'messageId': '12',
-          'message': 'Great! I\'ve accepted your request. Looking forward to helping you!',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 25)),
-          'type': 'text',
-        },
-        {
-          'messageId': '13',
-          'message': 'Thank you so much! Here\'s the pickup address: Shop No. 5, Platform 1, Mumbai Central Station',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 20)),
-          'type': 'text',
-        },
-        {
-          'messageId': '14',
-          'message': 'Perfect! I\'ve noted it down. And where should I deliver it in Pune?',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 15)),
-          'type': 'text',
-        },
-        {
-          'messageId': '15',
-          'message': 'Delivery address: B-204, Seasons Mall, Magarpatta, Pune. My colleague will receive it.',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 10)),
-          'type': 'text',
-        },
-        {
-          'messageId': '16',
-          'message': 'Got it! Please share the receiver\'s contact number.',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8, minutes: 5)),
-          'type': 'text',
-        },
-        {
-          'messageId': '17',
-          'message': 'Receiver contact: +91 98765 43210 (Priya)',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 8)),
-          'type': 'text',
-        },
-        {
-          'messageId': '18',
-          'message': 'Noted! One more thing - the package is fragile, right? I saw electronics mentioned.',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 7, minutes: 50)),
-          'type': 'text',
-        },
-        {
-          'messageId': '19',
-          'message': 'Yes, it\'s a laptop. Please handle with care and avoid placing anything heavy on it.',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 7, minutes: 45)),
-          'type': 'text',
-        },
-        {
-          'messageId': '20',
-          'message': 'Don\'t worry! I\'ll keep it safely in the front seat. See you tomorrow at 9:30 AM! 👍',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 7, minutes: 40)),
-          'type': 'text',
-        },
-        {
-          'messageId': '21',
-          'message': 'Thank you! See you tomorrow. Have a safe journey! 🙏',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 7, minutes: 35)),
-          'type': 'text',
-        },
-        {
-          'messageId': '22',
-          'message': 'Good morning! I\'m on my way to the pickup location. Will reach in 15 minutes.',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(hours: 8)),
-          'type': 'text',
-        },
-        {
-          'messageId': '23',
-          'message': 'Perfect! I\'m already here at Platform 1. Waiting near Shop No. 5.',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(hours: 7, minutes: 50)),
-          'type': 'text',
-        },
-        {
-          'messageId': '24',
-          'message': 'Package picked up! Starting my journey to Pune now. Will update you when I reach.',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(hours: 7, minutes: 30)),
-          'type': 'text',
-        },
-        {
-          'messageId': '25',
-          'message': 'Great! Thank you so much. Have a safe drive! 🚗',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(hours: 7, minutes: 25)),
-          'type': 'text',
-        },
-        {
-          'messageId': '26',
-          'message': 'Hi! I\'ve reached Pune. On my way to Magarpatta now. Should reach in 20 minutes.',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(hours: 4, minutes: 20)),
-          'type': 'text',
-        },
-        {
-          'messageId': '27',
-          'message': 'Excellent! I\'ve informed Priya. She\'s ready to receive it.',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(hours: 4, minutes: 15)),
-          'type': 'text',
-        },
-        {
-          'messageId': '28',
-          'message': 'Package delivered successfully to Priya at Seasons Mall! She confirmed receipt. 📦✅',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(hours: 4)),
-          'type': 'text',
-        },
-        {
-          'messageId': '29',
-          'message': 'Awesome! Thank you so much for the safe delivery! You were very professional. 🙏',
-          'senderId': currentUserId,
-          'timestamp': DateTime.now().subtract(const Duration(hours: 3, minutes: 55)),
-          'type': 'text',
-        },
-        {
-          'messageId': '30',
-          'message': 'My pleasure! Glad I could help. Feel free to contact me for any future deliveries on this route! 😊',
-          'senderId': widget.otherUserId,
-          'timestamp': DateTime.now().subtract(const Duration(hours: 3, minutes: 50)),
-          'type': 'text',
-        },
-      ];
+    if (_currentUserId == null) {
+      setState(() {
+        isLoading = false;
+        _errorMessage = 'User not authenticated';
+      });
+      return;
+    }
 
-      isLoading = false;
-    });
+    print('🔑 Current User ID: $_currentUserId');
+    await _loadMessages();
+  }
+
+  Future<void> _loadMessages({bool silent = false}) async {
+    if (!mounted) return;
+
+    if (!silent) {
+      setState(() {
+        isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
+    try {
+      final chatIdInt = int.tryParse(widget.chatId);
+
+      if (chatIdInt == null) {
+        if (!silent) {
+          setState(() {
+            isLoading = false;
+            _errorMessage = 'Invalid chat ID';
+          });
+        }
+        return;
+      }
+
+      final result = await ChatService.getChatMessages(chatId: chatIdInt);
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final apiMessages = result['messages'] as List<dynamic>;
+
+        final convertedMessages = apiMessages.map((msg) {
+          final senderId = msg['sender_id']; // ✅ Keep as int for proper comparison
+          final senderName = msg['sender_name'] ?? 'Unknown';
+
+          // ✅ Debug print to verify IDs
+          print('📨 Message: senderId=$senderId (type: ${senderId.runtimeType}), currentUserId=$_currentUserId (type: ${_currentUserId.runtimeType}), isMe=${senderId == _currentUserId}');
+
+          return {
+            'messageId': msg['id'].toString(),
+            'message': msg['message'] ?? '',
+            'senderId': senderId, // ✅ Store as int for proper comparison
+            'senderName': senderName,
+            'timestamp': DateTime.parse(msg['created_at']),
+            'type': 'text',
+          };
+        }).toList();
+
+        final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+        final wasAtBottom = scrollOffset < 50;
+
+        setState(() {
+          messages = convertedMessages;
+
+          if (convertedMessages.isNotEmpty) {
+            final firstOtherMessage = convertedMessages.firstWhere(
+                  (msg) => msg['senderId'] != _currentUserId,
+              orElse: () => {},
+            );
+
+            if (firstOtherMessage.isNotEmpty) {
+              otherUserData = {
+                'name': firstOtherMessage['senderName'] ?? widget.otherUserName ?? 'Unknown User',
+                'profileUrl': '',
+              };
+            } else {
+              otherUserData = {
+                'name': widget.otherUserName ?? 'Unknown User',
+                'profileUrl': '',
+              };
+            }
+          } else {
+            otherUserData = {
+              'name': widget.otherUserName ?? 'Unknown User',
+              'profileUrl': '',
+            };
+          }
+
+          isLoading = false;
+          _errorMessage = null;
+        });
+
+        if (silent || wasAtBottom) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        }
+
+        if (!silent) {
+          print('✅ Loaded ${messages.length} messages from API');
+        }
+      } else {
+        if (!silent) {
+          setState(() {
+            isLoading = false;
+            _errorMessage = result['error'] as String?;
+            otherUserData = {
+              'name': widget.otherUserName ?? 'Unknown User',
+              'profileUrl': '',
+            };
+          });
+        }
+
+        print('⚠️ Failed to load messages: ${result['error']}');
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      if (!silent) {
+        setState(() {
+          isLoading = false;
+          _errorMessage = 'Failed to load messages: $e';
+          otherUserData = {
+            'name': widget.otherUserName ?? 'Unknown User',
+            'profileUrl': '',
+          };
+        });
+      }
+
+      print('❌ Exception loading messages: $e');
+    }
   }
 
   @override
@@ -266,6 +189,14 @@ class _ChatScreenState extends State<ChatScreen> {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_errorMessage != null && messages.isEmpty) {
+      return Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        appBar: _buildModernAppBar(),
+        body: _buildErrorState(),
       );
     }
 
@@ -332,6 +263,13 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh, color: Colors.black87),
+          onPressed: () => _loadMessages(silent: false),
+          tooltip: 'Refresh',
+        ),
+      ],
     );
   }
 
@@ -354,23 +292,30 @@ class _ChatScreenState extends State<ChatScreen> {
       return _buildEmptyMessages();
     }
 
-    return ListView.builder(
-      controller: _scrollController,
-      reverse: true,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
-        final message = messages[messages.length - 1 - index];
-        final isMe = message['senderId'] == currentUserId;
-        return ModernMessageBubble(
-          message: message,
-          messageId: message['messageId'],
-          isMe: isMe,
-          onReply: (messageData) => _setReplyMessage(message['messageId'], messageData),
-          onCopy: _copyMessage,
-          onLaunchUrl: _launchUrl,
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: () => _loadMessages(silent: false),
+      child: ListView.builder(
+        controller: _scrollController,
+        reverse: true,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: messages.length,
+        itemBuilder: (context, index) {
+          final message = messages[messages.length - 1 - index];
+          // ✅ Compare senderId (int) with current user ID (int)
+          final isMe = message['senderId'] == _currentUserId;
+
+          print('💬 Rendering message: senderId=${message['senderId']}, currentUserId=$_currentUserId, isMe=$isMe');
+
+          return ModernMessageBubble(
+            message: message,
+            messageId: message['messageId'],
+            isMe: isMe,
+            onReply: (messageData) => _setReplyMessage(message['messageId'], messageData),
+            onCopy: _copyMessage,
+            onLaunchUrl: _launchUrl,
+          );
+        },
+      ),
     );
   }
 
@@ -414,8 +359,57 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load messages',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'Unknown error occurred',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => _loadMessages(silent: false),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildReplyPreview() {
     if (replyingToMessage == null) return const SizedBox.shrink();
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(12),
@@ -524,24 +518,37 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _sendMessage() {
+  void _sendMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
 
-    setState(() {
-      messages.add({
-        'messageId': DateTime.now().millisecondsSinceEpoch.toString(),
-        'message': message,
-        'senderId': currentUserId,
-        'timestamp': DateTime.now(),
-        'type': 'text',
-        if (replyingToMessageId != null) 'replyTo': replyingToMessageId,
-        if (replyingToMessage != null) 'replyMessage': replyingToMessage!['message'],
-      });
-    });
+    final chatIdInt = int.tryParse(widget.chatId);
+    if (chatIdInt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid chat ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     _messageController.clear();
     _clearReply();
+
+    final tempMessage = {
+      'messageId': 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      'message': message,
+      'senderId': _currentUserId, // ✅ Store as int
+      'senderName': 'You',
+      'timestamp': DateTime.now(),
+      'type': 'text',
+      'sending': true,
+    };
+
+    setState(() {
+      messages.add(tempMessage);
+    });
 
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -549,6 +556,48 @@ class _ChatScreenState extends State<ChatScreen> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
+    }
+
+    try {
+      final result = await ChatService.sendMessage(
+        chatId: chatIdInt,
+        message: message,
+      );
+
+      if (result['success'] == true) {
+        print('✅ Message sent successfully');
+        await _loadMessages(silent: true);
+      } else {
+        setState(() {
+          messages.removeWhere((msg) => msg['messageId'] == tempMessage['messageId']);
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['error'] ?? 'Failed to send message'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+
+        print('❌ Failed to send message: ${result['error']}');
+      }
+    } catch (e) {
+      setState(() {
+        messages.removeWhere((msg) => msg['messageId'] == tempMessage['messageId']);
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      print('❌ Exception sending message: $e');
     }
   }
 
@@ -600,6 +649,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
+// ✅ FIXED: Reversed color scheme - Your messages = WHITE, Other = BLUE
 class ModernMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final String messageId;
@@ -621,18 +671,21 @@ class ModernMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSystem = message['senderId'] == 'system';
+    final isSending = message['sending'] == true;
+
     if (isSystem) {
       return _buildSystemMessage();
     }
 
     return GestureDetector(
-      onLongPress: () => _showMessageOptions(context),
+      onLongPress: isSending ? null : () => _showMessageOptions(context),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            // ✅ Other person's avatar on LEFT (BLUE messages)
             if (!isMe) ...[
               Container(
                 width: 32,
@@ -666,12 +719,13 @@ class ModernMessageBubble extends StatelessWidget {
                         vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        color: isMe ? Colors.blue.shade600 : Colors.white,
+                        // ✅ REVERSED: Your messages = WHITE, Other person = BLUE
+                        color: isMe ? Colors.white : Colors.blue.shade600,
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(20),
                           topRight: const Radius.circular(20),
-                          bottomLeft: Radius.circular(isMe ? 20 : 4),
-                          bottomRight: Radius.circular(isMe ? 4 : 20),
+                          bottomLeft: Radius.circular(isMe ? 4 : 20),
+                          bottomRight: Radius.circular(isMe ? 20 : 4),
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -681,7 +735,25 @@ class ModernMessageBubble extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: _buildMessageContent(),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(child: _buildMessageContent()),
+                          if (isSending) ...[
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  isMe ? Colors.grey : Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -696,6 +768,7 @@ class ModernMessageBubble extends StatelessWidget {
                 ),
               ),
             ),
+            // ✅ Your avatar on RIGHT (WHITE messages)
             if (isMe) ...[
               const SizedBox(width: 8),
               Container(
@@ -703,7 +776,7 @@ class ModernMessageBubble extends StatelessWidget {
                 height: 32,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.blue.shade600,
+                  color: Colors.grey.shade400,
                 ),
                 child: const Center(
                   child: Icon(Icons.person, color: Colors.white, size: 16),
@@ -745,7 +818,7 @@ class ModernMessageBubble extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: isMe ? Colors.blue.shade700 : Colors.grey.shade100,
+        color: isMe ? Colors.grey.shade100 : Colors.blue.shade700,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -755,7 +828,7 @@ class ModernMessageBubble extends StatelessWidget {
             width: 3,
             height: 20,
             decoration: BoxDecoration(
-              color: isMe ? Colors.white : Colors.blue.shade600,
+              color: isMe ? Colors.blue.shade600 : Colors.white,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -765,7 +838,7 @@ class ModernMessageBubble extends StatelessWidget {
               message['replyMessage'] ?? '',
               style: TextStyle(
                 fontSize: 12,
-                color: isMe ? Colors.white70 : Colors.grey.shade600,
+                color: isMe ? Colors.grey.shade600 : Colors.white70,
                 fontStyle: FontStyle.italic,
               ),
               maxLines: 2,
@@ -792,7 +865,8 @@ class ModernMessageBubble extends StatelessWidget {
       messageText,
       style: TextStyle(
         fontSize: 15,
-        color: isMe ? Colors.white : Colors.black87,
+        // ✅ REVERSED: White bubbles (your messages) = black text, Blue bubbles (other) = white text
+        color: isMe ? Colors.black87 : Colors.white,
         height: 1.3,
       ),
     );
@@ -809,7 +883,7 @@ class ModernMessageBubble extends StatelessWidget {
           text: text.substring(lastMatchEnd, match.start),
           style: TextStyle(
             fontSize: 15,
-            color: isMe ? Colors.white : Colors.black87,
+            color: isMe ? Colors.black87 : Colors.white,
           ),
         ));
       }
@@ -819,7 +893,7 @@ class ModernMessageBubble extends StatelessWidget {
         text: url,
         style: TextStyle(
           fontSize: 15,
-          color: isMe ? Colors.white : Colors.blue.shade600,
+          color: isMe ? Colors.blue.shade600 : Colors.white,
           decoration: TextDecoration.underline,
           fontWeight: FontWeight.w500,
         ),
@@ -834,7 +908,7 @@ class ModernMessageBubble extends StatelessWidget {
         text: text.substring(lastMatchEnd),
         style: TextStyle(
           fontSize: 15,
-          color: isMe ? Colors.white : Colors.black87,
+          color: isMe ? Colors.black87 : Colors.white,
         ),
       ));
     }

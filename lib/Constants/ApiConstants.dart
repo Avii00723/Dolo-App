@@ -28,5 +28,5 @@ class ApiConstants {
   // Chat
   static const String getChatInbox = '$baseUrl/chat/inbox'; // append /{userId}
   static const String sendChatMessage = '$baseUrl/chat/send';
-  static const String getChatMessages = '$baseUrl/chat'; // append /{transaction_id}/{user_id}
+  static const String getChatMessages = '$baseUrl/chat'; // append /{chat_id}/{use
 }

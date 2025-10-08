@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../Controllers/AuthService.dart';
+import '../../Controllers/ChatService.dart'; // ✅ Import ChatService
 import 'ChatScreen.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -24,11 +25,11 @@ class _InboxScreenState extends State<InboxScreen> {
 
   Future<void> _initializeAndLoadInbox() async {
     _currentUserId = await AuthService.getUserId();
-    await _loadDummyInbox();
+    await _loadInbox(); // ✅ Changed to call API method
   }
 
-  // ✅ Load dummy data matching API response format
-  Future<void> _loadDummyInbox() async {
+  // ✅ NEW: Load inbox from API and append below dummy data
+  Future<void> _loadInbox() async {
     if (!mounted) return;
 
     setState(() {
@@ -36,14 +37,9 @@ class _InboxScreenState extends State<InboxScreen> {
       _errorMessage = null;
     });
 
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    if (!mounted) return;
-
-    // ✅ Dummy data matching the API response structure
-    setState(() {
-      _conversations = [
+    try {
+      // First, load dummy data
+      final dummyConversations = [
         {
           'transaction_id': 1,
           'other_user_id': 2,
@@ -56,11 +52,64 @@ class _InboxScreenState extends State<InboxScreen> {
           'lastMessageTime': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
           'accepted_by': null, // Not yet accepted
         },
-
       ];
-      _isLoading = false;
-      print('✅ Loaded ${_conversations.length} dummy conversations');
-    });
+
+      // ✅ Call the API to get real inbox data
+      final result = await ChatService.getInbox();
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final apiInbox = result['inbox'] as List<dynamic>;
+
+        // ✅ Combine dummy data with API data
+        final combinedConversations = [
+          ...dummyConversations,
+          ...apiInbox.map((item) => item as Map<String, dynamic>).toList(),
+        ];
+
+        setState(() {
+          _conversations = combinedConversations;
+          _isLoading = false;
+          _errorMessage = null;
+        });
+
+        print('✅ Loaded ${dummyConversations.length} dummy + ${apiInbox.length} API conversations = ${_conversations.length} total');
+      } else {
+        // If API fails, still show dummy data
+        setState(() {
+          _conversations = dummyConversations;
+          _isLoading = false;
+          _errorMessage = result['error'] as String?;
+        });
+
+        print('⚠️ API failed, showing dummy data only: ${result['error']}');
+      }
+    } catch (e) {
+      // On exception, show dummy data
+      if (!mounted) return;
+
+      setState(() {
+        _conversations = [
+          {
+            'transaction_id': 1,
+            'other_user_id': 2,
+            'other_user_name': 'Rajesh Kumar',
+            'other_user_photo': '',
+            'order_id': 101,
+            'origin': 'Mumbai Central',
+            'destination': 'Pune Station',
+            'lastMessage': 'Hi, I can deliver your package tomorrow morning',
+            'lastMessageTime': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
+            'accepted_by': null,
+          },
+        ];
+        _isLoading = false;
+        _errorMessage = 'Network error: $e';
+      });
+
+      print('❌ Exception loading inbox: $e');
+    }
   }
 
   @override
@@ -82,7 +131,7 @@ class _InboxScreenState extends State<InboxScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: _loadDummyInbox,
+            onPressed: _loadInbox, // ✅ Updated refresh method
             tooltip: 'Refresh',
           ),
         ],
@@ -102,18 +151,13 @@ class _InboxScreenState extends State<InboxScreen> {
       );
     }
 
-    // Show error state only if there's an actual error message
-    if (_errorMessage != null) {
-      return _buildErrorState();
-    }
-
     // Show empty state when conversations list is empty
     if (_conversations.isEmpty) {
       return _buildEmptyState();
     }
 
     return RefreshIndicator(
-      onRefresh: _loadDummyInbox,
+      onRefresh: _loadInbox, // ✅ Updated refresh method
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _conversations.length,
@@ -228,7 +272,7 @@ class _InboxScreenState extends State<InboxScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _loadDummyInbox,
+              onPressed: _loadInbox, // ✅ Updated retry method
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
@@ -249,17 +293,16 @@ class _InboxScreenState extends State<InboxScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          otherUserId: conversation['other_user_id'].toString(),
+          chatId: conversation['chat_id'].toString(), // ✅ Use chat_id from inbox
           orderId: conversation['order_id'].toString(),
+          otherUserName: conversation['other_user_name'], // Optional
         ),
       ),
-    ).then((_) {
-      // Refresh inbox when returning from chat
-      _loadDummyInbox();
-    });
+    );
   }
 }
 
+// ModernChatCard widget remains the same
 class ModernChatCard extends StatelessWidget {
   final Map<String, dynamic> conversation;
   final int currentUserId;
@@ -308,7 +351,6 @@ class ModernChatCard extends StatelessWidget {
                 // Profile Avatar
                 _buildAvatar(otherUserPhoto, otherUserName),
                 const SizedBox(width: 16),
-
                 // Chat Content
                 Expanded(
                   child: Column(
@@ -340,7 +382,6 @@ class ModernChatCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-
                       // Order Info Chip
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -383,7 +424,6 @@ class ModernChatCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-
                       // Last Message
                       Text(
                         lastMessage,
@@ -395,7 +435,6 @@ class ModernChatCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-
                       // Status indicator if accepted
                       if (acceptedBy != null) ...[
                         const SizedBox(height: 8),
@@ -409,7 +448,6 @@ class ModernChatCard extends StatelessWidget {
                     ],
                   ),
                 ),
-
                 // Arrow indicator
                 Icon(
                   Icons.chevron_right,

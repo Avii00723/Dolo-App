@@ -9,15 +9,14 @@ class ChatService {
     return await AuthService.getUserId();
   }
 
-  // Send a chat message within a transaction
+  // ✅ NEW: Send a chat message using the new API structure
   static Future<Map<String, dynamic>> sendMessage({
-    required int transactionId,
+    required int chatId,
     required String message,
     int? negotiatedPrice,
   }) async {
     try {
       final userId = await _getCurrentUserId();
-
       if (userId == null) {
         return {
           'success': false,
@@ -26,8 +25,8 @@ class ChatService {
       }
 
       final Map<String, dynamic> body = {
-        'transaction_id': transactionId,
-        'sender_id': userId,
+        'chat_id': chatId,
+        'user_id': userId,
         'message': message,
       };
 
@@ -35,6 +34,8 @@ class ChatService {
       if (negotiatedPrice != null) {
         body['negotiatedPrice'] = negotiatedPrice;
       }
+
+      print('📤 Sending message with body: $body');
 
       final response = await http.post(
         Uri.parse(ApiConstants.sendChatMessage),
@@ -53,15 +54,14 @@ class ChatService {
           'data': jsonDecode(response.body),
         };
       } else if (response.statusCode == 400) {
-        final error = jsonDecode(response.body);
         return {
           'success': false,
-          'error': error['error'] ?? 'Missing required fields or transaction not found',
+          'error': 'Missing required fields',
         };
       } else if (response.statusCode == 403) {
         return {
           'success': false,
-          'error': 'You are not a participant in this transaction',
+          'error': 'You are not a participant in this chat',
         };
       } else {
         return {
@@ -78,13 +78,12 @@ class ChatService {
     }
   }
 
-  // Get all messages for a specific transaction
+  // ✅ NEW: Get all messages for a specific chat using the new API structure
   static Future<Map<String, dynamic>> getChatMessages({
-    required int transactionId,
+    required int chatId,
   }) async {
     try {
       final userId = await _getCurrentUserId();
-
       if (userId == null) {
         return {
           'success': false,
@@ -94,13 +93,14 @@ class ChatService {
       }
 
       final response = await http.get(
-        Uri.parse('${ApiConstants.getChatMessages}/$transactionId/$userId'),
+        Uri.parse('${ApiConstants.getChatMessages}/$chatId/$userId'),
         headers: {
           'Content-Type': 'application/json',
         },
       );
 
       print('📥 Get Messages Response: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -111,7 +111,13 @@ class ChatService {
       } else if (response.statusCode == 403) {
         return {
           'success': false,
-          'error': 'You are not a participant in this transaction',
+          'error': 'You are not a participant in this chat',
+          'messages': [],
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'error': 'Chat not found',
           'messages': [],
         };
       } else {
@@ -135,7 +141,6 @@ class ChatService {
   static Future<Map<String, dynamic>> getInbox() async {
     try {
       final userId = await _getCurrentUserId();
-
       if (userId == null) {
         return {
           'success': false,
@@ -160,13 +165,11 @@ class ChatService {
           'success': true,
           'inbox': data['inbox'] ?? [],
         };
-      } else if (response.statusCode == 400) {
-        // 400 means no data available - this is not an error, just empty inbox
-        print('📬 No inbox data available (400)');
+      } else if (response.statusCode == 500) {
         return {
-          'success': true,
+          'success': false,
+          'error': 'Server error occurred',
           'inbox': [],
-          'isEmpty': true, // Flag to indicate this is an empty state, not an error
         };
       } else {
         return {
@@ -187,12 +190,12 @@ class ChatService {
 
   // Send message with price negotiation
   static Future<Map<String, dynamic>> sendNegotiationMessage({
-    required int transactionId,
+    required int chatId,
     required String message,
     required int negotiatedPrice,
   }) async {
     return await sendMessage(
-      transactionId: transactionId,
+      chatId: chatId,
       message: message,
       negotiatedPrice: negotiatedPrice,
     );
