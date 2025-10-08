@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async'; // ✅ ADD: Import for Timer
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
 
@@ -22,7 +23,8 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+// ✅ ADD: WidgetsBindingObserver for lifecycle monitoring
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -34,10 +36,49 @@ class _ChatScreenState extends State<ChatScreen> {
   String? replyingToMessageId;
   Map<String, dynamic>? replyingToMessage;
 
+  // ✅ NEW: Timer for auto-refresh
+  Timer? _autoRefreshTimer;
+  bool _isRefreshing = false;
+
   @override
   void initState() {
     super.initState();
+    // ✅ ADD: Register lifecycle observer
+    WidgetsBinding.instance.addObserver(this);
     _initializeChat();
+    // ✅ START: Auto-refresh every 5 seconds
+    _startAutoRefresh();
+  }
+
+  // ✅ NEW: Handle app lifecycle changes
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground - refresh and restart timer
+      print('📱 App resumed - refreshing messages...');
+      _loadMessages(silent: true);
+      if (_autoRefreshTimer?.isActive != true) {
+        _startAutoRefresh();
+      }
+    } else if (state == AppLifecycleState.paused) {
+      // App went to background - pause timer to save battery
+      print('📱 App paused - stopping auto-refresh...');
+      _autoRefreshTimer?.cancel();
+    }
+  }
+
+  // ✅ NEW: Start auto-refresh timer
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel(); // Cancel existing timer if any
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted && !_isRefreshing) {
+        print('🔄 Auto-refreshing messages at ${DateTime.now()}');
+        _loadMessages(silent: true);
+      }
+    });
+    print('✅ Auto-refresh timer started (every 5 seconds)');
   }
 
   Future<void> _initializeChat() async {
@@ -56,13 +97,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadMessages({bool silent = false}) async {
-    if (!mounted) return;
+    if (!mounted || _isRefreshing) return;
 
     if (!silent) {
       setState(() {
         isLoading = true;
         _errorMessage = null;
       });
+    } else {
+      _isRefreshing = true;
     }
 
     try {
@@ -75,33 +118,35 @@ class _ChatScreenState extends State<ChatScreen> {
             _errorMessage = 'Invalid chat ID';
           });
         }
+        _isRefreshing = false;
         return;
       }
 
       final result = await ChatService.getChatMessages(chatId: chatIdInt);
 
-      if (!mounted) return;
+      if (!mounted) {
+        _isRefreshing = false;
+        return;
+      }
 
       if (result['success'] == true) {
         final apiMessages = result['messages'] as List<dynamic>;
 
         final convertedMessages = apiMessages.map((msg) {
-          final senderId = msg['sender_id']; // ✅ Keep as int for proper comparison
+          final senderId = msg['sender_id'];
           final senderName = msg['sender_name'] ?? 'Unknown';
-
-          // ✅ Debug print to verify IDs
-          print('📨 Message: senderId=$senderId (type: ${senderId.runtimeType}), currentUserId=$_currentUserId (type: ${_currentUserId.runtimeType}), isMe=${senderId == _currentUserId}');
 
           return {
             'messageId': msg['id'].toString(),
             'message': msg['message'] ?? '',
-            'senderId': senderId, // ✅ Store as int for proper comparison
+            'senderId': senderId,
             'senderName': senderName,
             'timestamp': DateTime.parse(msg['created_at']),
             'type': 'text',
           };
         }).toList();
 
+        // ✅ Check if user is at bottom before updating
         final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
         final wasAtBottom = scrollOffset < 50;
 
@@ -136,7 +181,19 @@ class _ChatScreenState extends State<ChatScreen> {
           _errorMessage = null;
         });
 
-        if (silent || wasAtBottom) {
+        // ✅ Only auto-scroll if user was at bottom (to not interrupt reading)
+        if (silent && wasAtBottom) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        } else if (!silent) {
+          // Always scroll on manual refresh
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_scrollController.hasClients) {
               _scrollController.animateTo(
@@ -166,7 +223,10 @@ class _ChatScreenState extends State<ChatScreen> {
         print('⚠️ Failed to load messages: ${result['error']}');
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        _isRefreshing = false;
+        return;
+      }
 
       if (!silent) {
         setState(() {
@@ -180,6 +240,8 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       print('❌ Exception loading messages: $e');
+    } finally {
+      _isRefreshing = false;
     }
   }
 
@@ -250,13 +312,43 @@ class _ChatScreenState extends State<ChatScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  'Order #${widget.orderId}',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Order #${widget.orderId}',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    // ✅ NEW: Show live indicator
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withOpacity(0.5),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Live',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -264,11 +356,25 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh, color: Colors.black87),
-          onPressed: () => _loadMessages(silent: false),
-          tooltip: 'Refresh',
-        ),
+        // ✅ Show loading indicator when refreshing
+        if (_isRefreshing)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation(Colors.grey.shade600),
+              ),
+            ),
+          )
+        else
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black87),
+            onPressed: () => _loadMessages(silent: false),
+            tooltip: 'Refresh',
+          ),
       ],
     );
   }
@@ -301,10 +407,7 @@ class _ChatScreenState extends State<ChatScreen> {
         itemCount: messages.length,
         itemBuilder: (context, index) {
           final message = messages[messages.length - 1 - index];
-          // ✅ Compare senderId (int) with current user ID (int)
           final isMe = message['senderId'] == _currentUserId;
-
-          print('💬 Rendering message: senderId=${message['senderId']}, currentUserId=$_currentUserId, isMe=$isMe');
 
           return ModernMessageBubble(
             message: message,
@@ -539,7 +642,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final tempMessage = {
       'messageId': 'temp_${DateTime.now().millisecondsSinceEpoch}',
       'message': message,
-      'senderId': _currentUserId, // ✅ Store as int
+      'senderId': _currentUserId,
       'senderName': 'You',
       'timestamp': DateTime.now(),
       'type': 'text',
@@ -643,13 +746,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // ✅ IMPORTANT: Clean up timer and observer
+    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 }
 
-// ✅ FIXED: Reversed color scheme - Your messages = WHITE, Other = BLUE
+// ModernMessageBubble class remains exactly the same as in your file
 class ModernMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final String messageId;
@@ -685,7 +791,6 @@ class ModernMessageBubble extends StatelessWidget {
           mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // ✅ Other person's avatar on LEFT (BLUE messages)
             if (!isMe) ...[
               Container(
                 width: 32,
@@ -719,7 +824,6 @@ class ModernMessageBubble extends StatelessWidget {
                         vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        // ✅ REVERSED: Your messages = WHITE, Other person = BLUE
                         color: isMe ? Colors.white : Colors.blue.shade600,
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(20),
@@ -768,7 +872,6 @@ class ModernMessageBubble extends StatelessWidget {
                 ),
               ),
             ),
-            // ✅ Your avatar on RIGHT (WHITE messages)
             if (isMe) ...[
               const SizedBox(width: 8),
               Container(
@@ -865,7 +968,6 @@ class ModernMessageBubble extends StatelessWidget {
       messageText,
       style: TextStyle(
         fontSize: 15,
-        // ✅ REVERSED: White bubbles (your messages) = black text, Blue bubbles (other) = white text
         color: isMe ? Colors.black87 : Colors.white,
         height: 1.3,
       ),
