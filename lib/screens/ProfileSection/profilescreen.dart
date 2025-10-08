@@ -298,6 +298,58 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       },
     );
   }
+// ✅ NEW: Build gradient avatar with initials
+  Widget _buildGradientAvatar(String name, double radius) {
+    // Generate initials
+    String initials = 'U';
+    if (name.isNotEmpty) {
+      final nameParts = name.trim().split(' ');
+      if (nameParts.length >= 2) {
+        initials = '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
+      } else {
+        initials = name[0].toUpperCase();
+      }
+    }
+
+    // Generate color based on name for consistent colors
+    final colorIndex = name.isNotEmpty ? name.codeUnitAt(0) % 10 : 0;
+    final gradientColors = [
+      [Color(0xFF667eea), Color(0xFF764ba2)],
+      [Color(0xFFf093fb), Color(0xFFF5576c)],
+      [Color(0xFF4facfe), Color(0xFF00f2fe)],
+      [Color(0xFF43e97b), Color(0xFF38f9d7)],
+      [Color(0xFFfa709a), Color(0xFFfee140)],
+      [Color(0xFF30cfd0), Color(0xFF330867)],
+      [Color(0xFFa8edea), Color(0xFFfed6e3)],
+      [Color(0xFFff9a9e), Color(0xFFfecfef)],
+      [Color(0xFFffecd2), Color(0xFFfcb69f)],
+      [Color(0xFFff6e7f), Color(0xFFbfe9ff)],
+    ];
+
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: gradientColors[colorIndex],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: radius * 0.6,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildProfileCard() {
     return FadeTransition(
@@ -347,31 +399,49 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                     Stack(
                       alignment: Alignment.bottomRight,
                       children: [
-                        CircleAvatar(
-                          radius: 35,
-                          backgroundColor: AppColors.primary.withOpacity(0.1),
-                          backgroundImage: userProfile?.photoURL != null &&
-                              userProfile!.photoURL.isNotEmpty
-                              ? NetworkImage(userProfile!.photoURL)
-                              : null,
-                          child: userProfile?.photoURL == null ||
-                              userProfile!.photoURL.isEmpty
-                              ? Text(
-                            _getUserInitials(),
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                              : null,
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: CircleAvatar(
+                            radius: 35,
+                            backgroundColor: Colors.white,
+                            child: userProfile?.photoURL != null && userProfile!.photoURL.isNotEmpty
+                                ? ClipOval(
+                              child: Image.network(
+                                userProfile!.photoURL,
+                                width: 70,
+                                height: 70,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  // Fallback to gradient avatar
+                                  return _buildGradientAvatar(_getDisplayName(), 35);
+                                },
+                              ),
+                            )
+                                : _buildGradientAvatar(_getDisplayName(), 35),
+                          ),
                         ),
                         if (_isProfileComplete())
                           Container(
                             padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             child: Icon(
                               Icons.verified_user,
@@ -381,6 +451,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                           ),
                       ],
                     ),
+
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(

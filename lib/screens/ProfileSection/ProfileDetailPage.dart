@@ -21,13 +21,12 @@ class ProfileDetailsPage extends StatefulWidget {
 class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   final ProfileService _profileService = ProfileService();
   final _formKey = GlobalKey<FormState>();
-
   late TextEditingController _nameController;
   late TextEditingController _emailController;
-
   File? _newProfileImage;
   final ImagePicker _picker = ImagePicker();
   bool _isUpdating = false;
+  bool _isEditMode = false; // ✅ NEW: Track edit mode
 
   @override
   void initState() {
@@ -43,8 +42,23 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     super.dispose();
   }
 
+  // ✅ NEW: Toggle edit mode
+  void _toggleEditMode() {
+    setState(() {
+      _isEditMode = !_isEditMode;
+      if (!_isEditMode) {
+        // Cancel editing - reset to original values
+        _nameController.text = widget.userProfile.name;
+        _emailController.text = widget.userProfile.email;
+        _newProfileImage = null;
+      }
+    });
+  }
+
   // Pick new profile image
   Future<void> _pickProfileImage() async {
+    if (!_isEditMode) return; // ✅ Only allow in edit mode
+
     try {
       showDialog(
         context: context,
@@ -114,7 +128,6 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
       };
 
       // TODO: If you want to upload new profile image, implement upload first
-      // For now, we'll just update name and email
       if (_newProfileImage != null) {
         // Upload image and get URL
         // updates['photoURL'] = uploadedImageUrl;
@@ -128,6 +141,9 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
 
       if (success) {
         _showSnackBar('Profile updated successfully!', isError: false);
+        setState(() {
+          _isEditMode = false; // ✅ Exit edit mode after successful update
+        });
         // Wait a bit then go back
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) {
@@ -167,6 +183,58 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
       ),
     );
   }
+// ✅ NEW: Build gradient avatar with initials
+  Widget _buildGradientAvatar(String name, double radius) {
+    // Generate initials
+    String initials = 'U';
+    if (name.isNotEmpty) {
+      final nameParts = name.trim().split(' ');
+      if (nameParts.length >= 2) {
+        initials = '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
+      } else {
+        initials = name[0].toUpperCase();
+      }
+    }
+
+    // Generate color based on name for consistent colors
+    final colorIndex = name.isNotEmpty ? name.codeUnitAt(0) % 10 : 0;
+    final gradientColors = [
+      [Color(0xFF667eea), Color(0xFF764ba2)],
+      [Color(0xFFf093fb), Color(0xFFF5576c)],
+      [Color(0xFF4facfe), Color(0xFF00f2fe)],
+      [Color(0xFF43e97b), Color(0xFF38f9d7)],
+      [Color(0xFFfa709a), Color(0xFFfee140)],
+      [Color(0xFF30cfd0), Color(0xFF330867)],
+      [Color(0xFFa8edea), Color(0xFFfed6e3)],
+      [Color(0xFFff9a9e), Color(0xFFfecfef)],
+      [Color(0xFFffecd2), Color(0xFFfcb69f)],
+      [Color(0xFFff6e7f), Color(0xFFbfe9ff)],
+    ];
+
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: gradientColors[colorIndex],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: radius * 0.6,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -187,6 +255,18 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
           ),
         ),
         centerTitle: true,
+        // ✅ NEW: Edit/Cancel button in AppBar
+        actions: [
+          if (!_isUpdating)
+            IconButton(
+              icon: Icon(
+                _isEditMode ? Icons.close : Icons.edit,
+                color: _isEditMode ? Colors.red : Colors.indigo[800],
+              ),
+              onPressed: _toggleEditMode,
+              tooltip: _isEditMode ? 'Cancel' : 'Edit Profile',
+            ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -196,6 +276,34 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ✅ Show edit mode banner
+                if (_isEditMode)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, color: Colors.blue[800], size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Edit Mode: Make changes to your profile',
+                            style: TextStyle(
+                              color: Colors.blue[800],
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Profile Header Card with editable image
                 Card(
                   shape: RoundedRectangleBorder(
@@ -216,43 +324,75 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                     child: Column(
                       children: [
                         // Profile Image with edit button
+                        // Profile Image with edit button - REPLACE the existing Stack widget
                         Stack(
                           alignment: Alignment.bottomRight,
                           children: [
                             Container(
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 3),
+                                border: Border.all(color: Colors.white, width: 4),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
                               child: CircleAvatar(
-                                radius: 50,
+                                radius: 55,
                                 backgroundColor: Colors.white,
-                                backgroundImage: _newProfileImage != null
-                                    ? FileImage(_newProfileImage!)
-                                    : (widget.userProfile.photoURL.isNotEmpty
-                                    ? NetworkImage(widget.userProfile.photoURL)
-                                    : null) as ImageProvider?,
-                                child: (_newProfileImage == null &&
-                                    widget.userProfile.photoURL.isEmpty)
-                                    ? Icon(
-                                  Icons.person,
-                                  size: 50,
-                                  color: Colors.grey[400],
+                                child: _newProfileImage != null
+                                    ? ClipOval(
+                                  child: Image.file(
+                                    _newProfileImage!,
+                                    width: 110,
+                                    height: 110,
+                                    fit: BoxFit.cover,
+                                  ),
                                 )
-                                    : null,
+                                    : (widget.userProfile.photoURL.isNotEmpty
+                                    ? ClipOval(
+                                  child: Image.network(
+                                    widget.userProfile.photoURL,
+                                    width: 110,
+                                    height: 110,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      // Fallback to gradient avatar if network image fails
+                                      return _buildGradientAvatar(widget.userProfile.name, 55);
+                                    },
+                                  ),
+                                )
+                                    : _buildGradientAvatar(widget.userProfile.name, 55)),
                               ),
                             ),
-                            // Edit button
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundColor: Colors.white,
-                              child: IconButton(
-                                icon: const Icon(Icons.camera_alt, size: 18),
-                                onPressed: _pickProfileImage,
-                                padding: EdgeInsets.zero,
-                                color: Colors.indigo[800],
+                            // ✅ Edit button only visible in edit mode
+                            if (_isEditMode)
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.indigo[800]!, width: 2),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: IconButton(
+                                    icon: Icon(Icons.camera_alt, size: 20, color: Colors.indigo[800]),
+                                    onPressed: _pickProfileImage,
+                                    padding: const EdgeInsets.all(8),
+                                  ),
+                                ),
                               ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -296,12 +436,15 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                   children: [
                     TextFormField(
                       controller: _nameController,
+                      enabled: _isEditMode, // ✅ Only editable in edit mode
                       decoration: InputDecoration(
                         labelText: 'Full Name',
                         prefixIcon: const Icon(Icons.person),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        filled: !_isEditMode,
+                        fillColor: !_isEditMode ? Colors.grey[100] : null,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -313,6 +456,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _emailController,
+                      enabled: _isEditMode, // ✅ Only editable in edit mode
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
                         labelText: 'Email',
@@ -320,6 +464,8 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        filled: !_isEditMode,
+                        fillColor: !_isEditMode ? Colors.grey[100] : null,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -364,39 +510,40 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                 ),
                 const SizedBox(height: 24),
 
-                // Update Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isUpdating ? null : _updateProfile,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF001127),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                // ✅ Save button only visible in edit mode
+                if (_isEditMode)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isUpdating ? null : _updateProfile,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF001127),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        disabledBackgroundColor: Colors.grey[300],
                       ),
-                      disabledBackgroundColor: Colors.grey[300],
-                    ),
-                    child: _isUpdating
-                        ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor:
-                        AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                        : const Text(
-                      'Save Changes',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                      child: _isUpdating
+                          ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                          AlwaysStoppedAnimation(Colors.white),
+                        ),
+                      )
+                          : const Text(
+                        'Save Changes',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

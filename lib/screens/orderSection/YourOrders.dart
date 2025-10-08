@@ -537,229 +537,256 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         builder: (context, setState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: EdgeInsets.zero,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24), // ✅ Add padding for keyboard
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue[600]!, Colors.blue[400]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        color: Colors.white,
-                        size: 48,
+            constraints: BoxConstraints(
+              maxWidth: 400,
+              maxHeight: MediaQuery.of(context).size.height * 0.8, // ✅ Limit max height
+            ),
+            // ✅ WRAP IN SINGLECHILDSCROLLVIEW for keyboard responsiveness
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header Section
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue[600]!, Colors.blue[400]!],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Rate Your Experience',
-                        style: TextStyle(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(0),
+                        topRight: Radius.circular(0),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
                           color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                          size: 48,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Order #${order.id}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Rate Your Experience',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Order #${order.id}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.route, size: 16, color: Colors.grey[600]),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '${order.origin} → ${order.destination}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
+
+                  // Content Section
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Order Info
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.route, size: 16, color: Colors.grey[600]),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      '${order.origin} → ${order.destination}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey[600]),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    order.itemDescription,
-                                    style: const TextStyle(fontSize: 12),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'How was the delivery?',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(5, (index) {
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  rating = index + 1.0;
-                                });
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: Icon(
-                                  index < rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                                  color: Colors.amber[600],
-                                  size: 40,
-                                ),
+                                ],
                               ),
-                            );
-                          }),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.inventory_2_outlined,
+                                      size: 16, color: Colors.grey[600]),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      order.itemDescription,
+                                      style: const TextStyle(fontSize: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Center(
-                        child: Text(
-                          _getRatingText(rating),
+                        const SizedBox(height: 20),
+
+                        // Rating Section
+                        const Text(
+                          'How was the delivery?',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(5, (index) {
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    rating = index + 1.0;
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Icon(
+                                    index < rating
+                                        ? Icons.star_rounded
+                                        : Icons.star_outline_rounded,
+                                    color: Colors.amber[600],
+                                    size: 40,
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Text(
+                            _getRatingText(rating),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Feedback Section
+                        const Text(
+                          'Additional Feedback (Optional)',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Additional Feedback (Optional)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: feedbackController,
-                        maxLines: 3,
-                        maxLength: 200,
-                        decoration: InputDecoration(
-                          hintText: 'Share your experience with the traveler...',
-                          hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[400],
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.all(12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(context, null),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: feedbackController,
+                          maxLines: 3,
+                          maxLength: 200,
+                          textInputAction: TextInputAction.done, // ✅ Add done button
+                          decoration: InputDecoration(
+                            hintText: 'Share your experience with the traveler...',
+                            hintStyle: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[400],
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
                             ),
-                            side: BorderSide(color: Colors.grey[300]!),
-                          ),
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            contentPadding: const EdgeInsets.all(12),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context, {
-                              'rating': rating,
-                              'feedback': feedbackController.text.trim(),
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green[600],
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Submit & Complete',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                        const SizedBox(height: 8), // ✅ Reduced spacing
+                      ],
+                    ),
                   ),
-                ),
-              ],
+
+                  // Action Buttons
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              feedbackController.dispose();
+                              Navigator.pop(context, null);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              side: BorderSide(color: Colors.grey[300]!),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final result = {
+                                'rating': rating,
+                                'feedback': feedbackController.text.trim(),
+                              };
+                              feedbackController.dispose();
+                              Navigator.pop(context, result);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green[600],
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'Submit & Complete',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
