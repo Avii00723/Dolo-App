@@ -85,14 +85,16 @@ class TripRequestDisplay {
 }
 
 class YourOrdersPage extends StatefulWidget {
-  const YourOrdersPage({Key? key}) : super(key: key);
+  final int initialTabIndex; // ✅ Parameter to set initial tab
+
+  const YourOrdersPage({Key? key, this.initialTabIndex = 0}) : super(key: key);
 
   @override
   State<YourOrdersPage> createState() => _YourOrdersPageState();
 }
 
 class _YourOrdersPageState extends State<YourOrdersPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   // Services
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
@@ -110,98 +112,52 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+
+    // ✅ ADD: Lifecycle observer to detect app state changes
+    WidgetsBinding.instance.addObserver(this);
+
+    // ✅ UPDATED: Initialize with provided tab index
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
+
+    // ✅ Listen to tab changes and refresh data
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        if (_tabController.index == 1 && currentUserId != null) {
+          print('📍 Switched to My Requests tab - refreshing...');
+          _loadMyRequestedOrders();
+        } else if (_tabController.index == 0 && currentUserId != null) {
+          print('📍 Switched to My Orders tab - refreshing...');
+          _loadMyOrders();
+        }
+      }
+    });
+
     _initializeUser();
 
-    // Auto-refresh every 30 seconds
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (currentUserId != null) {
-        _loadAllData();
+    // ✅ UPDATED: More frequent auto-refresh (every 15 seconds instead of 30)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (currentUserId != null && mounted) {
+        print('⏰ Auto-refresh triggered at ${DateTime.now()}');
+        _loadAllData(silent: true); // ✅ Silent refresh to avoid UI flicker
       }
     });
   }
-  Future<void> _deleteOrder(int orderId) async {
-    if (currentUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('User ID not found'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
 
-    try {
-      // Show loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(Colors.white),
-                ),
-              ),
-              SizedBox(width: 12),
-              Text('Deleting order...'),
-            ],
-          ),
-          duration: Duration(seconds: 2),
-        ),
-      );
+  // ✅ NEW: Handle app lifecycle changes
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
 
-      final success = await _orderService.deleteOrder(orderId, currentUserId!);
-
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Order deleted successfully!'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-
-        // Refresh orders
-        await _loadAllData();
-      }
-    } catch (e) {
-      print('Error deleting order: $e');
-      if (mounted) {
-        String errorMessage = 'Delete failed: $e';
-
-        if (e.toString().contains('KYC_NOT_APPROVED')) {
-          errorMessage = 'KYC not approved. Cannot delete order.';
-        } else if (e.toString().contains('ORDER_NOT_FOUND')) {
-          errorMessage = 'Order not found or not owned by you.';
-        } else if (e.toString().contains('USER_ID_REQUIRED')) {
-          errorMessage = 'User ID is required.';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text(errorMessage)),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
+    if (state == AppLifecycleState.resumed && currentUserId != null) {
+      print('📱 App resumed - refreshing all data...');
+      _loadAllData();
     }
   }
+
   Future<void> _initializeUser() async {
     try {
       final userId = await AuthService.getUserId();
@@ -238,29 +194,36 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // ✅ Remove observer
     _refreshTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadAllData() async {
+  // ✅ UPDATED: Support silent refresh to avoid UI flicker
+  Future<void> _loadAllData({bool silent = false}) async {
     if (currentUserId == null) {
       print('⚠️ Cannot load data - no user ID');
       return;
     }
 
+    print('🔄 Loading all data... (silent: $silent)');
     await Future.wait([
-      _loadMyOrders(),
-      _loadMyRequestedOrders(),
+      _loadMyOrders(silent: silent),
+      _loadMyRequestedOrders(silent: silent),
     ]);
+    print('✅ All data loaded successfully');
   }
 
-  Future<void> _loadMyOrders() async {
+  // ✅ UPDATED: Add silent parameter
+  Future<void> _loadMyOrders({bool silent = false}) async {
     if (currentUserId == null) return;
 
-    setState(() {
-      isLoadingMyOrders = true;
-    });
+    if (!silent) {
+      setState(() {
+        isLoadingMyOrders = true;
+      });
+    }
 
     try {
       print('🔍 Loading orders for user: $currentUserId');
@@ -296,17 +259,21 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         await _loadTripRequestsForOrders(orders.map((o) => o.id).toList());
       }
 
-      setState(() {
-        myOrders = displayOrders;
-        isLoadingMyOrders = false;
-      });
+      if (mounted) {
+        setState(() {
+          myOrders = displayOrders;
+          isLoadingMyOrders = false;
+        });
+      }
       print('✅ Loaded ${displayOrders.length} orders successfully');
     } catch (e) {
       print('❌ Error loading my orders: $e');
-      setState(() {
-        isLoadingMyOrders = false;
-        myOrders = [];
-      });
+      if (mounted) {
+        setState(() {
+          isLoadingMyOrders = false;
+          myOrders = [];
+        });
+      }
     }
   }
 
@@ -321,8 +288,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       Map<int, List<TripRequestDisplay>> requestsByOrder = {};
 
       for (var request in allRequests) {
-        print('Processing request: ID=${request.id}, OrderID=${request.orderId}, TravelerID=${request.travelerId}, Status=${request.status}');
-
         if (request.status == 'pending' && orderIds.contains(request.orderId)) {
           final displayRequest = TripRequestDisplay(
             id: request.id,
@@ -340,34 +305,29 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           } else {
             requestsByOrder[request.orderId] = [displayRequest];
           }
-
-          print('✅ Added request to order ${request.orderId}');
         }
       }
 
-      print('📊 Total requests by order: ${requestsByOrder.length}');
-      setState(() {
-        tripRequestsByOrder = requestsByOrder;
-      });
+      print('📊 Total pending requests by order: ${requestsByOrder.length}');
+      if (mounted) {
+        setState(() {
+          tripRequestsByOrder = requestsByOrder;
+        });
+      }
     } catch (e) {
       print('❌ Error loading trip requests: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load trip requests: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
-  Future<void> _loadMyRequestedOrders() async {
+  // ✅ UPDATED: Add silent parameter
+  Future<void> _loadMyRequestedOrders({bool silent = false}) async {
     if (currentUserId == null) return;
 
-    setState(() {
-      isLoadingMyRequests = true;
-    });
+    if (!silent) {
+      setState(() {
+        isLoadingMyRequests = true;
+      });
+    }
 
     try {
       print('🔍 Loading trip requests sent by user: $currentUserId');
@@ -379,12 +339,10 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
       for (var request in tripRequests) {
         if (request.travelerId != currentUserId) {
-          print('⏭️ Skipping request ${request.id} - not sent by current user');
           continue;
         }
 
         if (processedOrderIds.contains(request.orderId)) {
-          print('⏭️ Skipping duplicate order ${request.orderId}');
           continue;
         }
 
@@ -404,20 +362,23 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           requestStatus: request.status,
           notes: request.vehicleInfo,
         ));
-        print('✅ Added order ${request.orderId} to My Requests');
       }
 
-      setState(() {
-        myRequestedOrders = displayOrders;
-        isLoadingMyRequests = false;
-      });
+      if (mounted) {
+        setState(() {
+          myRequestedOrders = displayOrders;
+          isLoadingMyRequests = false;
+        });
+      }
       print('✅ Loaded ${displayOrders.length} requested orders');
     } catch (e) {
       print('❌ Error loading requested orders: $e');
-      setState(() {
-        isLoadingMyRequests = false;
-        myRequestedOrders = [];
-      });
+      if (mounted) {
+        setState(() {
+          isLoadingMyRequests = false;
+          myRequestedOrders = [];
+        });
+      }
     }
   }
 
@@ -469,10 +430,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     );
   }
 
-  // ✅ NEW COMPLETE ORDER METHOD WITH RATING DIALOG
-  // ✅ FIXED COMPLETE ORDER METHOD WITH RATING DIALOG
   Future<void> _completeOrder(OrderDisplay order) async {
-    // Check if user ID is available
     if (currentUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -490,15 +448,12 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
 
     try {
-      // Show rating dialog first
       final ratingData = await _showRatingDialog(order);
 
       if (ratingData == null) {
-        // User cancelled
         return;
       }
 
-      // Show loading
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -521,11 +476,9 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         );
       }
 
-      // ✅ Call API with userId parameter
       final success = await _orderService.completeOrder(order.id, currentUserId!);
 
       if (success && mounted) {
-        // TODO: Send rating to backend when rating API is ready
         print('📝 Rating: ${ratingData['rating']} stars');
         print('💬 Feedback: ${ratingData['feedback']}');
 
@@ -543,7 +496,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           ),
         );
 
-        // Refresh orders
+        // ✅ Immediate refresh
         await _loadAllData();
       }
     } catch (e) {
@@ -573,7 +526,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
-  // ✅ RATING DIALOG
   Future<Map<String, dynamic>?> _showRatingDialog(OrderDisplay order) async {
     double rating = 5.0;
     final feedbackController = TextEditingController();
@@ -591,7 +543,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -632,14 +583,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                     ],
                   ),
                 ),
-
-                // Content
                 Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Order Info
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -685,8 +633,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                         ),
                       ),
                       const SizedBox(height: 24),
-
-                      // Star Rating
                       const Text(
                         'How was the delivery?',
                         style: TextStyle(
@@ -729,8 +675,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                         ),
                       ),
                       const SizedBox(height: 24),
-
-                      // Feedback TextField
                       const Text(
                         'Additional Feedback (Optional)',
                         style: TextStyle(
@@ -761,8 +705,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                     ],
                   ),
                 ),
-
-                // Action Buttons
                 Padding(
                   padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
                   child: Row(
@@ -833,6 +775,200 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     return 'Excellent';
   }
 
+  Future<void> _updateOrder(OrderDisplay updatedOrder) async {
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User ID not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Updating order...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final updateRequest = OrderModels.OrderUpdateRequest(
+        userId: currentUserId!,
+        origin: updatedOrder.origin,
+        originLatitude: updatedOrder.originLatitude!,
+        originLongitude: updatedOrder.originLongitude!,
+        destination: updatedOrder.destination,
+        destinationLatitude: updatedOrder.destinationLatitude!,
+        destinationLongitude: updatedOrder.destinationLongitude!,
+        deliveryDate: _formatDateForApi(updatedOrder.date),
+        weight: updatedOrder.weight,
+        imageUrl: updatedOrder.imageUrl,
+        specialInstructions: updatedOrder.notes,
+      );
+
+      final response = await _orderService.updateOrder(
+        updatedOrder.id,
+        updateRequest,
+      );
+
+      if (response != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Order updated successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // ✅ Immediate refresh
+        await _loadAllData();
+      } else {
+        throw Exception('Failed to update order');
+      }
+    } catch (e) {
+      print('Error updating order: $e');
+      if (mounted) {
+        String errorMessage = 'Update failed: $e';
+
+        if (e.toString().contains('KYC_NOT_APPROVED')) {
+          errorMessage = 'KYC not approved. Cannot update order.';
+        } else if (e.toString().contains('ORDER_NOT_FOUND')) {
+          errorMessage = 'Order not found or not owned by you.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(errorMessage)),
+              ],
+            ),
+            backgroundColor: Colors.red[600],
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatDateForApi(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (e) {
+      final parts = dateString.split('/');
+      if (parts.length == 3) {
+        return '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
+      }
+      return dateString;
+    }
+  }
+
+  Future<void> _deleteOrder(int orderId) async {
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User ID not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Deleting order...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final success = await _orderService.deleteOrder(orderId, currentUserId!);
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Order deleted successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        // ✅ Immediate refresh
+        await _loadAllData();
+      }
+    } catch (e) {
+      print('Error deleting order: $e');
+      if (mounted) {
+        String errorMessage = 'Delete failed: $e';
+
+        if (e.toString().contains('KYC_NOT_APPROVED')) {
+          errorMessage = 'KYC not approved. Cannot delete order.';
+        } else if (e.toString().contains('ORDER_NOT_FOUND')) {
+          errorMessage = 'Order not found or not owned by you.';
+        } else if (e.toString().contains('USER_ID_REQUIRED')) {
+          errorMessage = 'User ID is required.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(errorMessage)),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
   void _openInbox() {
     Navigator.push(
       context,
@@ -846,12 +982,30 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       TripRequestDisplay request, int orderId) async {
     if (currentUserId == null) return;
 
-    // Show confirmation dialog
     final confirmed = await _showAcceptConfirmationDialog(request);
     if (confirmed != true) return;
 
     try {
-      // Accept with default/no negotiated price (0 or null based on your API)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Accepting trip request...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
       final acceptRequest = TripRequestAcceptRequest(
         orderCreatorId: currentUserId!,
         tripRequestId: request.id,
@@ -863,13 +1017,20 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       if (response != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                'Trip request accepted! Transaction ID: #${response.transactionId}'),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Text('Trip request accepted! Transaction ID: #${response.transactionId}'),
+              ],
+            ),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 3),
           ),
         );
-        _loadAllData();
+
+        // ✅ Immediate refresh
+        await _loadAllData();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1005,6 +1166,12 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          // ✅ ADD: Manual refresh button
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _loadAllData(),
+            tooltip: 'Refresh',
+          ),
           IconButton(
             icon: const Icon(Icons.inbox),
             onPressed: _openInbox,
@@ -1050,12 +1217,12 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         title: 'No Orders Yet',
         subtitle: 'Create your first order to get started',
         actionText: 'Refresh',
-        onAction: _loadMyOrders,
+        onAction: () => _loadMyOrders(),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: _loadMyOrders,
+      onRefresh: () => _loadMyOrders(),
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
         itemCount: myOrders.length,
@@ -1069,130 +1236,12 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             onTrackOrder: () => _openOrderTracking(order),
             onMarkReceived: () => _markOrderReceived(order),
             onCompleteOrder: () => _completeOrder(order),
-            onUpdateOrder: _updateOrder, // ✅ ADD THIS LINE - IT'S MISSING!
+            onUpdateOrder: _updateOrder,
             onDeleteOrder: _deleteOrder,
           );
         },
       ),
     );
-  }
-
-// ✅ NEW: UPDATE ORDER METHOD
-  Future<void> _updateOrder(OrderDisplay updatedOrder) async {
-    if (currentUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('User ID not found'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    try {
-      // Show loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(Colors.white),
-                ),
-              ),
-              SizedBox(width: 12),
-              Text('Updating order...'),
-            ],
-          ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-      // Create update request with only changed fields
-      final updateRequest = OrderModels.OrderUpdateRequest(
-        userId: currentUserId!,
-        origin: updatedOrder.origin,
-        originLatitude: updatedOrder.originLatitude!,
-        originLongitude: updatedOrder.originLongitude!,
-        destination: updatedOrder.destination,
-        destinationLatitude: updatedOrder.destinationLatitude!,
-        destinationLongitude: updatedOrder.destinationLongitude!,
-        deliveryDate: _formatDateForApi(updatedOrder.date),
-        weight: updatedOrder.weight,
-        imageUrl: updatedOrder.imageUrl,
-        specialInstructions: updatedOrder.notes,
-      );
-
-      final response = await _orderService.updateOrder(
-        updatedOrder.id,
-        updateRequest,
-      );
-
-      if (response != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Order updated successfully!'),
-              ],
-            ),
-            backgroundColor: Colors.green[600],
-            duration: const Duration(seconds: 3),
-          ),
-        );
-
-        // Refresh orders
-        await _loadAllData();
-      } else {
-        throw Exception('Failed to update order');
-      }
-    } catch (e) {
-      print('Error updating order: $e');
-      if (mounted) {
-        String errorMessage = 'Update failed: $e';
-
-        if (e.toString().contains('KYC_NOT_APPROVED')) {
-          errorMessage = 'KYC not approved. Cannot update order.';
-        } else if (e.toString().contains('ORDER_NOT_FOUND')) {
-          errorMessage = 'Order not found or not owned by you.';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text(errorMessage)),
-              ],
-            ),
-            backgroundColor: Colors.red[600],
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    }
-  }
-
-// Helper method to format date for API
-  String _formatDateForApi(String dateString) {
-    try {
-      // If already in ISO format, parse and reformat
-      final date = DateTime.parse(dateString);
-      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    } catch (e) {
-      // If in dd/MM/yyyy format
-      final parts = dateString.split('/');
-      if (parts.length == 3) {
-        return '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
-      }
-      return dateString;
-    }
   }
 
   Widget _buildMyRequestedOrdersTab() {
@@ -1204,15 +1253,14 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       return _buildEmptyState(
         icon: Icons.delivery_dining_outlined,
         title: 'No Trip Requests Yet',
-        subtitle:
-        'Search for available orders and send trip requests to see them here',
+        subtitle: 'Search for available orders and send trip requests to see them here',
         actionText: 'Refresh',
-        onAction: _loadMyRequestedOrders,
+        onAction: () => _loadMyRequestedOrders(),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: _loadMyRequestedOrders,
+      onRefresh: () => _loadMyRequestedOrders(),
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
         itemCount: myRequestedOrders.length,
@@ -1271,8 +1319,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0A1A2A),
                 foregroundColor: Colors.white,
-                padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

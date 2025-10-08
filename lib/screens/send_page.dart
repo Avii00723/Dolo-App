@@ -7,7 +7,8 @@ import '../../Models/TripRequestModel.dart';
 import '../Controllers/OrderService.dart';
 import '../Controllers/TripRequestService.dart';
 import '../Controllers/AuthService.dart';
-import 'orderSection/SearchResultPage.dart'; // ✅ ADDED
+import 'orderSection/SearchResultPage.dart';
+import 'orderSection/YourOrders.dart'; // ✅ ADDED
 
 class SendPage extends StatefulWidget {
   const SendPage({Key? key}) : super(key: key);
@@ -836,7 +837,10 @@ class _SendPageState extends State<SendPage> {
   }
 
   // Success dialog
-  void _showSuccessDialog({required int tripRequestId, required String orderOwner}) {
+  void _showSuccessDialog({
+    required int tripRequestId,
+    required String orderOwner,
+  }) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -911,7 +915,29 @@ class _SendPageState extends State<SendPage> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              // ✅ UPDATED: Navigate to YourOrders with result to trigger refresh
+              onPressed: () {
+                Navigator.pop(context); // Close success dialog
+
+                // ✅ Navigate to YourOrders page and return true to indicate refresh needed
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const YourOrdersPage(),
+                  ),
+                ).then((_) {
+                  // Optional: Clear search form after navigating
+                  fromController.clear();
+                  toController.clear();
+                  dateController.clear();
+                  hoursController.clear();
+                  setState(() {
+                    selectedVehicle = null;
+                    originPosition = null;
+                    availableOrders = [];
+                  });
+                });
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -921,7 +947,7 @@ class _SendPageState extends State<SendPage> {
                 ),
               ),
               child: const Text(
-                'Done',
+                'View My Requests',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -933,6 +959,7 @@ class _SendPageState extends State<SendPage> {
       ),
     );
   }
+
 
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
