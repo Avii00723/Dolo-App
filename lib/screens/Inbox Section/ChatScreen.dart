@@ -4,8 +4,12 @@ import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:http/http.dart' as http;
+import '../../Constants/ApiConstants.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
 
@@ -38,11 +42,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String? replyingToMessageId;
   Map<String, dynamic>? replyingToMessage;
 
-  // Timer for auto-refresh
   Timer? _autoRefreshTimer;
   bool _isRefreshing = false;
 
-  // Image upload state
   List<File> _selectedImages = [];
   bool _isUploadingImages = false;
 
@@ -136,7 +138,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           final senderId = msg['sender_id'];
           final senderName = msg['sender_name'] ?? 'Unknown';
           final messageText = msg['message'] ?? '';
-          final images = msg['images'] as List<dynamic>?;
+          final mediaUrl = msg['media_url'] as String?;
+
+          final hasMedia = mediaUrl != null && mediaUrl.isNotEmpty;
 
           return {
             'messageId': msg['id'].toString(),
@@ -144,8 +148,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'senderId': senderId,
             'senderName': senderName,
             'timestamp': DateTime.parse(msg['created_at']),
-            'type': images != null && images.isNotEmpty ? 'image' : 'text',
-            'images': images?.map((img) => img.toString()).toList() ?? [],
+            'type': hasMedia ? 'image' : 'text',
+            'mediaUrl': hasMedia ? mediaUrl : null,
           };
         }).toList();
 
@@ -529,6 +533,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             onReply: (messageData) => _setReplyMessage(message['messageId'], messageData),
             onCopy: _copyMessage,
             onLaunchUrl: _launchUrl,
+            onDownloadImage: _downloadImage,
           );
         },
       ),
@@ -877,6 +882,58 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _downloadImage(String imageUrl) async {
+    try {
+      _showSnackBar('Downloading image...', Colors.blue);
+
+      final status = await Permission.storage.request();
+      if (!status.isGranted) {
+        _showSnackBar('Storage permission denied', Colors.red);
+        return;
+      }
+
+      String fullUrl = imageUrl;
+      if (!imageUrl.startsWith('http')) {
+        fullUrl = '${ApiConstants.baseUrl}$imageUrl';
+      }
+
+      final response = await http.get(Uri.parse(fullUrl));
+
+      if (response.statusCode != 200) {
+        _showSnackBar('Failed to download image', Colors.red);
+        return;
+      }
+
+      Directory? directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      if (directory == null) {
+        _showSnackBar('Could not access storage', Colors.red);
+        return;
+      }
+
+      final fileName = 'chat_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final filePath = '${directory.path}/$fileName';
+
+      final file = File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
+
+      _showSnackBar('Image saved successfully', Colors.green);
+
+      print('✅ Image saved to: $filePath');
+    } catch (e) {
+      print('❌ Error downloading image: $e');
+      _showSnackBar('Failed to download image: $e', Colors.red);
+    }
+  }
+
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -897,7 +954,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-// ModernMessageBubble with Image Support
+// ModernMessageBubble with Image Display and Download
 class ModernMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final String messageId;
@@ -905,6 +962,7 @@ class ModernMessageBubble extends StatelessWidget {
   final Function(Map<String, dynamic>) onReply;
   final Function(String) onCopy;
   final Function(String) onLaunchUrl;
+  final Function(String) onDownloadImage;
 
   const ModernMessageBubble({
     Key? key,
@@ -914,13 +972,14 @@ class ModernMessageBubble extends StatelessWidget {
     required this.onReply,
     required this.onCopy,
     required this.onLaunchUrl,
+    required this.onDownloadImage,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final isSystem = message['senderId'] == 'system';
     final isSending = message['sending'] == true;
-    final hasImages = message['images'] != null && (message['images'] as List).isNotEmpty;
+    final hasImage = message['type'] == 'image' && message['mediaUrl'] != null;
 
     if (isSystem) {
       return _buildSystemMessage();
@@ -961,54 +1020,59 @@ class ModernMessageBubble extends StatelessWidget {
                       : CrossAxisAlignment.start,
                   children: [
                     if (message['replyMessage'] != null) _buildReplyPreview(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isMe ? Colors.white : Colors.blue.shade600,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(20),
-                          topRight: const Radius.circular(20),
-                          bottomLeft: Radius.circular(isMe ? 4 : 20),
-                          bottomRight: Radius.circular(isMe ? 20 : 4),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
+                    GestureDetector(
+                      onTap: hasImage ? () => _showFullImage(context) : null,
+                      child: Container(
+                        padding: EdgeInsets.all(hasImage ? 4 : 12),
+                        decoration: BoxDecoration(
+                          color: isMe ? Colors.white : Colors.blue.shade600,
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(20),
+                            topRight: const Radius.circular(20),
+                            bottomLeft: Radius.circular(isMe ? 4 : 20),
+                            bottomRight: Radius.circular(isMe ? 20 : 4),
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (hasImages) _buildImageGrid(),
-                          if (hasImages && message['message'].toString().isNotEmpty)
-                            const SizedBox(height: 8),
-                          if (message['message'].toString().isNotEmpty)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Flexible(child: _buildMessageContent()),
-                                if (isSending) ...[
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        isMe ? Colors.grey : Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
                             ),
-                        ],
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (hasImage) _buildImageDisplay(context),
+                            if (hasImage && message['message'].toString().isNotEmpty)
+                              const SizedBox(height: 8),
+                            if (message['message'].toString().isNotEmpty)
+                              Padding(
+                                padding: hasImage
+                                    ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
+                                    : EdgeInsets.zero,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(child: _buildMessageContent()),
+                                    if (isSending) ...[
+                                      const SizedBox(width: 8),
+                                      SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            isMe ? Colors.grey : Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1044,56 +1108,153 @@ class ModernMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildImageGrid() {
-    final images = message['images'] as List;
+  Widget _buildImageDisplay(BuildContext context) {
+    final mediaUrl = message['mediaUrl'] as String;
 
-    if (images.isEmpty) return const SizedBox.shrink();
-
-    if (images.length == 1) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          images[0],
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              height: 200,
-              color: Colors.grey[300],
-              child: const Center(
-                child: Icon(Icons.broken_image, size: 50),
-              ),
-            );
-          },
-        ),
-      );
+    String imageUrl = mediaUrl;
+    if (!mediaUrl.startsWith('http')) {
+      imageUrl = '${ApiConstants.baseUrl}$mediaUrl';
     }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 4,
-        mainAxisSpacing: 4,
-      ),
-      itemCount: images.length,
-      itemBuilder: (context, index) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
           child: Image.network(
-            images[index],
+            imageUrl,
             fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                height: 200,
+                width: 200,
+                color: Colors.grey[300],
+                child: Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                        : null,
+                  ),
+                ),
+              );
+            },
             errorBuilder: (context, error, stackTrace) {
               return Container(
+                height: 200,
+                width: 200,
                 color: Colors.grey[300],
-                child: const Center(
-                  child: Icon(Icons.broken_image, size: 30),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.broken_image, size: 50, color: Colors.grey[600]),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Failed to load image',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
+                  ],
                 ),
               );
             },
           ),
-        );
-      },
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.download, color: Colors.white, size: 20),
+              onPressed: () => onDownloadImage(mediaUrl),
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(),
+              tooltip: 'Download Image',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showFullImage(BuildContext context) {
+    final mediaUrl = message['mediaUrl'] as String;
+    String imageUrl = mediaUrl;
+    if (!mediaUrl.startsWith('http')) {
+      imageUrl = '${ApiConstants.baseUrl}$mediaUrl';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: Image.network(
+                  imageUrl,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      padding: const EdgeInsets.all(20),
+                      color: Colors.black87,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.broken_image,
+                              size: 80,
+                              color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Failed to load image',
+                            style: TextStyle(color: Colors.grey[400]),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.download, color: Colors.white),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onDownloadImage(mediaUrl);
+                      },
+                      tooltip: 'Download',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
