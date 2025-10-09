@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart'; // ✅ ADD THIS IMPORT
 import '../Constants/ApiConstants.dart';
 import '../Controllers/AuthService.dart';
 
@@ -9,11 +11,12 @@ class ChatService {
     return await AuthService.getUserId();
   }
 
-  // ✅ NEW: Send a chat message using the new API structure
+  // ✅ UPDATED: Send a chat message with optional images using multipart/form-data
   static Future<Map<String, dynamic>> sendMessage({
     required int chatId,
-    required String message,
+    String? message,
     int? negotiatedPrice,
+    List<File>? images,
   }) async {
     try {
       final userId = await _getCurrentUserId();
@@ -24,26 +27,66 @@ class ChatService {
         };
       }
 
-      final Map<String, dynamic> body = {
-        'chat_id': chatId,
-        'user_id': userId,
-        'message': message,
-      };
+      // Create multipart request
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(ApiConstants.sendChatMessage),
+      );
 
-      // Add negotiated price only if provided
-      if (negotiatedPrice != null) {
-        body['negotiatedPrice'] = negotiatedPrice;
+      // Add required fields
+      request.fields['chat_id'] = chatId.toString();
+      request.fields['user_id'] = userId.toString();
+
+      // Add optional message
+      if (message != null && message.isNotEmpty) {
+        request.fields['message'] = message;
       }
 
-      print('📤 Sending message with body: $body');
+      // Add optional negotiated price
+      if (negotiatedPrice != null) {
+        request.fields['negotiatedPrice'] = negotiatedPrice.toString();
+      }
 
-      final response = await http.post(
-        Uri.parse(ApiConstants.sendChatMessage),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(body),
-      );
+      // Add images if provided
+      if (images != null && images.isNotEmpty) {
+        print('📤 Adding ${images.length} images to request');
+
+        for (int i = 0; i < images.length; i++) {
+          final file = images[i];
+
+          // Get file extension
+          final extension = file.path.split('.').last.toLowerCase();
+          String mimeType = 'image/jpeg';
+
+          if (extension == 'png') {
+            mimeType = 'image/png';
+          } else if (extension == 'jpg' || extension == 'jpeg') {
+            mimeType = 'image/jpeg';
+          } else if (extension == 'gif') {
+            mimeType = 'image/gif';
+          }
+
+          var stream = http.ByteStream(file.openRead());
+          var length = await file.length();
+
+          var multipartFile = http.MultipartFile(
+            'images', // Field name as per API
+            stream,
+            length,
+            filename: 'image_${DateTime.now().millisecondsSinceEpoch}_$i.$extension',
+            contentType: MediaType.parse(mimeType), // ✅ FIXED: Use MediaType directly
+          );
+
+          request.files.add(multipartFile);
+        }
+      }
+
+      print('📤 Sending message with fields: ${request.fields}');
+      print('📤 Number of files: ${request.files.length}');
+
+      // Send request
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
 
       print('📤 Send Message Response: ${response.statusCode}');
       print('📤 Response Body: ${response.body}');
@@ -54,14 +97,21 @@ class ChatService {
           'data': jsonDecode(response.body),
         };
       } else if (response.statusCode == 400) {
+        final errorData = jsonDecode(response.body);
         return {
           'success': false,
-          'error': 'Missing required fields',
+          'error': errorData['error'] ?? 'Missing required fields',
         };
       } else if (response.statusCode == 403) {
         return {
           'success': false,
           'error': 'You are not a participant in this chat',
+        };
+      } else if (response.statusCode == 500) {
+        final errorData = jsonDecode(response.body);
+        return {
+          'success': false,
+          'error': errorData['error'] ?? 'Internal server error',
         };
       } else {
         return {
@@ -78,7 +128,7 @@ class ChatService {
     }
   }
 
-  // ✅ NEW: Get all messages for a specific chat using the new API structure
+  // ✅ Get all messages for a specific chat
   static Future<Map<String, dynamic>> getChatMessages({
     required int chatId,
   }) async {
@@ -100,7 +150,8 @@ class ChatService {
       );
 
       print('📥 Get Messages Response: ${response.statusCode}');
-      print('📥 Response Body: ${response.body}');
+      // Don't print body for silent refreshes to reduce logs
+      // print('📥 Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -198,6 +249,30 @@ class ChatService {
       chatId: chatId,
       message: message,
       negotiatedPrice: negotiatedPrice,
+    );
+  }
+
+  // ✅ NEW: Send only images without text message
+  static Future<Map<String, dynamic>> sendImages({
+    required int chatId,
+    required List<File> images,
+  }) async {
+    return await sendMessage(
+      chatId: chatId,
+      images: images,
+    );
+  }
+
+  // ✅ NEW: Send message with both text and images
+  static Future<Map<String, dynamic>> sendMessageWithImages({
+    required int chatId,
+    required String message,
+    required List<File> images,
+  }) async {
+    return await sendMessage(
+      chatId: chatId,
+      message: message,
+      images: images,
     );
   }
 

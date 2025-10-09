@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:async'; // ✅ ADD: Import for Timer
+import 'package:image_picker/image_picker.dart';
+import 'dart:async';
+import 'dart:io';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
 
@@ -23,10 +25,10 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-// ✅ ADD: WidgetsBindingObserver for lifecycle monitoring
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _imagePicker = ImagePicker();
 
   int? _currentUserId;
   Map<String, dynamic> otherUserData = {};
@@ -36,42 +38,40 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String? replyingToMessageId;
   Map<String, dynamic>? replyingToMessage;
 
-  // ✅ NEW: Timer for auto-refresh
+  // Timer for auto-refresh
   Timer? _autoRefreshTimer;
   bool _isRefreshing = false;
+
+  // Image upload state
+  List<File> _selectedImages = [];
+  bool _isUploadingImages = false;
 
   @override
   void initState() {
     super.initState();
-    // ✅ ADD: Register lifecycle observer
     WidgetsBinding.instance.addObserver(this);
     _initializeChat();
-    // ✅ START: Auto-refresh every 5 seconds
     _startAutoRefresh();
   }
 
-  // ✅ NEW: Handle app lifecycle changes
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
     if (state == AppLifecycleState.resumed) {
-      // App came to foreground - refresh and restart timer
       print('📱 App resumed - refreshing messages...');
       _loadMessages(silent: true);
       if (_autoRefreshTimer?.isActive != true) {
         _startAutoRefresh();
       }
     } else if (state == AppLifecycleState.paused) {
-      // App went to background - pause timer to save battery
       print('📱 App paused - stopping auto-refresh...');
       _autoRefreshTimer?.cancel();
     }
   }
 
-  // ✅ NEW: Start auto-refresh timer
   void _startAutoRefresh() {
-    _autoRefreshTimer?.cancel(); // Cancel existing timer if any
+    _autoRefreshTimer?.cancel();
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (mounted && !_isRefreshing) {
         print('🔄 Auto-refreshing messages at ${DateTime.now()}');
@@ -135,18 +135,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final convertedMessages = apiMessages.map((msg) {
           final senderId = msg['sender_id'];
           final senderName = msg['sender_name'] ?? 'Unknown';
+          final messageText = msg['message'] ?? '';
+          final images = msg['images'] as List<dynamic>?;
 
           return {
             'messageId': msg['id'].toString(),
-            'message': msg['message'] ?? '',
+            'message': messageText,
             'senderId': senderId,
             'senderName': senderName,
             'timestamp': DateTime.parse(msg['created_at']),
-            'type': 'text',
+            'type': images != null && images.isNotEmpty ? 'image' : 'text',
+            'images': images?.map((img) => img.toString()).toList() ?? [],
           };
         }).toList();
 
-        // ✅ Check if user is at bottom before updating
         final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
         final wasAtBottom = scrollOffset < 50;
 
@@ -181,7 +183,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _errorMessage = null;
         });
 
-        // ✅ Only auto-scroll if user was at bottom (to not interrupt reading)
         if (silent && wasAtBottom) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_scrollController.hasClients) {
@@ -193,7 +194,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             }
           });
         } else if (!silent) {
-          // Always scroll on manual refresh
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_scrollController.hasClients) {
               _scrollController.animateTo(
@@ -245,6 +245,120 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _pickImages() async {
+    try {
+      final List<XFile> images = await _imagePicker.pickMultiImage(
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (images.isNotEmpty) {
+        setState(() {
+          _selectedImages = images.map((xFile) => File(xFile.path)).toList();
+        });
+      }
+    } catch (e) {
+      print('❌ Error picking images: $e');
+      _showSnackBar('Failed to pick images: $e', Colors.red);
+    }
+  }
+
+  Future<void> _pickCamera() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImages.add(File(image.path));
+        });
+      }
+    } catch (e) {
+      print('❌ Error taking photo: $e');
+      _showSnackBar('Failed to take photo: $e', Colors.red);
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
+  }
+
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Add Images',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _pickCamera();
+                    },
+                    icon: const Icon(Icons.camera_alt),
+                    label: const Text('Camera'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _pickImages();
+                    },
+                    icon: const Icon(Icons.photo_library),
+                    label: const Text('Gallery'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[100],
+                      foregroundColor: Colors.grey[700],
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -269,6 +383,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         children: [
           Expanded(child: _buildMessagesList()),
           if (replyingToMessage != null) _buildReplyPreview(),
+          if (_selectedImages.isNotEmpty) _buildImagePreview(),
           _buildMessageInput(),
         ],
       ),
@@ -322,7 +437,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    // ✅ NEW: Show live indicator
                     const SizedBox(width: 8),
                     Container(
                       width: 6,
@@ -356,7 +470,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ],
       ),
       actions: [
-        // ✅ Show loading indicator when refreshing
         if (_isRefreshing)
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -563,6 +676,54 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildImagePreview() {
+    return Container(
+      height: 100,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _selectedImages.length,
+        itemBuilder: (context, index) {
+          return Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    _selectedImages[index],
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () => _removeImage(index),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildMessageInput() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -579,6 +740,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       child: SafeArea(
         child: Row(
           children: [
+            IconButton(
+              icon: Icon(Icons.image, color: Colors.blue.shade600),
+              onPressed: _showImagePickerOptions,
+              tooltip: 'Add Images',
+            ),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -607,12 +773,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             const SizedBox(width: 8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.blue.shade600,
+                color: _isUploadingImages
+                    ? Colors.grey
+                    : Colors.blue.shade600,
                 shape: BoxShape.circle,
               ),
               child: IconButton(
-                icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                onPressed: _sendMessage,
+                icon: _isUploadingImages
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                  ),
+                )
+                    : const Icon(Icons.send, color: Colors.white, size: 20),
+                onPressed: _isUploadingImages ? null : _sendMessage,
               ),
             ),
           ],
@@ -623,84 +800,50 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _sendMessage() async {
     final message = _messageController.text.trim();
-    if (message.isEmpty) return;
+
+    if (message.isEmpty && _selectedImages.isEmpty) return;
 
     final chatIdInt = int.tryParse(widget.chatId);
     if (chatIdInt == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid chat ID'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnackBar('Invalid chat ID', Colors.red);
       return;
     }
 
     _messageController.clear();
+    final imagesToSend = List<File>.from(_selectedImages);
+    setState(() {
+      _selectedImages.clear();
+    });
     _clearReply();
 
-    final tempMessage = {
-      'messageId': 'temp_${DateTime.now().millisecondsSinceEpoch}',
-      'message': message,
-      'senderId': _currentUserId,
-      'senderName': 'You',
-      'timestamp': DateTime.now(),
-      'type': 'text',
-      'sending': true,
-    };
-
     setState(() {
-      messages.add(tempMessage);
+      _isUploadingImages = true;
     });
-
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
 
     try {
       final result = await ChatService.sendMessage(
         chatId: chatIdInt,
         message: message,
+        images: imagesToSend,
       );
 
       if (result['success'] == true) {
         print('✅ Message sent successfully');
         await _loadMessages(silent: true);
       } else {
-        setState(() {
-          messages.removeWhere((msg) => msg['messageId'] == tempMessage['messageId']);
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['error'] ?? 'Failed to send message'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-
+        _showSnackBar(
+          result['error'] ?? 'Failed to send message',
+          Colors.red,
+        );
         print('❌ Failed to send message: ${result['error']}');
       }
     } catch (e) {
-      setState(() {
-        messages.removeWhere((msg) => msg['messageId'] == tempMessage['messageId']);
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-
+      _showSnackBar('Error: $e', Colors.red);
       print('❌ Exception sending message: $e');
+    } finally {
+      setState(() {
+        _isUploadingImages = false;
+      });
     }
   }
 
@@ -720,12 +863,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _copyMessage(String message) {
     Clipboard.setData(ClipboardData(text: message));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Message copied to clipboard'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    _showSnackBar('Message copied to clipboard', Colors.green);
   }
 
   Future<void> _launchUrl(String url) async {
@@ -735,18 +873,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open link'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnackBar('Could not open link', Colors.red);
     }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    // ✅ IMPORTANT: Clean up timer and observer
     _autoRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _messageController.dispose();
@@ -755,7 +897,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-// ModernMessageBubble class remains exactly the same as in your file
+// ModernMessageBubble with Image Support
 class ModernMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final String messageId;
@@ -778,6 +920,7 @@ class ModernMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSystem = message['senderId'] == 'system';
     final isSending = message['sending'] == true;
+    final hasImages = message['images'] != null && (message['images'] as List).isNotEmpty;
 
     if (isSystem) {
       return _buildSystemMessage();
@@ -839,23 +982,32 @@ class ModernMessageBubble extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(child: _buildMessageContent()),
-                          if (isSending) ...[
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  isMe ? Colors.grey : Colors.white,
-                                ),
-                              ),
+                          if (hasImages) _buildImageGrid(),
+                          if (hasImages && message['message'].toString().isNotEmpty)
+                            const SizedBox(height: 8),
+                          if (message['message'].toString().isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(child: _buildMessageContent()),
+                                if (isSending) ...[
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        isMe ? Colors.grey : Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
-                          ],
                         ],
                       ),
                     ),
@@ -889,6 +1041,59 @@ class ModernMessageBubble extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildImageGrid() {
+    final images = message['images'] as List;
+
+    if (images.isEmpty) return const SizedBox.shrink();
+
+    if (images.length == 1) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          images[0],
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: 200,
+              color: Colors.grey[300],
+              child: const Center(
+                child: Icon(Icons.broken_image, size: 50),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 4,
+        mainAxisSpacing: 4,
+      ),
+      itemCount: images.length,
+      itemBuilder: (context, index) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            images[index],
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: Colors.grey[300],
+                child: const Center(
+                  child: Icon(Icons.broken_image, size: 30),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
