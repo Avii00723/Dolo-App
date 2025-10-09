@@ -7,8 +7,9 @@ import '../../Models/TripRequestModel.dart';
 import '../Controllers/OrderService.dart';
 import '../Controllers/TripRequestService.dart';
 import '../Controllers/AuthService.dart';
+import 'LocationinputField.dart';
 import 'orderSection/SearchResultPage.dart';
-import 'orderSection/YourOrders.dart'; // ✅ ADDED
+import 'orderSection/YourOrders.dart';
 
 class SendPage extends StatefulWidget {
   const SendPage({Key? key}) : super(key: key);
@@ -47,20 +48,18 @@ class _SendPageState extends State<SendPage> {
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
 
-  // Location variables
+  // ✅ Position variables for location tracking
   Position? originPosition;
-  bool isLoadingLocation = false;
+  Position? destinationPosition;
 
-  // ✅ CHANGED: Fetch user ID from AuthService
   int? currentUserId;
 
   @override
   void initState() {
     super.initState();
-    _initializeUser(); // ✅ ADDED
+    _initializeUser();
   }
 
-  // ✅ ADDED: Initialize user from AuthService
   Future<void> _initializeUser() async {
     try {
       final userId = await AuthService.getUserId();
@@ -86,93 +85,6 @@ class _SendPageState extends State<SendPage> {
     }
   }
 
-  // Get current location
-  Future<void> _getCurrentLocation() async {
-    setState(() {
-      isLoadingLocation = true;
-    });
-
-    try {
-      final position = await LocationService.getCurrentPosition();
-      if (position != null) {
-        final address = await LocationService.getAddressFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-
-        setState(() {
-          originPosition = position;
-          fromController.text = address ??
-              'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
-          isLoadingLocation = false;
-        });
-
-        _showSnackBar('✅ Location coordinates saved', Colors.green);
-      } else {
-        setState(() {
-          isLoadingLocation = false;
-        });
-        _showSnackBar('Unable to get location. Please check permissions.', Colors.red);
-      }
-    } catch (e) {
-      setState(() {
-        isLoadingLocation = false;
-      });
-      _showSnackBar('Error: $e', Colors.red);
-    }
-  }
-
-  // Search location from text input
-  Future<void> _searchOriginLocation() async {
-    if (fromController.text.trim().isEmpty) {
-      _showSnackBar('Please enter a location to search', Colors.orange);
-      return;
-    }
-
-    setState(() {
-      isLoadingLocation = true;
-    });
-
-    try {
-      final locations = await LocationService.getCoordinatesFromAddress(
-          fromController.text.trim()
-      );
-
-      if (locations != null && locations.isNotEmpty) {
-        final location = locations.first;
-        final position = Position(
-          latitude: location.latitude,
-          longitude: location.longitude,
-          timestamp: DateTime.now(),
-          accuracy: 0.0,
-          altitude: 0.0,
-          altitudeAccuracy: 0.0,
-          heading: 0.0,
-          headingAccuracy: 0.0,
-          speed: 0.0,
-          speedAccuracy: 0.0,
-        );
-
-        setState(() {
-          originPosition = position;
-          isLoadingLocation = false;
-        });
-
-        _showSnackBar('✅ Origin coordinates found', Colors.green);
-      } else {
-        setState(() {
-          isLoadingLocation = false;
-        });
-        _showSnackBar('Location not found. Please try different search.', Colors.orange);
-      }
-    } catch (e) {
-      setState(() {
-        isLoadingLocation = false;
-      });
-      _showSnackBar('Error searching location: $e', Colors.red);
-    }
-  }
-
   Future<void> _selectDate(BuildContext context) async {
     DateTime? picked = await showDatePicker(
       context: context,
@@ -188,15 +100,12 @@ class _SendPageState extends State<SendPage> {
     }
   }
 
-  // ✅ FIXED: Search available orders using API with userId parameter
   Future<void> _searchAvailableOrders() async {
-    // ✅ ADDED: Check if user is logged in
     if (currentUserId == null) {
       _showSnackBar('Please log in to search orders', Colors.red);
       return;
     }
 
-    // Validate all required fields
     if (fromController.text.trim().isEmpty ||
         toController.text.trim().isEmpty ||
         dateController.text.trim().isEmpty ||
@@ -206,13 +115,11 @@ class _SendPageState extends State<SendPage> {
       return;
     }
 
-    // Validate origin position
     if (originPosition == null) {
-      _showSnackBar('Please get coordinates for origin location', Colors.orange);
+      _showSnackBar('Please select origin location from suggestions', Colors.orange);
       return;
     }
 
-    // Validate hours
     final hours = double.tryParse(hoursController.text.trim());
     if (hours == null || hours <= 0) {
       _showSnackBar('Please enter valid hours', Colors.red);
@@ -251,7 +158,6 @@ class _SendPageState extends State<SendPage> {
         isSearching = false;
       });
 
-      // ✅ NEW: Navigate to results page
       if (context.mounted) {
         Navigator.push(
           context,
@@ -282,8 +188,6 @@ class _SendPageState extends State<SendPage> {
     }
   }
 
-
-  // Send trip request to order creator
   Future<void> _sendRequestToSender(Order order) async {
     try {
       await _showTripRequestDialog(order);
@@ -292,9 +196,7 @@ class _SendPageState extends State<SendPage> {
     }
   }
 
-// Enhanced trip request dialog with proper API integration
   Future<void> _showTripRequestDialog(Order order) async {
-    // ✅ ADDED: Check if user is logged in
     if (currentUserId == null) {
       _showSnackBar('Please log in to send requests', Colors.red);
       return;
@@ -304,7 +206,6 @@ class _SendPageState extends State<SendPage> {
     final startTimeController = TextEditingController();
     final endTimeController = TextEditingController();
 
-    // Helper function to show time picker
     Future<void> selectTime(BuildContext context, TextEditingController controller) async {
       TimeOfDay? pickedTime = await showTimePicker(
         context: context,
@@ -312,7 +213,6 @@ class _SendPageState extends State<SendPage> {
       );
 
       if (pickedTime != null) {
-        // Format time as HH:MM:SS
         final formattedTime = '${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}:00';
         controller.text = formattedTime;
       }
@@ -330,7 +230,6 @@ class _SendPageState extends State<SendPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header with gradient
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -389,14 +288,12 @@ class _SendPageState extends State<SendPage> {
                 ),
               ),
 
-              // Scrollable content
               Flexible(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Order Summary Card
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -485,7 +382,6 @@ class _SendPageState extends State<SendPage> {
                       ),
                       const SizedBox(height: 15),
 
-                      // Vehicle Type (Read-only, from search)
                       _buildReadOnlyField(
                         label: 'Vehicle Type',
                         value: selectedVehicle ?? 'Not selected',
@@ -493,7 +389,6 @@ class _SendPageState extends State<SendPage> {
                       ),
                       const SizedBox(height: 15),
 
-                      // Vehicle Info Field
                       _buildEnhancedTextField(
                         controller: vehicleInfoController,
                         label: 'Vehicle Number',
@@ -503,7 +398,6 @@ class _SendPageState extends State<SendPage> {
                       ),
                       const SizedBox(height: 15),
 
-                      // Pickup Time
                       GestureDetector(
                         onTap: () => selectTime(dialogContext, startTimeController),
                         child: AbsorbPointer(
@@ -518,7 +412,6 @@ class _SendPageState extends State<SendPage> {
                       ),
                       const SizedBox(height: 15),
 
-                      // Dropoff Time
                       GestureDetector(
                         onTap: () => selectTime(dialogContext, endTimeController),
                         child: AbsorbPointer(
@@ -536,7 +429,6 @@ class _SendPageState extends State<SendPage> {
                 ),
               ),
 
-              // Action buttons
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -547,7 +439,6 @@ class _SendPageState extends State<SendPage> {
                 ),
                 child: Row(
                   children: [
-                    // Cancel button
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(dialogContext),
@@ -573,12 +464,10 @@ class _SendPageState extends State<SendPage> {
                     ),
                     const SizedBox(width: 12),
 
-                    // Send Request button
                     Expanded(
                       flex: 2,
                       child: ElevatedButton.icon(
                         onPressed: () async {
-                          // Validate all fields
                           if (vehicleInfoController.text.trim().isEmpty ||
                               startTimeController.text.trim().isEmpty ||
                               endTimeController.text.trim().isEmpty) {
@@ -586,11 +475,9 @@ class _SendPageState extends State<SendPage> {
                             return;
                           }
 
-                          // Close the trip request dialog first
                           Navigator.pop(dialogContext);
 
                           try {
-                            // Show loading dialog
                             showDialog(
                               context: context,
                               barrierDismissible: false,
@@ -623,13 +510,11 @@ class _SendPageState extends State<SendPage> {
                               ),
                             );
 
-                            // Format the date properly
                             String formattedDate = order.deliveryDate;
                             if (order.deliveryDate.contains('T')) {
                               formattedDate = order.deliveryDate.split('T')[0];
                             }
 
-                            // Prepare trip request with currentUserId
                             final tripRequest = TripRequestSendRequest(
                               travelerId: currentUserId!,
                               orderId: order.id,
@@ -648,12 +533,10 @@ class _SendPageState extends State<SendPage> {
                             print('DEBUG: Pickup Time: ${startTimeController.text}');
                             print('DEBUG: Dropoff Time: ${endTimeController.text}');
 
-                            // Send trip request via API
                             final response = await _tripRequestService.sendTripRequest(tripRequest);
 
-                            // ✅ FIXED: Close loading dialog safely
                             if (context.mounted) {
-                              Navigator.of(context).pop(); // Close loading dialog
+                              Navigator.of(context).pop();
 
                               if (response != null) {
                                 _showSuccessDialog(
@@ -668,9 +551,8 @@ class _SendPageState extends State<SendPage> {
                               }
                             }
                           } catch (e) {
-                            // ✅ FIXED: Close loading dialog on error safely
                             if (context.mounted) {
-                              Navigator.of(context).pop(); // Close loading dialog
+                              Navigator.of(context).pop();
                             }
                             print('ERROR: Failed to send trip request: $e');
 
@@ -708,7 +590,6 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  // Helper widget for read-only field
   Widget _buildReadOnlyField({
     required String label,
     required String value,
@@ -752,7 +633,6 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  // Helper widget for order detail rows
   Widget _buildOrderDetailRow(IconData icon, String label, String value, Color color) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -781,7 +661,6 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  // Enhanced text field widget
   Widget _buildEnhancedTextField({
     required TextEditingController controller,
     required String label,
@@ -836,7 +715,6 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  // Success dialog
   void _showSuccessDialog({
     required int tripRequestId,
     required String orderOwner,
@@ -915,18 +793,15 @@ class _SendPageState extends State<SendPage> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              // ✅ UPDATED: Navigate to YourOrders with result to trigger refresh
               onPressed: () {
-                Navigator.pop(context); // Close success dialog
+                Navigator.pop(context);
 
-                // ✅ Navigate to YourOrders page and return true to indicate refresh needed
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const YourOrdersPage(),
                   ),
                 ).then((_) {
-                  // Optional: Clear search form after navigating
                   fromController.clear();
                   toController.clear();
                   dateController.clear();
@@ -934,6 +809,7 @@ class _SendPageState extends State<SendPage> {
                   setState(() {
                     selectedVehicle = null;
                     originPosition = null;
+                    destinationPosition = null;
                     availableOrders = [];
                   });
                 });
@@ -960,7 +836,6 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -975,7 +850,6 @@ class _SendPageState extends State<SendPage> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ ADDED: Show loading state while fetching user ID
     if (currentUserId == null) {
       return Scaffold(
         backgroundColor: Colors.grey[50],
@@ -992,7 +866,6 @@ class _SendPageState extends State<SendPage> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              // Header with logo and notifications
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Row(
@@ -1012,7 +885,6 @@ class _SendPageState extends State<SendPage> {
               ),
               const SizedBox(height: 30),
 
-              // Title
               const Text(
                 'Search Available Orders',
                 style: TextStyle(
@@ -1023,7 +895,6 @@ class _SendPageState extends State<SendPage> {
               ),
               const SizedBox(height: 20),
 
-              // Search form
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 padding: const EdgeInsets.all(20),
@@ -1040,10 +911,36 @@ class _SendPageState extends State<SendPage> {
                 ),
                 child: Column(
                   children: [
-                    _buildLocationInputField(),
+                    // ✅ REPLACED WITH ENHANCED LOCATION INPUT FIELD
+                    EnhancedLocationInputField(
+                      controller: fromController,
+                      label: 'From',
+                      hint: 'Tap to search location',
+                      icon: Icons.my_location,
+                      isOrigin: true,
+                      onLocationSelected: (position) {
+                        setState(() {
+                          originPosition = position;
+                        });
+                      },
+                    ),
                     const SizedBox(height: 15),
-                    buildInputBox('To', toController, Icons.location_on),
+
+                    // ✅ REPLACED WITH ENHANCED LOCATION INPUT FIELD
+                    EnhancedLocationInputField(
+                      controller: toController,
+                      label: 'To',
+                      hint: 'Tap to search location',
+                      icon: Icons.location_on,
+                      isOrigin: false,
+                      onLocationSelected: (position) {
+                        setState(() {
+                          destinationPosition = position;
+                        });
+                      },
+                    ),
                     const SizedBox(height: 15),
+
                     GestureDetector(
                       onTap: () => _selectDate(context),
                       child: AbsorbPointer(
@@ -1057,7 +954,6 @@ class _SendPageState extends State<SendPage> {
                         keyboardType: TextInputType.number),
                     const SizedBox(height: 20),
 
-                    // Search button
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -1093,7 +989,6 @@ class _SendPageState extends State<SendPage> {
               ),
               const SizedBox(height: 20),
 
-              // Available Orders List
               if (availableOrders.isNotEmpty)
                 _buildAvailableOrdersList()
               else if (isSearching)
@@ -1112,98 +1007,6 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  // Location input field with search and current location buttons
-  Widget _buildLocationInputField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey[50],
-            border: Border.all(color: Colors.grey.shade300, width: 1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextField(
-            controller: fromController,
-            style: const TextStyle(fontSize: 16, color: Colors.black),
-            decoration: InputDecoration(
-              labelText: 'From',
-              labelStyle: TextStyle(color: Colors.grey[600]),
-              icon: const Padding(
-                padding: EdgeInsets.only(left: 15),
-                child: Icon(Icons.my_location, color: AppColors.primary, size: 20),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 15),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isLoadingLocation)
-                    const Padding(
-                      padding: EdgeInsets.all(12.0),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  else ...[
-                    IconButton(
-                      icon: const Icon(Icons.gps_fixed),
-                      onPressed: _getCurrentLocation,
-                      tooltip: 'Use current location',
-                      color: AppColors.primary,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.search),
-                      onPressed: _searchOriginLocation,
-                      tooltip: 'Search location',
-                      color: AppColors.primary,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            onChanged: (value) {
-              if (originPosition != null) {
-                setState(() {
-                  originPosition = null;
-                });
-              }
-            },
-          ),
-        ),
-        if (originPosition != null) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.location_on, color: Colors.green[700], size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Lat: ${originPosition!.latitude.toStringAsFixed(6)}, Lng: ${originPosition!.longitude.toStringAsFixed(6)}',
-                    style: TextStyle(
-                      color: Colors.green[700],
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  // Vehicle Dropdown Widget
   Widget _buildVehicleDropdown() {
     return Container(
       height: 55,
@@ -1259,7 +1062,6 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  // Helper method to get vehicle icon
   Widget _getVehicleIcon(String vehicle) {
     IconData icon;
     Color color = AppColors.primary;
@@ -1374,29 +1176,6 @@ class _SendPageState extends State<SendPage> {
               height: 1.5,
             ),
           ),
-          // const SizedBox(height: 30),
-          // ElevatedButton.icon(
-          //   onPressed: () {
-          //     fromController.clear();
-          //     toController.clear();
-          //     dateController.clear();
-          //     hoursController.clear();
-          //     setState(() {
-          //       selectedVehicle = null;
-          //       originPosition = null;
-          //     });
-          //   },
-          //   icon: const Icon(Icons.refresh, size: 18),
-          //   label: const Text('Clear Search'),
-          //   style: ElevatedButton.styleFrom(
-          //     backgroundColor: AppColors.primary,
-          //     foregroundColor: Colors.white,
-          //     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          //     shape: RoundedRectangleBorder(
-          //       borderRadius: BorderRadius.circular(10),
-          //     ),
-          //   ),
-          // ),
         ],
       ),
     );

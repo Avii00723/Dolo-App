@@ -532,10 +532,18 @@ packages:
     dependency: "direct main"
     description:
       name: google_places_autocomplete_text_field
-      sha256: e9cedae37e8b2cbb1d396d045ae299dd22894a38f347e3fa85557a88419dbcad
+      sha256: "0d469f3230bca1ce517951ad248417e966b99aa748040bbc2090c564716d268e"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.0"
+    version: "2.0.3"
+  google_places_flutter:
+    dependency: "direct main"
+    description:
+      name: google_places_flutter
+      sha256: "37bd64221cf4a5aa97eb3a33dc2d40f6326aa5ae4e2f2a9a7116bdc1a14f5194"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.1"
   html:
     dependency: transitive
     description:

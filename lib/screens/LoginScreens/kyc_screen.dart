@@ -103,7 +103,7 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 32),
             const SizedBox(width: 12),
-            const Text('KYC Uploaded Successfully'),
+            const Text('KYC Uploaded \nSuccessfully'),
           ],
         ),
         content: Column(

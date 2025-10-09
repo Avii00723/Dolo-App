@@ -4,7 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import '../../Controllers/OrderService.dart';
-import '../../Controllers/AuthService.dart'; // ✅ ADD THIS IMPORT
+import '../../Controllers/AuthService.dart';
+import '../LocationinputField.dart';
 import '../LoginScreens/UserProfileHelper.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Services/LocationService.dart';
@@ -21,7 +22,6 @@ class CreateOrderPage extends StatefulWidget {
 }
 
 class _CreateOrderPageState extends State<CreateOrderPage> {
-  // Page controller for step navigation
   final PageController _pageController = PageController();
   int _currentStep = 0;
   final int _totalSteps = 5;
@@ -40,25 +40,23 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   // Location variables
   Position? originPosition;
   Position? destinationPosition;
-  bool isLoadingOriginLocation = false;
-  bool isLoadingDestinationLocation = false;
 
   // Image handling
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
   bool _isCreatingOrder = false;
 
-  // ✅ FIXED: User ID fetched from AuthService
-  int? userId; // Changed from int to int? (nullable)
-  bool _isLoadingUser = true; // Track loading state
+  // User ID fetched from AuthService
+  int? userId;
+  bool _isLoadingUser = true;
 
   @override
   void initState() {
     super.initState();
-    _initializeUser(); // ✅ Fetch userId on init
+    _initializeUser();
   }
 
-  // ✅ NEW: Initialize user from AuthService
+  // Initialize user from AuthService
   Future<void> _initializeUser() async {
     try {
       final fetchedUserId = await AuthService.getUserId();
@@ -66,7 +64,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         print('❌ No user ID found in AuthService');
         if (mounted) {
           _showSnackBar('Please log in to create orders', Colors.red);
-          Navigator.of(context).pop(); // Go back if no userId
+          Navigator.of(context).pop();
         }
         return;
       }
@@ -172,139 +170,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-  // Get current location for origin
-  Future<void> _getCurrentLocationForOrigin() async {
-    setState(() {
-      isLoadingOriginLocation = true;
-    });
-    try {
-      final position = await LocationService.getCurrentPosition();
-      if (position != null) {
-        final address = await LocationService.getAddressFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-        setState(() {
-          originPosition = position;
-          originController.text = address ?? 'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
-          isLoadingOriginLocation = false;
-        });
-        _showSnackBar('✅ Origin coordinates saved', Colors.green);
-      } else {
-        setState(() {
-          isLoadingOriginLocation = false;
-        });
-        _showSnackBar('Unable to get current location. Please check permissions.', Colors.red);
-      }
-    } catch (e) {
-      setState(() {
-        isLoadingOriginLocation = false;
-      });
-      _showSnackBar('Error: $e', Colors.red);
-    }
-  }
-
-  // Get current location for destination
-  Future<void> _getCurrentLocationForDestination() async {
-    setState(() {
-      isLoadingDestinationLocation = true;
-    });
-    try {
-      final position = await LocationService.getCurrentPosition();
-      if (position != null) {
-        final address = await LocationService.getAddressFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-        setState(() {
-          destinationPosition = position;
-          destinationController.text = address ?? 'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
-          isLoadingDestinationLocation = false;
-        });
-        _showSnackBar('✅ Destination coordinates saved', Colors.green);
-      } else {
-        setState(() {
-          isLoadingDestinationLocation = false;
-        });
-        _showSnackBar('Unable to get current location. Please check permissions.', Colors.red);
-      }
-    } catch (e) {
-      setState(() {
-        isLoadingDestinationLocation = false;
-      });
-      _showSnackBar('Error: $e', Colors.red);
-    }
-  }
-
-  // Search location from text input
-  Future<void> _searchLocation(TextEditingController controller, bool isOrigin) async {
-    if (controller.text.trim().isEmpty) {
-      _showSnackBar('Please enter a location to search', Colors.orange);
-      return;
-    }
-
-    if (isOrigin) {
-      setState(() {
-        isLoadingOriginLocation = true;
-      });
-    } else {
-      setState(() {
-        isLoadingDestinationLocation = true;
-      });
-    }
-
-    try {
-      final locations = await LocationService.getCoordinatesFromAddress(controller.text.trim());
-      if (locations != null && locations.isNotEmpty) {
-        final location = locations.first;
-        final position = Position(
-          latitude: location.latitude,
-          longitude: location.longitude,
-          timestamp: DateTime.now(),
-          accuracy: 0.0,
-          altitude: 0.0,
-          altitudeAccuracy: 0.0,
-          heading: 0.0,
-          headingAccuracy: 0.0,
-          speed: 0.0,
-          speedAccuracy: 0.0,
-        );
-
-        setState(() {
-          if (isOrigin) {
-            originPosition = position;
-            isLoadingOriginLocation = false;
-          } else {
-            destinationPosition = position;
-            isLoadingDestinationLocation = false;
-          }
-        });
-        _showSnackBar(isOrigin ? '✅ Origin coordinates found' : '✅ Destination coordinates found', Colors.green);
-      } else {
-        setState(() {
-          if (isOrigin) {
-            isLoadingOriginLocation = false;
-          } else {
-            isLoadingDestinationLocation = false;
-          }
-        });
-        _showSnackBar('Location not found. Please try a different search term.', Colors.orange);
-      }
-    } catch (e) {
-      setState(() {
-        if (isOrigin) {
-          isLoadingOriginLocation = false;
-        } else {
-          isLoadingDestinationLocation = false;
-        }
-      });
-      _showSnackBar('Error searching location: $e', Colors.red);
-    }
-  }
-
-  // ✅ UPDATED: Create order with null check for userId
+  // Create order
   Future<void> _createOrder() async {
-    // ✅ Check if userId is loaded
     if (userId == null) {
       _showSnackBar('User ID not found. Please log in again.', Colors.red);
       return;
@@ -317,12 +184,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       setState(() {
         _isCreatingOrder = true;
       });
-
       print('DEBUG: Starting order creation process');
 
       // Prepare order request with non-null userId
       final orderRequest = OrderCreateRequest(
-        userId: userId!, // ✅ Use fetched userId
+        userId: userId!,
         origin: originController.text.trim(),
         originLatitude: originPosition!.latitude,
         originLongitude: originPosition!.longitude,
@@ -370,8 +236,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         setState(() {
           _isCreatingOrder = false;
         });
-
-        // Check if it's a KYC error
         _showKycRequiredDialog();
       }
     } catch (e, stackTrace) {
@@ -485,7 +349,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // ✅ UPDATED: KYC screen navigation with null check
+  // KYC screen navigation
   void _navigateToKycScreen() async {
     if (userId == null) {
       _showSnackBar('User ID not found. Please log in again.', Colors.red);
@@ -496,7 +360,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       context,
       MaterialPageRoute(
         builder: (context) => KycUploadScreen(
-          userId: userId!, // ✅ Use fetched userId
+          userId: userId!,
         ),
       ),
     );
@@ -512,8 +376,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
   // Format date for API (yyyy-MM-dd)
   String _formatDateForApi(String dateString) {
-    // Input format: dd/MM/yyyy
-    // Output format: yyyy-MM-dd
     try {
       final parts = dateString.split('/');
       if (parts.length == 3) {
@@ -663,10 +525,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         maxHeight: 1024,
         imageQuality: 80,
       );
+
       if (image != null) {
         setState(() {
           _selectedImage = File(image.path);
-          // For demo purposes, set a placeholder URL
           imageUrlController.text = 'https://example.com/image_${DateTime.now().millisecondsSinceEpoch}.jpg';
         });
       }
@@ -731,6 +593,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
+
     if (picked != null) {
       setState(() {
         dateController.text = '${picked.day}/${picked.month}/${picked.year}';
@@ -740,7 +603,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Show loading indicator while fetching userId
+    // Show loading indicator while fetching userId
     if (_isLoadingUser) {
       return Scaffold(
         body: Center(
@@ -762,7 +625,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       );
     }
 
-    // ✅ Show error if userId couldn't be loaded
+    // Show error if userId couldn't be loaded
     if (userId == null) {
       return Scaffold(
         body: Center(
@@ -804,7 +667,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       );
     }
 
-    // ✅ Normal UI when userId is loaded
+    // Normal UI when userId is loaded
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -908,7 +771,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Step 1: Origin Location
+  // Step 1: Origin Location with Enhanced Field
   Widget _buildStep1() {
     return _buildStepContainer(
       title: '📍 Origin Location',
@@ -916,16 +779,17 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       child: Column(
         children: [
           const SizedBox(height: 40),
-          _buildLocationInputField(
+          EnhancedLocationInputField(
             controller: originController,
-            icon: Icons.my_location,
             label: 'Origin Address',
-            hint: 'Enter origin location',
-            helperText: 'Be specific with landmarks for easy pickup',
-            isLoading: isLoadingOriginLocation,
-            onCurrentLocationPressed: _getCurrentLocationForOrigin,
-            onSearchPressed: () => _searchLocation(originController, true),
-            position: originPosition,
+            hint: 'Tap to search location',
+            icon: Icons.my_location,
+            isOrigin: true,
+            onLocationSelected: (position) {
+              setState(() {
+                originPosition = position;
+              });
+            },
           ),
           const SizedBox(height: 20),
           Container(
@@ -941,7 +805,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Tap the location icon to use your current location or search icon to find a location.',
+                    'Tap the field above to open location search. You can use current location or search for an address.',
                     style: TextStyle(
                       color: Colors.blue[700],
                       fontSize: 13,
@@ -987,114 +851,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  Widget _buildLocationInputField({
-    required TextEditingController controller,
-    required IconData icon,
-    required String label,
-    required String hint,
-    String? helperText,
-    required bool isLoading,
-    required VoidCallback onCurrentLocationPressed,
-    required VoidCallback onSearchPressed,
-    Position? position,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TextField(
-            controller: controller,
-            decoration: InputDecoration(
-              labelText: label,
-              hintText: hint,
-              prefixIcon: Icon(icon, color: AppColors.primary),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(16),
-              labelStyle: TextStyle(color: AppColors.primary),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isLoading)
-                    const Padding(
-                      padding: EdgeInsets.all(12.0),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  else ...[
-                    IconButton(
-                      icon: const Icon(Icons.my_location),
-                      onPressed: onCurrentLocationPressed,
-                      tooltip: 'Use current location',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.search),
-                      onPressed: onSearchPressed,
-                      tooltip: 'Search location',
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            onChanged: (value) {
-              if (position != null) {
-                setState(() {
-                  if (controller == originController) {
-                    originPosition = null;
-                  } else {
-                    destinationPosition = null;
-                  }
-                });
-              }
-            },
-          ),
-        ),
-        if (position != null) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.location_on, color: Colors.green[700], size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Lat: ${position.latitude.toStringAsFixed(6)}, Lng: ${position.longitude.toStringAsFixed(6)}',
-                    style: TextStyle(
-                      color: Colors.green[700],
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        if (helperText != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            helperText,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
   Widget _buildNavigationButtons() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1129,7 +885,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           Expanded(
             flex: _currentStep > 0 ? 1 : 2,
             child: ElevatedButton(
-              onPressed: _currentStep == _totalSteps - 1 ? _createOrder : () {
+              onPressed: _currentStep == _totalSteps - 1
+                  ? _createOrder
+                  : () {
                 if (_validateCurrentStep()) {
                   _nextStep();
                 }
@@ -1165,7 +923,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Step 2: Destination Location
+  // Step 2: Destination Location with Enhanced Field
   Widget _buildStep2() {
     return _buildStepContainer(
       title: '🎯 Destination Location',
@@ -1173,16 +931,17 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       child: Column(
         children: [
           const SizedBox(height: 40),
-          _buildLocationInputField(
+          EnhancedLocationInputField(
             controller: destinationController,
-            icon: Icons.place,
             label: 'Destination Address',
-            hint: 'Enter destination location',
-            helperText: 'Exact delivery address',
-            isLoading: isLoadingDestinationLocation,
-            onCurrentLocationPressed: _getCurrentLocationForDestination,
-            onSearchPressed: () => _searchLocation(destinationController, false),
-            position: destinationPosition,
+            hint: 'Tap to search location',
+            icon: Icons.place,
+            isOrigin: false,
+            onLocationSelected: (position) {
+              setState(() {
+                destinationPosition = position;
+              });
+            },
           ),
           const SizedBox(height: 20),
           Container(
@@ -1198,7 +957,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Make sure the delivery address is complete and accessible.',
+                    'Tap the field above to open location search. Ensure the delivery address is complete.',
                     style: TextStyle(
                       color: Colors.green[700],
                       fontSize: 13,
@@ -1244,7 +1003,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Date format: YYYY-MM-DD (e.g., 2025-09-30)',
+                    'Date format: DD/MM/YYYY (e.g., 30/09/2025)',
                     style: TextStyle(
                       color: Colors.orange[700],
                       fontSize: 13,
