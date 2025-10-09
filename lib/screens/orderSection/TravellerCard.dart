@@ -833,7 +833,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
           ),
         );
 
-      case 'rejected':
+      case 'booked':
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -848,7 +848,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
               Icon(Icons.cancel, color: Colors.red[600], size: 20),
               const SizedBox(width: 12),
               Text(
-                'Request Rejected',
+                'Order Booked',
                 style: TextStyle(
                   color: Colors.red[700],
                   fontWeight: FontWeight.w600,
@@ -874,7 +874,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
         return Colors.blue[600]!;
       case 'delivered':
         return Colors.green[700]!;
-      case 'rejected':
+      case 'booked':
         return Colors.red[600]!;
       default:
         return Colors.grey[600]!;
@@ -891,7 +891,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
         return Icons.local_shipping;
       case 'delivered':
         return Icons.done_all;
-      case 'rejected':
+      case 'booked':
         return Icons.cancel;
       default:
         return Icons.info;

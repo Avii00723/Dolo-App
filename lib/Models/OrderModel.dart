@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class Order {
   final int id;
   final String userName;
@@ -255,5 +257,37 @@ class OrderUpdateResponse {
     return OrderUpdateResponse(
       message: json['message'] ?? '',
     );
+  }
+}
+enum OrderStatus {
+  pending,
+  accepted,
+  booked,
+  delivered;
+
+  String get displayName {
+    switch (this) {
+      case OrderStatus.pending:
+        return 'Pending';
+      case OrderStatus.accepted:
+        return 'Accepted';
+      case OrderStatus.booked:
+        return 'Booked';
+      case OrderStatus.delivered:
+        return 'Delivered';
+    }
+  }
+
+  Color get statusColor {
+    switch (this) {
+      case OrderStatus.pending:
+        return Colors.orange;
+      case OrderStatus.accepted:
+        return Colors.blue;
+      case OrderStatus.booked:
+        return Colors.purple;
+      case OrderStatus.delivered:
+        return Colors.green;
+    }
   }
 }

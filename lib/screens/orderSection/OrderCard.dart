@@ -1510,6 +1510,8 @@ class ModernSenderOrderCard extends StatelessWidget {
         return Colors.deepPurple[600]!;
       case 'delivered':
         return Colors.green[600]!;
+        case 'booked':
+        return Colors.yellow[600]!;
       default:
         return Colors.grey[600]!;
     }

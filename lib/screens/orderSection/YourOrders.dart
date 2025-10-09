@@ -1039,8 +1039,10 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         negotiatedPrice: 0,
       );
 
+      // ✅ Call the accept API
       final response = await _tripRequestService.acceptTripRequest(acceptRequest);
 
+      // ✅ CHECK: Only show accepted if response is not null AND status code is 200
       if (response != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1056,12 +1058,13 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           ),
         );
 
-        // ✅ Immediate refresh
+        // ✅ Immediate refresh to show accepted status
         await _loadAllData();
       } else {
+        // ✅ Show error if response is null or status code is not 200
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to accept trip request'),
+            content: Text('Failed to accept trip request - Invalid response'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1075,6 +1078,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       );
     }
   }
+
 
   Future<bool?> _showAcceptConfirmationDialog(TripRequestDisplay request) async {
     return showDialog<bool>(
