@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart'; // ✅ ADD THIS IMPORT
+import 'package:http_parser/http_parser.dart';
 import '../Constants/ApiConstants.dart';
 import '../Controllers/AuthService.dart';
 
@@ -11,12 +11,13 @@ class ChatService {
     return await AuthService.getUserId();
   }
 
-  // ✅ UPDATED: Send a chat message with optional images using multipart/form-data
+  // ✅ UPDATED: Send a chat message with optional images and reply_to support
   static Future<Map<String, dynamic>> sendMessage({
     required int chatId,
     String? message,
     int? negotiatedPrice,
     List<File>? images,
+    int? replyTo, // ✅ NEW: Added reply_to parameter
   }) async {
     try {
       final userId = await _getCurrentUserId();
@@ -47,6 +48,12 @@ class ChatService {
         request.fields['negotiatedPrice'] = negotiatedPrice.toString();
       }
 
+      // ✅ NEW: Add optional reply_to
+      if (replyTo != null) {
+        request.fields['reply_to'] = replyTo.toString();
+        print('📤 Replying to message ID: $replyTo');
+      }
+
       // Add images if provided
       if (images != null && images.isNotEmpty) {
         print('📤 Adding ${images.length} images to request');
@@ -70,11 +77,11 @@ class ChatService {
           var length = await file.length();
 
           var multipartFile = http.MultipartFile(
-            'images', // Field name as per API
+            'images',
             stream,
             length,
             filename: 'image_${DateTime.now().millisecondsSinceEpoch}_$i.$extension',
-            contentType: MediaType.parse(mimeType), // ✅ FIXED: Use MediaType directly
+            contentType: MediaType.parse(mimeType),
           );
 
           request.files.add(multipartFile);
@@ -150,8 +157,6 @@ class ChatService {
       );
 
       print('📥 Get Messages Response: ${response.statusCode}');
-      // Don't print body for silent refreshes to reduce logs
-      // print('📥 Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -256,10 +261,12 @@ class ChatService {
   static Future<Map<String, dynamic>> sendImages({
     required int chatId,
     required List<File> images,
+    int? replyTo, // ✅ Added reply support
   }) async {
     return await sendMessage(
       chatId: chatId,
       images: images,
+      replyTo: replyTo,
     );
   }
 
@@ -268,11 +275,28 @@ class ChatService {
     required int chatId,
     required String message,
     required List<File> images,
+    int? replyTo, // ✅ Added reply support
   }) async {
     return await sendMessage(
       chatId: chatId,
       message: message,
       images: images,
+      replyTo: replyTo,
+    );
+  }
+
+  // ✅ NEW: Send reply to a message
+  static Future<Map<String, dynamic>> sendReply({
+    required int chatId,
+    required int replyToMessageId,
+    String? message,
+    List<File>? images,
+  }) async {
+    return await sendMessage(
+      chatId: chatId,
+      message: message,
+      images: images,
+      replyTo: replyToMessageId,
     );
   }
 

@@ -42,10 +42,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String? _errorMessage;
   String? replyingToMessageId;
   Map<String, dynamic>? replyingToMessage;
-
   Timer? _autoRefreshTimer;
   bool _isRefreshing = false;
-
   List<File> _selectedImages = [];
   bool _isUploadingImages = false;
 
@@ -60,7 +58,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-
     if (state == AppLifecycleState.resumed) {
       print('📱 App resumed - refreshing messages...');
       _loadMessages(silent: true);
@@ -86,7 +83,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Future<void> _initializeChat() async {
     _currentUserId = await AuthService.getUserId();
-
     if (_currentUserId == null) {
       setState(() {
         isLoading = false;
@@ -95,7 +91,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
 
-    print('🔑 Current User ID: $_currentUserId');
+    print('🔍 Current User ID: $_currentUserId');
     await _loadMessages();
   }
 
@@ -113,7 +109,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     try {
       final chatIdInt = int.tryParse(widget.chatId);
-
       if (chatIdInt == null) {
         if (!silent) {
           setState(() {
@@ -133,15 +128,26 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
 
       if (result['success'] == true) {
-        final apiMessages = result['messages'] as List<dynamic>;
-
+        final apiMessages = result['messages'] as List;
         final convertedMessages = apiMessages.map((msg) {
           final senderId = msg['sender_id'];
           final senderName = msg['sender_name'] ?? 'Unknown';
           final messageText = msg['message'] ?? '';
           final mediaUrl = msg['media_url'] as String?;
-
+          final replyToId = msg['reply_to'];
+          final replyMessage = msg['reply_message'];
+          final replySenderName = msg['reply_sender_name'];
           final hasMedia = mediaUrl != null && mediaUrl.isNotEmpty;
+
+          // ✅ Build reply object if reply exists
+          Map<String, dynamic>? replyData;
+          if (replyToId != null && replyMessage != null) {
+            replyData = {
+              'message': replyMessage,
+              'sender_name': replySenderName ?? 'Unknown',
+              'reply_to_id': replyToId,
+            };
+          }
 
           return {
             'messageId': msg['id'].toString(),
@@ -151,6 +157,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'timestamp': DateTime.parse(msg['created_at']),
             'type': hasMedia ? 'image' : 'text',
             'mediaUrl': hasMedia ? mediaUrl : null,
+            'replyToId': replyToId,
+            'replyData': replyData, // ✅ Store parsed reply data
           };
         }).toList();
 
@@ -159,7 +167,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
         setState(() {
           messages = convertedMessages;
-
           if (convertedMessages.isNotEmpty) {
             final firstOtherMessage = convertedMessages.firstWhere(
                   (msg) => msg['senderId'] != _currentUserId,
@@ -224,7 +231,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             };
           });
         }
-
         print('⚠️ Failed to load messages: ${result['error']}');
       }
     } catch (e) {
@@ -243,7 +249,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           };
         });
       }
-
       print('❌ Exception loading messages: $e');
     } finally {
       _isRefreshing = false;
@@ -527,14 +532,41 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           final message = messages[messages.length - 1 - index];
           final isMe = message['senderId'] == _currentUserId;
 
-          return ModernMessageBubble(
-            message: message,
-            messageId: message['messageId'],
-            isMe: isMe,
-            onReply: (messageData) => _setReplyMessage(message['messageId'], messageData),
-            onCopy: _copyMessage,
-            onLaunchUrl: _launchUrl,
-            onDownloadImage: _downloadImage,
+          return Dismissible(
+            key: Key('${message['messageId']}_$index'),
+            direction: DismissDirection.horizontal,
+            confirmDismiss: (direction) async {
+              _setReplyMessage(message['messageId'], message);
+              return false;
+            },
+            background: Container(
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.only(left: 20),
+              child: Icon(
+                Icons.reply,
+                color: Colors.blue.shade600,
+                size: 28,
+              ),
+            ),
+            secondaryBackground: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 20),
+              child: Icon(
+                Icons.reply,
+                color: Colors.blue.shade600,
+                size: 28,
+              ),
+            ),
+            child: ModernMessageBubble(
+              message: message,
+              messageId: message['messageId'],
+              isMe: isMe,
+              currentUserId: _currentUserId,
+              onReply: (messageData) => _setReplyMessage(message['messageId'], messageData),
+              onCopy: _copyMessage,
+              onLaunchUrl: _launchUrl,
+              onDownloadImage: _downloadImage,
+            ),
           );
         },
       ),
@@ -632,6 +664,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget _buildReplyPreview() {
     if (replyingToMessage == null) return const SizedBox.shrink();
 
+    String previewText = replyingToMessage!['message'] ?? '';
+    if (previewText.isEmpty && replyingToMessage!['type'] == 'image') {
+      previewText = '📷 Image';
+    }
+
+    final isReplyToMe = replyingToMessage!['senderId'] == _currentUserId;
+    final senderName = isReplyToMe ? 'You' : (replyingToMessage!['senderName'] ?? 'Unknown');
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(12),
@@ -639,7 +679,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         color: Colors.blue.shade50,
         borderRadius: BorderRadius.circular(12),
         border: Border(
-          left: BorderSide(color: Colors.blue.shade600, width: 3),
+          left: BorderSide(
+            color: isReplyToMe ? Colors.teal.shade400 : Colors.blue.shade600,
+            width: 3,
+          ),
         ),
       ),
       child: Row(
@@ -651,16 +694,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Replying to',
+                  'Replying to $senderName',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.blue.shade700,
+                    color: isReplyToMe ? Colors.teal.shade700 : Colors.blue.shade700,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  replyingToMessage!['message'] ?? '',
+                  previewText,
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.grey.shade700,
@@ -806,7 +849,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _sendMessage() async {
     final message = _messageController.text.trim();
-
     if (message.isEmpty && _selectedImages.isEmpty) return;
 
     final chatIdInt = int.tryParse(widget.chatId);
@@ -817,9 +859,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     _messageController.clear();
     final imagesToSend = List<File>.from(_selectedImages);
+    final replyToId = replyingToMessageId != null ? int.tryParse(replyingToMessageId!) : null;
+
     setState(() {
       _selectedImages.clear();
     });
+
     _clearReply();
 
     setState(() {
@@ -829,8 +874,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       final result = await ChatService.sendMessage(
         chatId: chatIdInt,
-        message: message,
-        images: imagesToSend,
+        message: message.isNotEmpty ? message : null,
+        images: imagesToSend.isNotEmpty ? imagesToSend : null,
+        replyTo: replyToId,
       );
 
       if (result['success'] == true) {
@@ -858,6 +904,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       replyingToMessageId = messageId;
       replyingToMessage = messageData;
     });
+    FocusScope.of(context).requestFocus(FocusNode());
   }
 
   void _clearReply() {
@@ -887,33 +934,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       _showSnackBar('Downloading image...', Colors.blue);
 
-      // Check Android version and request appropriate permissions
       bool hasPermission = false;
 
       if (Platform.isAndroid) {
         final androidInfo = await DeviceInfoPlugin().androidInfo;
-
         if (androidInfo.version.sdkInt >= 33) {
-          // Android 13+ - Request READ_MEDIA_IMAGES
           final status = await Permission.photos.request();
           hasPermission = status.isGranted;
         } else if (androidInfo.version.sdkInt >= 30) {
-          // Android 11, 12 - Use manageExternalStorage for downloads
           final status = await Permission.manageExternalStorage.request();
           hasPermission = status.isGranted;
-
-          // Fallback to storage permission if manage not granted
           if (!hasPermission) {
             final storageStatus = await Permission.storage.request();
             hasPermission = storageStatus.isGranted;
           }
         } else {
-          // Android 10 and below
           final status = await Permission.storage.request();
           hasPermission = status.isGranted;
         }
       } else {
-        // iOS
         final status = await Permission.photos.request();
         hasPermission = status.isGranted;
       }
@@ -923,7 +962,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         return;
       }
 
-      // Construct full URL
       String fullUrl = imageUrl;
       if (!imageUrl.startsWith('http')) {
         fullUrl = 'http://51.20.193.95:3000$imageUrl';
@@ -931,7 +969,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
       print('📥 Downloading from: $fullUrl');
 
-      // Download image
       final response = await http.get(Uri.parse(fullUrl));
 
       if (response.statusCode != 200) {
@@ -939,47 +976,37 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         return;
       }
 
-      // Save to appropriate directory based on Android version
       String? savedPath;
 
       if (Platform.isAndroid) {
         final androidInfo = await DeviceInfoPlugin().androidInfo;
-
         if (androidInfo.version.sdkInt >= 29) {
-          // Android 10+ - Use app-specific directory
           final directory = await getExternalStorageDirectory();
           if (directory != null) {
-            // Create a Pictures subdirectory
             final picturesDir = Directory('${directory.path}/Pictures');
             if (!await picturesDir.exists()) {
               await picturesDir.create(recursive: true);
             }
-
             final fileName = 'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
             final filePath = '${picturesDir.path}/$fileName';
-
             final file = File(filePath);
             await file.writeAsBytes(response.bodyBytes);
             savedPath = filePath;
           }
         } else {
-          // Android 9 and below - Use Downloads folder
           final directory = Directory('/storage/emulated/0/Download');
           if (await directory.exists()) {
             final fileName = 'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
             final filePath = '${directory.path}/$fileName';
-
             final file = File(filePath);
             await file.writeAsBytes(response.bodyBytes);
             savedPath = filePath;
           }
         }
       } else {
-        // iOS
         final directory = await getApplicationDocumentsDirectory();
         final fileName = 'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final filePath = '${directory.path}/$fileName';
-
         final file = File(filePath);
         await file.writeAsBytes(response.bodyBytes);
         savedPath = filePath;
@@ -989,41 +1016,45 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _showSnackBar('Image saved successfully', Colors.green);
         print('✅ Image saved to: $savedPath');
       } else {
-        _showSnackBar('Could not save image', Colors.red);
+        _showSnackBar('Failed to save image', Colors.red);
       }
-
     } catch (e) {
       print('❌ Error downloading image: $e');
-      _showSnackBar('Failed to download image: $e', Colors.red);
+      _showSnackBar('Error downloading image: $e', Colors.red);
     }
   }
 
-
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: color,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    _autoRefreshTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 }
 
-// ModernMessageBubble with Fixed Image Sizes
+// ✅ ENHANCED: Modern Message Bubble Widget with WhatsApp-style Reply Display
 class ModernMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final String messageId;
   final bool isMe;
+  final int? currentUserId;
   final Function(Map<String, dynamic>) onReply;
   final Function(String) onCopy;
   final Function(String) onLaunchUrl;
@@ -1034,6 +1065,7 @@ class ModernMessageBubble extends StatelessWidget {
     required this.message,
     required this.messageId,
     required this.isMe,
+    required this.currentUserId,
     required this.onReply,
     required this.onCopy,
     required this.onLaunchUrl,
@@ -1042,440 +1074,262 @@ class ModernMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSystem = message['senderId'] == 'system';
-    final isSending = message['sending'] == true;
-    final hasImage = message['type'] == 'image' && message['mediaUrl'] != null;
-
-    if (isSystem) {
-      return _buildSystemMessage();
-    }
+    final messageText = message['message'] ?? '';
+    final timestamp = message['timestamp'] as DateTime?;
+    final timeString = timestamp != null
+        ? DateFormat('hh:mm a').format(timestamp)
+        : '';
+    final messageType = message['type'] ?? 'text';
+    final mediaUrl = message['mediaUrl'];
+    final hasReply = message['replyData'] != null;
 
     return GestureDetector(
-      onLongPress: isSending ? null : () => _showMessageOptions(context),
+      onLongPress: () => _showMessageOptions(context),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            if (!isMe) ...[
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Colors.blue.shade400, Colors.blue.shade600],
-                  ),
-                ),
-                child: const Center(
-                  child: Icon(Icons.person, color: Colors.white, size: 16),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
+            if (!isMe) _buildAvatar(),
+            if (!isMe) const SizedBox(width: 8),
             Flexible(
               child: Container(
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
-                child: Column(
-                  crossAxisAlignment: isMe
-                      ? CrossAxisAlignment.end
-                      : CrossAxisAlignment.start,
-                  children: [
-                    if (message['replyMessage'] != null) _buildReplyPreview(),
-                    Container(
-                      padding: EdgeInsets.all(hasImage ? 4 : 12),
-                      decoration: BoxDecoration(
-                        color: isMe ? Colors.white : Colors.blue.shade600,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(20),
-                          topRight: const Radius.circular(20),
-                          bottomLeft: Radius.circular(isMe ? 4 : 20),
-                          bottomRight: Radius.circular(isMe ? 20 : 4),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (hasImage) _buildImageDisplay(context),
-                          if (hasImage && message['message'].toString().isNotEmpty)
-                            const SizedBox(height: 8),
-                          if (message['message'].toString().isNotEmpty)
-                            Padding(
-                              padding: hasImage
-                                  ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
-                                  : EdgeInsets.zero,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Flexible(child: _buildMessageContent()),
-                                  if (isSending) ...[
-                                    const SizedBox(width: 8),
-                                    SizedBox(
-                                      width: 12,
-                                      height: 12,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          isMe ? Colors.grey : Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: isMe
+                      ? LinearGradient(
+                    colors: [Colors.blue.shade600, Colors.blue.shade500],
+                  )
+                      : null,
+                  color: isMe ? null : Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16),
+                    topRight: const Radius.circular(16),
+                    bottomLeft: Radius.circular(isMe ? 16 : 4),
+                    bottomRight: Radius.circular(isMe ? 4 : 16),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _formatTime(message['timestamp']),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w500,
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!isMe)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          message['senderName'] ?? 'Unknown',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
                       ),
+                    // ✅ ENHANCED: WhatsApp-style Reply Section
+                    if (hasReply) _buildWhatsAppStyleReplySection(),
+                    if (messageType == 'image' && mediaUrl != null)
+                      _buildImageMessage(mediaUrl),
+                    if (messageText.isNotEmpty) _buildTextMessage(messageText),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          timeString,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isMe ? Colors.white70 : Colors.grey.shade500,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-            if (isMe) ...[
-              const SizedBox(width: 8),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey.shade400,
-                ),
-                child: const Center(
-                  child: Icon(Icons.person, color: Colors.white, size: 16),
-                ),
-              ),
-            ],
+            if (isMe) const SizedBox(width: 8),
+            if (isMe) _buildAvatar(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildImageDisplay(BuildContext context) {
-    final mediaUrl = message['mediaUrl'] as String;
+  Widget _buildAvatar() {
+    final name = message['senderName'] ?? 'U';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
 
-    String imageUrl = mediaUrl;
-    if (!mediaUrl.startsWith('http')) {
-      imageUrl = "http://51.20.193.95:3000$mediaUrl";
-      print(imageUrl);
-    }
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: isMe
+              ? [Colors.blue.shade400, Colors.blue.shade600]
+              : [Colors.grey.shade400, Colors.grey.shade600],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
 
-    // Fixed square box size - 200x200
-    const double imageSize = 200.0;
+  // ✅ ENHANCED: WhatsApp-style Reply Section - Now uses replyData from API
+  Widget _buildWhatsAppStyleReplySection() {
+    final replyData = message['replyData'];
+    if (replyData == null) return const SizedBox.shrink();
+
+    final replyText = replyData['message'] ?? '';
+    final replySenderName = replyData['sender_name'] ?? 'Unknown';
+
+    // Determine if the replied message is from the current user by checking the sender name
+    // Since we don't have sender_id in replyData, we compare names
+    final currentUserName = message['senderName'];
+    final isReplyFromMe = replySenderName == currentUserName;
+    final displayName = isReplyFromMe ? 'You' : replySenderName;
 
     return GestureDetector(
-      onTap: () => _showFullImage(context),
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: imageSize,
-              height: imageSize,
-              color: Colors.grey[300],
-              child: Image.network(
-                imageUrl,
-                width: imageSize,
-                height: imageSize,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                          : null,
-                      strokeWidth: 2,
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.broken_image, size: 50, color: Colors.grey[600]),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Failed to load image',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                    ],
-                  );
-                },
-              ),
+      onTap: () {
+        print('📌 Tapped on reply - scroll to original message');
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isMe
+              ? Colors.black.withOpacity(0.15)
+              : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+          border: Border(
+            left: BorderSide(
+              color: isMe
+                  ? Colors.white.withOpacity(0.8)
+                  : (isReplyFromMe
+                  ? Colors.teal.shade400
+                  : Colors.grey.shade400),
+              width: 3,
             ),
           ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.download, color: Colors.white, size: 20),
-                onPressed: () => onDownloadImage(mediaUrl),
-                padding: const EdgeInsets.all(8),
-                constraints: const BoxConstraints(),
-                tooltip: 'Download Image',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showFullImage(BuildContext context) {
-    final mediaUrl = message['mediaUrl'] as String;
-    String imageUrl = mediaUrl;
-    if (!mediaUrl.startsWith('http')) {
-      imageUrl = "http://51.20.193.95:3000$mediaUrl";
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                color: Colors.black87,
-                child: Center(
-                  child: InteractiveViewer(
-                    panEnabled: true,
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                                : null,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.broken_image,
-                                  size: 80,
-                                  color: Colors.grey[400]),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Failed to load image',
-                                style: TextStyle(color: Colors.grey[400]),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 40,
-              right: 20,
-              child: Row(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.download, color: Colors.white),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        onDownloadImage(mediaUrl);
-                      },
-                      tooltip: 'Download',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSystemMessage() {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade200,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            message['message'] ?? '',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReplyPreview() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: isMe ? Colors.grey.shade100 : Colors.blue.shade700,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 3,
-            height: 20,
-            decoration: BoxDecoration(
-              color: isMe ? Colors.blue.shade600 : Colors.white,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              message['replyMessage'] ?? '',
+            // Sender name with color coding
+            Text(
+              displayName,
               style: TextStyle(
                 fontSize: 12,
-                color: isMe ? Colors.grey.shade600 : Colors.white70,
-                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w700,
+                color: isMe
+                    ? Colors.white.withOpacity(0.95)
+                    : (isReplyFromMe
+                    ? Colors.teal.shade600
+                    : Colors.grey.shade600),
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Reply message content
+            Text(
+              replyText.isNotEmpty ? replyText : '📷 Photo',
+              style: TextStyle(
+                fontSize: 13,
+                color: isMe
+                    ? Colors.white.withOpacity(0.8)
+                    : Colors.grey.shade800,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildMessageContent() {
-    final messageText = message['message'] ?? '';
-    final urlRegex = RegExp(
-      r'https?://(?:[-\w.])+(?::[0-9]+)?(?:/(?:[\w/_.])*(?:\?[-\w&=%.]*)?)?#?(?:[\w]*)?',
-      caseSensitive: false,
-    );
-
-    if (urlRegex.hasMatch(messageText)) {
-      return _buildTextWithLinks(messageText, urlRegex);
+  Widget _buildImageMessage(String mediaUrl) {
+    String fullUrl = mediaUrl;
+    if (!mediaUrl.startsWith('http')) {
+      fullUrl = 'http://51.20.193.95:3000$mediaUrl';
     }
 
-    return Text(
+    return GestureDetector(
+      onTap: () => onLaunchUrl(fullUrl),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            fullUrl,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                height: 200,
+                width: 200,
+                color: Colors.grey[300],
+                child: Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                        : null,
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                height: 200,
+                width: 200,
+                color: Colors.grey[300],
+                child: const Center(
+                  child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextMessage(String messageText) {
+    return SelectableText(
       messageText,
       style: TextStyle(
         fontSize: 15,
-        color: isMe ? Colors.black87 : Colors.white,
-        height: 1.3,
+        height: 1.4,
+        color: isMe ? Colors.white : Colors.black87,
       ),
-    );
-  }
-
-  Widget _buildTextWithLinks(String text, RegExp urlRegex) {
-    final spans = <TextSpan>[];
-    final matches = urlRegex.allMatches(text);
-    int lastMatchEnd = 0;
-
-    for (final match in matches) {
-      if (match.start > lastMatchEnd) {
-        spans.add(TextSpan(
-          text: text.substring(lastMatchEnd, match.start),
-          style: TextStyle(
-            fontSize: 15,
-            color: isMe ? Colors.black87 : Colors.white,
-          ),
-        ));
-      }
-
-      final url = match.group(0)!;
-      spans.add(TextSpan(
-        text: url,
-        style: TextStyle(
-          fontSize: 15,
-          color: isMe ? Colors.blue.shade600 : Colors.white,
-          decoration: TextDecoration.underline,
-          fontWeight: FontWeight.w500,
-        ),
-        recognizer: TapGestureRecognizer()..onTap = () => onLaunchUrl(url),
-      ));
-
-      lastMatchEnd = match.end;
-    }
-
-    if (lastMatchEnd < text.length) {
-      spans.add(TextSpan(
-        text: text.substring(lastMatchEnd),
-        style: TextStyle(
-          fontSize: 15,
-          color: isMe ? Colors.black87 : Colors.white,
-        ),
-      ));
-    }
-
-    return RichText(
-      text: TextSpan(children: spans),
     );
   }
 
   void _showMessageOptions(BuildContext context) {
+    final messageText = message['message'] ?? '';
+    final messageType = message['type'] ?? 'text';
+    final mediaUrl = message['mediaUrl'];
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -1490,52 +1344,53 @@ class ModernMessageBubble extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 20),
             ListTile(
-              leading: Icon(Icons.reply, color: Colors.blue.shade600),
+              leading: const Icon(Icons.reply, color: Colors.blue),
               title: const Text('Reply'),
               onTap: () {
                 Navigator.pop(context);
                 onReply(message);
               },
             ),
-            ListTile(
-              leading: Icon(Icons.copy, color: Colors.grey.shade600),
-              title: const Text('Copy'),
-              onTap: () {
-                Navigator.pop(context);
-                onCopy(message['message'] ?? '');
-              },
-            ),
+            if (messageText.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.copy, color: Colors.grey),
+                title: const Text('Copy Text'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onCopy(messageText);
+                },
+              ),
+            if (messageType == 'image' && mediaUrl != null)
+              ListTile(
+                leading: const Icon(Icons.download, color: Colors.green),
+                title: const Text('Download Image'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onDownloadImage(mediaUrl);
+                },
+              ),
+            if (messageType == 'image' && mediaUrl != null)
+              ListTile(
+                leading: const Icon(Icons.open_in_new, color: Colors.orange),
+                title: const Text('Open Image'),
+                onTap: () {
+                  Navigator.pop(context);
+                  String fullUrl = mediaUrl;
+                  if (!mediaUrl.startsWith('http')) {
+                    fullUrl = 'http://51.20.193.95:3000$mediaUrl';
+                  }
+                  onLaunchUrl(fullUrl);
+                },
+              ),
           ],
         ),
       ),
     );
-  }
-
-  String _formatTime(dynamic timestamp) {
-    if (timestamp == null) return '';
-
-    DateTime time;
-    if (timestamp is DateTime) {
-      time = timestamp;
-    } else {
-      time = DateTime.parse(timestamp.toString());
-    }
-
-    final now = DateTime.now();
-    final difference = now.difference(time);
-
-    if (difference.inDays == 0) {
-      return DateFormat('HH:mm').format(time);
-    } else if (difference.inDays == 1) {
-      return 'Yesterday ${DateFormat('HH:mm').format(time)}';
-    } else {
-      return DateFormat('MMM dd, HH:mm').format(time);
-    }
   }
 }
