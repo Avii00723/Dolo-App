@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import '../../Constants/ApiConstants.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -886,53 +887,117 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       _showSnackBar('Downloading image...', Colors.blue);
 
-      final status = await Permission.storage.request();
-      if (!status.isGranted) {
-        _showSnackBar('Storage permission denied', Colors.red);
+      // Check Android version and request appropriate permissions
+      bool hasPermission = false;
+
+      if (Platform.isAndroid) {
+        final androidInfo = await DeviceInfoPlugin().androidInfo;
+
+        if (androidInfo.version.sdkInt >= 33) {
+          // Android 13+ - Request READ_MEDIA_IMAGES
+          final status = await Permission.photos.request();
+          hasPermission = status.isGranted;
+        } else if (androidInfo.version.sdkInt >= 30) {
+          // Android 11, 12 - Use manageExternalStorage for downloads
+          final status = await Permission.manageExternalStorage.request();
+          hasPermission = status.isGranted;
+
+          // Fallback to storage permission if manage not granted
+          if (!hasPermission) {
+            final storageStatus = await Permission.storage.request();
+            hasPermission = storageStatus.isGranted;
+          }
+        } else {
+          // Android 10 and below
+          final status = await Permission.storage.request();
+          hasPermission = status.isGranted;
+        }
+      } else {
+        // iOS
+        final status = await Permission.photos.request();
+        hasPermission = status.isGranted;
+      }
+
+      if (!hasPermission) {
+        _showSnackBar('Storage permission denied. Please enable it in settings.', Colors.red);
         return;
       }
 
+      // Construct full URL
       String fullUrl = imageUrl;
       if (!imageUrl.startsWith('http')) {
-        fullUrl = '${ApiConstants.baseUrl}$imageUrl';
+        fullUrl = 'http://51.20.193.95:3000$imageUrl';
       }
 
+      print('📥 Downloading from: $fullUrl');
+
+      // Download image
       final response = await http.get(Uri.parse(fullUrl));
 
       if (response.statusCode != 200) {
-        _showSnackBar('Failed to download image', Colors.red);
+        _showSnackBar('Failed to download image (${response.statusCode})', Colors.red);
         return;
       }
 
-      Directory? directory;
+      // Save to appropriate directory based on Android version
+      String? savedPath;
+
       if (Platform.isAndroid) {
-        directory = Directory('/storage/emulated/0/Download');
-        if (!await directory.exists()) {
-          directory = await getExternalStorageDirectory();
+        final androidInfo = await DeviceInfoPlugin().androidInfo;
+
+        if (androidInfo.version.sdkInt >= 29) {
+          // Android 10+ - Use app-specific directory
+          final directory = await getExternalStorageDirectory();
+          if (directory != null) {
+            // Create a Pictures subdirectory
+            final picturesDir = Directory('${directory.path}/Pictures');
+            if (!await picturesDir.exists()) {
+              await picturesDir.create(recursive: true);
+            }
+
+            final fileName = 'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            final filePath = '${picturesDir.path}/$fileName';
+
+            final file = File(filePath);
+            await file.writeAsBytes(response.bodyBytes);
+            savedPath = filePath;
+          }
+        } else {
+          // Android 9 and below - Use Downloads folder
+          final directory = Directory('/storage/emulated/0/Download');
+          if (await directory.exists()) {
+            final fileName = 'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            final filePath = '${directory.path}/$fileName';
+
+            final file = File(filePath);
+            await file.writeAsBytes(response.bodyBytes);
+            savedPath = filePath;
+          }
         }
       } else {
-        directory = await getApplicationDocumentsDirectory();
+        // iOS
+        final directory = await getApplicationDocumentsDirectory();
+        final fileName = 'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final filePath = '${directory.path}/$fileName';
+
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+        savedPath = filePath;
       }
 
-      if (directory == null) {
-        _showSnackBar('Could not access storage', Colors.red);
-        return;
+      if (savedPath != null) {
+        _showSnackBar('Image saved successfully', Colors.green);
+        print('✅ Image saved to: $savedPath');
+      } else {
+        _showSnackBar('Could not save image', Colors.red);
       }
 
-      final fileName = 'chat_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final filePath = '${directory.path}/$fileName';
-
-      final file = File(filePath);
-      await file.writeAsBytes(response.bodyBytes);
-
-      _showSnackBar('Image saved successfully', Colors.green);
-
-      print('✅ Image saved to: $filePath');
     } catch (e) {
       print('❌ Error downloading image: $e');
       _showSnackBar('Failed to download image: $e', Colors.red);
     }
   }
+
 
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -954,7 +1019,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-// ModernMessageBubble with Image Display and Download
+// ModernMessageBubble with Fixed Image Sizes
 class ModernMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final String messageId;
@@ -1020,59 +1085,56 @@ class ModernMessageBubble extends StatelessWidget {
                       : CrossAxisAlignment.start,
                   children: [
                     if (message['replyMessage'] != null) _buildReplyPreview(),
-                    GestureDetector(
-                      onTap: hasImage ? () => _showFullImage(context) : null,
-                      child: Container(
-                        padding: EdgeInsets.all(hasImage ? 4 : 12),
-                        decoration: BoxDecoration(
-                          color: isMe ? Colors.white : Colors.blue.shade600,
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(20),
-                            topRight: const Radius.circular(20),
-                            bottomLeft: Radius.circular(isMe ? 4 : 20),
-                            bottomRight: Radius.circular(isMe ? 20 : 4),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 5,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+                    Container(
+                      padding: EdgeInsets.all(hasImage ? 4 : 12),
+                      decoration: BoxDecoration(
+                        color: isMe ? Colors.white : Colors.blue.shade600,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(20),
+                          topRight: const Radius.circular(20),
+                          bottomLeft: Radius.circular(isMe ? 4 : 20),
+                          bottomRight: Radius.circular(isMe ? 20 : 4),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (hasImage) _buildImageDisplay(context),
-                            if (hasImage && message['message'].toString().isNotEmpty)
-                              const SizedBox(height: 8),
-                            if (message['message'].toString().isNotEmpty)
-                              Padding(
-                                padding: hasImage
-                                    ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
-                                    : EdgeInsets.zero,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Flexible(child: _buildMessageContent()),
-                                    if (isSending) ...[
-                                      const SizedBox(width: 8),
-                                      SizedBox(
-                                        width: 12,
-                                        height: 12,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            isMe ? Colors.grey : Colors.white,
-                                          ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (hasImage) _buildImageDisplay(context),
+                          if (hasImage && message['message'].toString().isNotEmpty)
+                            const SizedBox(height: 8),
+                          if (message['message'].toString().isNotEmpty)
+                            Padding(
+                              padding: hasImage
+                                  ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
+                                  : EdgeInsets.zero,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(child: _buildMessageContent()),
+                                  if (isSending) ...[
+                                    const SizedBox(width: 8),
+                                    SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          isMe ? Colors.grey : Colors.white,
                                         ),
                                       ),
-                                    ],
+                                    ),
                                   ],
-                                ),
+                                ],
                               ),
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1113,70 +1175,75 @@ class ModernMessageBubble extends StatelessWidget {
 
     String imageUrl = mediaUrl;
     if (!mediaUrl.startsWith('http')) {
-      imageUrl = '${ApiConstants.baseUrl}$mediaUrl';
+      imageUrl = "http://51.20.193.95:3000$mediaUrl";
+      print(imageUrl);
     }
 
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Container(
-                height: 200,
-                width: 200,
-                color: Colors.grey[300],
-                child: Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 200,
-                width: 200,
-                color: Colors.grey[300],
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.broken_image, size: 50, color: Colors.grey[600]),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Failed to load image',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+    // Fixed square box size - 200x200
+    const double imageSize = 200.0;
+
+    return GestureDetector(
+      onTap: () => _showFullImage(context),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: imageSize,
+              height: imageSize,
+              color: Colors.grey[300],
+              child: Image.network(
+                imageUrl,
+                width: imageSize,
+                height: imageSize,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                          : null,
+                      strokeWidth: 2,
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-        Positioned(
-          top: 8,
-          right: 8,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.download, color: Colors.white, size: 20),
-              onPressed: () => onDownloadImage(mediaUrl),
-              padding: const EdgeInsets.all(8),
-              constraints: const BoxConstraints(),
-              tooltip: 'Download Image',
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.broken_image, size: 50, color: Colors.grey[600]),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Failed to load image',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      ],
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.download, color: Colors.white, size: 20),
+                onPressed: () => onDownloadImage(mediaUrl),
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(),
+                tooltip: 'Download Image',
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1184,38 +1251,60 @@ class ModernMessageBubble extends StatelessWidget {
     final mediaUrl = message['mediaUrl'] as String;
     String imageUrl = mediaUrl;
     if (!mediaUrl.startsWith('http')) {
-      imageUrl = '${ApiConstants.baseUrl}$mediaUrl';
+      imageUrl = "http://51.20.193.95:3000$mediaUrl";
     }
 
     showDialog(
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
         child: Stack(
           children: [
-            Center(
-              child: InteractiveViewer(
-                child: Image.network(
-                  imageUrl,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      padding: const EdgeInsets.all(20),
-                      color: Colors.black87,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.broken_image,
-                              size: 80,
-                              color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Failed to load image',
-                            style: TextStyle(color: Colors.grey[400]),
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                color: Colors.black87,
+                child: Center(
+                  child: InteractiveViewer(
+                    panEnabled: true,
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                                : null,
+                            color: Colors.white,
                           ),
-                        ],
-                      ),
-                    );
-                  },
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.broken_image,
+                                  size: 80,
+                                  color: Colors.grey[400]),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Failed to load image',
+                                style: TextStyle(color: Colors.grey[400]),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ),
               ),
             ),
