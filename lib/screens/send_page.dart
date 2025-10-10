@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart'; // ✅ ADD THIS IMPORT
 import '../Constants/colorconstant.dart';
 import '../../Services/LocationService.dart';
 import '../../Models/OrderModel.dart';
@@ -51,7 +52,6 @@ class _SendPageState extends State<SendPage> {
   // ✅ Position variables for location tracking
   Position? originPosition;
   Position? destinationPosition;
-
   int? currentUserId;
 
   @override
@@ -60,10 +60,19 @@ class _SendPageState extends State<SendPage> {
     _initializeUser();
   }
 
+  // ✅ ADD THIS HELPER METHOD FOR DATE FORMATTING
+  String _formatDateForDisplay(String isoDate) {
+    try {
+      DateTime dateTime = DateTime.parse(isoDate);
+      return DateFormat('dd MMM yyyy').format(dateTime);
+    } catch (e) {
+      return isoDate;
+    }
+  }
+
   Future<void> _initializeUser() async {
     try {
       final userId = await AuthService.getUserId();
-
       if (userId == null) {
         print('❌ No user ID found in AuthService');
         if (mounted) {
@@ -75,7 +84,6 @@ class _SendPageState extends State<SendPage> {
       setState(() {
         currentUserId = userId;
       });
-
       print('✅ User ID loaded from AuthService: $userId');
     } catch (e) {
       print('❌ Error initializing user: $e');
@@ -287,7 +295,6 @@ class _SendPageState extends State<SendPage> {
                   ],
                 ),
               ),
-
               Flexible(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
@@ -341,7 +348,7 @@ class _SendPageState extends State<SendPage> {
                             _buildOrderDetailRow(
                               Icons.calendar_today,
                               'Date',
-                              order.deliveryDate,
+                              _formatDateForDisplay(order.deliveryDate), // ✅ CHANGED
                               Colors.orange,
                             ),
                             const SizedBox(height: 8),
@@ -363,7 +370,7 @@ class _SendPageState extends State<SendPage> {
                               _buildOrderDetailRow(
                                 Icons.currency_rupee,
                                 'Estimated Price',
-                                '₹${order.calculatedPrice}',
+                                '₹${order.calculatedPrice!.toStringAsFixed(2)}', // ✅ CHANGED
                                 Colors.green.shade700,
                               ),
                             ],
@@ -371,7 +378,6 @@ class _SendPageState extends State<SendPage> {
                         ),
                       ),
                       const SizedBox(height: 20),
-
                       const Text(
                         'Your Travel Information',
                         style: TextStyle(
@@ -381,14 +387,12 @@ class _SendPageState extends State<SendPage> {
                         ),
                       ),
                       const SizedBox(height: 15),
-
                       _buildReadOnlyField(
                         label: 'Vehicle Type',
                         value: selectedVehicle ?? 'Not selected',
                         icon: Icons.directions_car,
                       ),
                       const SizedBox(height: 15),
-
                       _buildEnhancedTextField(
                         controller: vehicleInfoController,
                         label: 'Vehicle Number',
@@ -397,7 +401,6 @@ class _SendPageState extends State<SendPage> {
                         isRequired: true,
                       ),
                       const SizedBox(height: 15),
-
                       GestureDetector(
                         onTap: () => selectTime(dialogContext, startTimeController),
                         child: AbsorbPointer(
@@ -411,7 +414,6 @@ class _SendPageState extends State<SendPage> {
                         ),
                       ),
                       const SizedBox(height: 15),
-
                       GestureDetector(
                         onTap: () => selectTime(dialogContext, endTimeController),
                         child: AbsorbPointer(
@@ -428,7 +430,6 @@ class _SendPageState extends State<SendPage> {
                   ),
                 ),
               ),
-
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -463,7 +464,6 @@ class _SendPageState extends State<SendPage> {
                       ),
                     ),
                     const SizedBox(width: 12),
-
                     Expanded(
                       flex: 2,
                       child: ElevatedButton.icon(
@@ -554,8 +554,8 @@ class _SendPageState extends State<SendPage> {
                             if (context.mounted) {
                               Navigator.of(context).pop();
                             }
-                            print('ERROR: Failed to send trip request: $e');
 
+                            print('ERROR: Failed to send trip request: $e');
                             if (context.mounted) {
                               _showSnackBar('Failed to send request: $e', Colors.red);
                             }
@@ -795,7 +795,6 @@ class _SendPageState extends State<SendPage> {
             child: ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
@@ -884,7 +883,6 @@ class _SendPageState extends State<SendPage> {
                 ),
               ),
               const SizedBox(height: 30),
-
               const Text(
                 'Search Available Orders',
                 style: TextStyle(
@@ -894,7 +892,6 @@ class _SendPageState extends State<SendPage> {
                 ),
               ),
               const SizedBox(height: 20),
-
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 padding: const EdgeInsets.all(20),
@@ -925,7 +922,6 @@ class _SendPageState extends State<SendPage> {
                       },
                     ),
                     const SizedBox(height: 15),
-
                     // ✅ REPLACED WITH ENHANCED LOCATION INPUT FIELD
                     EnhancedLocationInputField(
                       controller: toController,
@@ -940,7 +936,6 @@ class _SendPageState extends State<SendPage> {
                       },
                     ),
                     const SizedBox(height: 15),
-
                     GestureDetector(
                       onTap: () => _selectDate(context),
                       child: AbsorbPointer(
@@ -953,7 +948,6 @@ class _SendPageState extends State<SendPage> {
                     buildInputBox('Travel Hours', hoursController, Icons.access_time,
                         keyboardType: TextInputType.number),
                     const SizedBox(height: 20),
-
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -971,7 +965,7 @@ class _SendPageState extends State<SendPage> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
                             : const Text(
@@ -988,7 +982,6 @@ class _SendPageState extends State<SendPage> {
                 ),
               ),
               const SizedBox(height: 20),
-
               if (availableOrders.isNotEmpty)
                 _buildAvailableOrdersList()
               else if (isSearching)
@@ -998,7 +991,6 @@ class _SendPageState extends State<SendPage> {
                 )
               else
                 _buildEmptyState(),
-
               const SizedBox(height: 30),
             ],
           ),
@@ -1217,7 +1209,7 @@ class _SendPageState extends State<SendPage> {
   }
 }
 
-// Compact Order Card Widget
+// ✅ FIXED Compact Order Card Widget - Shows Image & Price Always
 class CompactOrderCard extends StatelessWidget {
   final Order order;
   final VoidCallback onSendRequest;
@@ -1228,42 +1220,52 @@ class CompactOrderCard extends StatelessWidget {
     required this.onSendRequest,
   }) : super(key: key);
 
+  String _formatDateForCard(String isoDate) {
+    try {
+      DateTime dateTime = DateTime.parse(isoDate);
+      return DateFormat('dd MMM yyyy').format(dateTime);
+    } catch (e) {
+      return isoDate;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      shadowColor: Colors.black12,
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 3,
+      shadowColor: Colors.black26,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.white, Colors.green.shade50.withOpacity(0.3)],
+            colors: [Colors.white, Colors.green.shade50.withOpacity(0.4)],
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header with User Info and Status Badge
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 16,
+                    radius: 22,
                     backgroundColor: AppColors.primary.withOpacity(0.1),
                     child: Text(
                       order.userName.isNotEmpty ? order.userName[0].toUpperCase() : 'S',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
-                        fontSize: 14,
+                        fontSize: 18,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1271,22 +1273,24 @@ class CompactOrderCard extends StatelessWidget {
                         Text(
                           order.userName,
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           'Package Sender',
                           style: TextStyle(
                             color: Colors.grey[600],
-                            fontSize: 11,
+                            fontSize: 12,
                           ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.green[600],
                       borderRadius: BorderRadius.circular(12),
@@ -1295,109 +1299,297 @@ class CompactOrderCard extends StatelessWidget {
                       'AVAILABLE',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 9,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 0.3,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
 
+              // ✅ FIXED: Package Image Section (always show if URL exists)
+              if (order.imageUrl.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      order.imageUrl,
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          height: 180,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                                  : null,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        // ✅ Show placeholder image when URL is invalid/example
+                        return Container(
+                          height: 180,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.blue.shade100,
+                                Colors.purple.shade100,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.inventory_2_outlined,
+                                size: 60,
+                                color: Colors.grey[700],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Package Image',
+                                style: TextStyle(
+                                  color: Colors.grey[700],
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${order.weight.toStringAsFixed(1)} kg',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+
+              // Route Information
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey[200]!),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: Colors.green[600],
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        order.origin,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                    Column(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: Colors.green[600],
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Icon(Icons.arrow_forward, size: 14, color: Colors.grey[400]),
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: Colors.red[600],
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        order.destination,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                        Container(
+                          width: 2,
+                          height: 30,
+                          color: Colors.grey[300],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: Colors.red[600],
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.origin,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            order.destination,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
 
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildCompactDetail(Icons.calendar_today, order.deliveryDate),
-                    const SizedBox(width: 8),
-                    _buildCompactDetail(Icons.inventory, order.itemDescription),
-                    const SizedBox(width: 8),
-                    _buildCompactDetail(Icons.scale, '${order.weight} kg'),
-                    const SizedBox(width: 8),
-                    if (order.distanceKm != null)
-                      _buildCompactDetail(Icons.social_distance, '${order.distanceKm!.toStringAsFixed(1)} km'),
-                    const SizedBox(width: 8),
-                    if (order.calculatedPrice != null)
-                      _buildCompactDetail(Icons.currency_rupee, '₹${order.calculatedPrice}'),
-                  ],
-                ),
+              // Order Details Grid
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildInfoChip(
+                      Icons.calendar_today,
+                      _formatDateForCard(order.deliveryDate),
+                      Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildInfoChip(
+                      Icons.scale,
+                      '${order.weight.toStringAsFixed(1)} kg',
+                      Colors.orange,
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildInfoChip(
+                      Icons.inventory_2,
+                      order.itemDescription,
+                      Colors.purple,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (order.distanceKm != null && order.distanceKm! > 0)
+                    Expanded(
+                      child: _buildInfoChip(
+                        Icons.social_distance,
+                        '${order.distanceKm!.toStringAsFixed(1)} km',
+                        Colors.teal,
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: _buildInfoChip(
+                        Icons.local_shipping,
+                        'Delivery',
+                        Colors.indigo,
+                      ),
+                    ),
+                ],
+              ),
+
+              // ✅ FIXED: Price Display (always show, even if 0)
               const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: order.calculatedPrice != null && order.calculatedPrice! > 0
+                        ? [Colors.green.shade50, Colors.green.shade100]
+                        : [Colors.grey.shade100, Colors.grey.shade200],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: order.calculatedPrice != null && order.calculatedPrice! > 0
+                        ? Colors.green.shade300
+                        : Colors.grey.shade400,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.currency_rupee,
+                      color: order.calculatedPrice != null && order.calculatedPrice! > 0
+                          ? Colors.green[800]
+                          : Colors.grey[700],
+                      size: 22,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Estimated Earnings: ',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    Text(
+                      order.calculatedPrice != null
+                          ? '₹${order.calculatedPrice!.toStringAsFixed(2)}'
+                          : 'To be calculated',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: order.calculatedPrice != null && order.calculatedPrice! > 0
+                            ? Colors.green[800]
+                            : Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
 
+              // Send Request Button
               SizedBox(
                 width: double.infinity,
-                height: 36,
+                height: 46,
                 child: ElevatedButton.icon(
                   onPressed: onSendRequest,
-                  icon: const Icon(Icons.send, size: 16),
+                  icon: const Icon(Icons.send, size: 20),
                   label: const Text(
-                    'Send Request',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    'Send Request to Sender',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
                     ),
+                    elevation: 2,
                   ),
                 ),
               ),
@@ -1408,27 +1600,30 @@ class CompactOrderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCompactDetail(IconData icon, String value) {
+  Widget _buildInfoChip(IconData icon, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey[200]!),
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: Colors.grey[600]),
-          const SizedBox(width: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

@@ -17,7 +17,7 @@ class Order {
   final String specialInstructions;
   final String status;
   final double? distanceKm;
-  final double? calculatedPrice;  // ✅ Changed from int? to double?
+  final double? calculatedPrice;
   final String? createdAt;
 
   Order({
@@ -45,7 +45,7 @@ class Order {
     return Order(
       id: json['id'] ?? 0,
       userName: json['user_name'] ?? '',
-      itemDescription: json['item_description'] ?? '',
+      itemDescription: json['item_description'] ?? 'Package', // ✅ FIXED: Default to "Package"
       origin: json['origin'] ?? '',
       originLatitude: _parseDouble(json['origin_latitude']),
       originLongitude: _parseDouble(json['origin_longitude']),
@@ -54,12 +54,12 @@ class Order {
       destinationLongitude: _parseDouble(json['destination_longitude']),
       deliveryDate: json['delivery_date'] ?? '',
       weight: _parseDouble(json['weight']),
-      expectedPrice: _parseInt(json['expected_price']),  // ✅ Use _parseInt
+      expectedPrice: _parseInt(json['expected_price']),
       imageUrl: json['image_url'] ?? '',
       specialInstructions: json['special_instructions'] ?? '',
       status: json['status'] ?? '',
       distanceKm: json['distance_km'] != null ? _parseDouble(json['distance_km']) : null,
-      calculatedPrice: json['calculated_price'] != null ? _parseDouble(json['calculated_price']) : null,  // ✅ Use _parseDouble
+      calculatedPrice: json['calculated_price'] != null ? _parseDouble(json['calculated_price']) : null,
       createdAt: json['created_at'],
     );
   }
@@ -73,7 +73,7 @@ class Order {
     return 0.0;
   }
 
-  // ✅ NEW: Helper method to parse int from String or num
+  // Helper method to parse int from String or num
   static int _parseInt(dynamic value) {
     if (value == null) return 0;
     if (value is int) return value;
@@ -135,7 +135,7 @@ class OrderCreateRequest {
   });
 
   Map<String, dynamic> toJson() {
-    final map = <String, dynamic>{
+    final map = {
       'userId': userId,
       'origin': origin,
       'origin_latitude': originLatitude,
@@ -149,7 +149,7 @@ class OrderCreateRequest {
     };
 
     if (specialInstructions != null && specialInstructions!.isNotEmpty) {
-      map['special_instructions'] = specialInstructions;
+      map['special_instructions'] = specialInstructions as Object;
     }
 
     print('📤 Request JSON: $map');
@@ -184,8 +184,8 @@ class OrderUpdateRequest {
   final double destinationLongitude;
   final String deliveryDate;
   final double weight;
-  final String? imageUrl; // Optional
-  final String? specialInstructions; // Optional
+  final String? imageUrl;
+  final String? specialInstructions;
 
   OrderUpdateRequest({
     required this.userId,
@@ -214,10 +214,10 @@ class OrderUpdateRequest {
       'weight': weight,
     };
 
-    // Only add optional fields if they have values
     if (imageUrl != null && imageUrl!.isNotEmpty) {
       map['image_url'] = imageUrl!;
     }
+
     if (specialInstructions != null && specialInstructions!.isNotEmpty) {
       map['special_instructions'] = specialInstructions!;
     }
@@ -236,7 +236,6 @@ class OrderDeleteRequest {
   }
 }
 
-// ✅ NEW: Order Delete Response
 class OrderDeleteResponse {
   final String message;
 
@@ -248,6 +247,7 @@ class OrderDeleteResponse {
     );
   }
 }
+
 class OrderUpdateResponse {
   final String message;
 
@@ -259,6 +259,7 @@ class OrderUpdateResponse {
     );
   }
 }
+
 enum OrderStatus {
   pending,
   accepted,
