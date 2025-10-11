@@ -1,5 +1,6 @@
 // Modern Sender Order Card - COMPACT VERSION with Click to Expand, Edit and Delete
 
+import 'package:dolo/Constants/ApiConstants.dart';
 import 'package:flutter/material.dart';
 import 'YourOrders.dart';
 
@@ -695,7 +696,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 orderType: order.orderType,
                                 estimatedDistance: order.estimatedDistance,
                                 requestStatus: order.requestStatus,
-                                imageUrl: order.imageUrl ?? 'https://example.com/default.jpg',
+                                imageUrl:"${ApiConstants.imagebaseUrl}${order.imageUrl}" ?? 'https://example.com/default.jpg',
                                 profileImageUrl: order.profileImageUrl,
                                 matchedTravellerId: order.matchedTravellerId,
                               );
@@ -1007,7 +1008,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: Image.network(
-                            order.imageUrl!,
+                            "${order.imageUrl}"!,
                             height: 180,
                             width: double.infinity,
                             fit: BoxFit.cover,

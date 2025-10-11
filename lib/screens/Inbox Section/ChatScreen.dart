@@ -964,7 +964,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
       String fullUrl = imageUrl;
       if (!imageUrl.startsWith('http')) {
-        fullUrl = 'http://51.20.193.95:3000$imageUrl';
+        fullUrl = '${ApiConstants.imagebaseUrl}$imageUrl';
       }
 
       print('📥 Downloading from: $fullUrl');
@@ -1270,7 +1270,7 @@ class ModernMessageBubble extends StatelessWidget {
   Widget _buildImageMessage(String mediaUrl) {
     String fullUrl = mediaUrl;
     if (!mediaUrl.startsWith('http')) {
-      fullUrl = 'http://51.20.193.95:3000$mediaUrl';
+      fullUrl = '${ApiConstants.imagebaseUrl}$mediaUrl';
     }
 
     return GestureDetector(
@@ -1383,7 +1383,7 @@ class ModernMessageBubble extends StatelessWidget {
                   Navigator.pop(context);
                   String fullUrl = mediaUrl;
                   if (!mediaUrl.startsWith('http')) {
-                    fullUrl = 'http://51.20.193.95:3000$mediaUrl';
+                    fullUrl = '${ApiConstants.imagebaseUrl}$mediaUrl';
                   }
                   onLaunchUrl(fullUrl);
                 },

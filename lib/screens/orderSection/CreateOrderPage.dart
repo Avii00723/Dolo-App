@@ -26,27 +26,22 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   int _currentStep = 0;
   final int _totalSteps = 5;
 
-  // Services
   final OrderService _orderService = OrderService();
 
-  // Text controllers for form fields
   final TextEditingController originController = TextEditingController();
   final TextEditingController destinationController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
   final TextEditingController weightController = TextEditingController();
-  final TextEditingController imageUrlController = TextEditingController();
   final TextEditingController specialInstructionsController = TextEditingController();
 
-  // Location variables
   Position? originPosition;
   Position? destinationPosition;
 
-  // Image handling
-  File? _selectedImage;
+  // Changed to support multiple images
+  List<File> _selectedImages = [];
   final ImagePicker _picker = ImagePicker();
   bool _isCreatingOrder = false;
 
-  // User ID fetched from AuthService
   int? userId;
   bool _isLoadingUser = true;
 
@@ -56,7 +51,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     _initializeUser();
   }
 
-  // Initialize user from AuthService
   Future<void> _initializeUser() async {
     try {
       final fetchedUserId = await AuthService.getUserId();
@@ -92,12 +86,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     destinationController.dispose();
     dateController.dispose();
     weightController.dispose();
-    imageUrlController.dispose();
     specialInstructionsController.dispose();
     super.dispose();
   }
 
-  // Navigate to next step
   void _nextStep() {
     if (_currentStep < _totalSteps - 1) {
       setState(() {
@@ -110,7 +102,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-  // Navigate to previous step
   void _previousStep() {
     if (_currentStep > 0) {
       setState(() {
@@ -123,10 +114,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-  // Validate current step
   bool _validateCurrentStep() {
     switch (_currentStep) {
-      case 0: // Origin Location
+      case 0:
         if (originController.text.trim().isEmpty) {
           _showSnackBar('Please enter origin location', Colors.orange);
           return false;
@@ -136,7 +126,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           return false;
         }
         return true;
-      case 1: // Destination Location
+      case 1:
         if (destinationController.text.trim().isEmpty) {
           _showSnackBar('Please enter destination location', Colors.orange);
           return false;
@@ -146,13 +136,13 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           return false;
         }
         return true;
-      case 2: // Date
+      case 2:
         if (dateController.text.trim().isEmpty) {
           _showSnackBar('Please select delivery date', Colors.orange);
           return false;
         }
         return true;
-      case 3: // Weight
+      case 3:
         if (weightController.text.trim().isEmpty) {
           _showSnackBar('Please enter weight', Colors.orange);
           return false;
@@ -163,21 +153,19 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           return false;
         }
         return true;
-      case 4: // Image and Special Instructions (optional)
+      case 4:
         return true;
       default:
         return true;
     }
   }
 
-  // Create order
   Future<void> _createOrder() async {
     if (userId == null) {
       _showSnackBar('User ID not found. Please log in again.', Colors.red);
       return;
     }
 
-    // Validate all required fields
     if (!_validateAllFields()) return;
 
     try {
@@ -185,8 +173,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         _isCreatingOrder = true;
       });
       print('DEBUG: Starting order creation process');
+      print('DEBUG: Uploading ${_selectedImages.length} images');
 
-      // Prepare order request with non-null userId
       final orderRequest = OrderCreateRequest(
         userId: userId!,
         origin: originController.text.trim(),
@@ -197,26 +185,33 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         destinationLongitude: destinationPosition!.longitude,
         deliveryDate: _formatDateForApi(dateController.text.trim()),
         weight: double.parse(weightController.text.trim()),
-        imageUrl: imageUrlController.text.trim().isEmpty
-            ? 'https://example.com/default.jpg'
-            : imageUrlController.text.trim(),
+        images: _selectedImages, // Pass File objects directly
         specialInstructions: specialInstructionsController.text.trim().isEmpty
             ? null
             : specialInstructionsController.text.trim(),
       );
 
-      print('DEBUG: Order request prepared: ${orderRequest.toJson()}');
+      print('DEBUG: Order request prepared with ${_selectedImages.length} images');
 
-      // Call API to create order
       final response = await _orderService.createOrder(orderRequest);
 
       if (response != null) {
-        print('DEBUG: Order created successfully: ${response.message}, Order ID: ${response.orderId}');
+        print('DEBUG: Order created successfully!');
+        print('DEBUG: Message: ${response.message}');
+        print('DEBUG: Order ID: ${response.orderId}');
 
-        // Clear all fields for next order
+        // Enhanced logging for images
+        if (response.imageUrls != null && response.imageUrls!.isNotEmpty) {
+          print('DEBUG: ✅ ${response.imageUrls!.length} image(s) uploaded successfully:');
+          for (int i = 0; i < response.imageUrls!.length; i++) {
+            print('DEBUG:   Image ${i + 1}: ${response.imageUrls![i]}');
+          }
+        } else {
+          print('DEBUG: ℹ️ No images were uploaded (optional)');
+        }
+
         _clearAllFields();
 
-        // Reset to first step
         setState(() {
           _currentStep = 0;
           _isCreatingOrder = false;
@@ -227,10 +222,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           curve: Curves.easeInOut,
         );
 
-        // Show success message
-        _showSuccessToast('Order created successfully! Order ID: #${response.orderId}');
+        // Enhanced success message with image count
+        String successMessage = 'Order ID: #${response.orderId}';
+        if (response.imageUrls != null && response.imageUrls!.isNotEmpty) {
+          successMessage += '\n📸 ${response.imageUrls!.length} image(s) uploaded';
+        }
 
-        // Call callback if provided
+        _showSuccessToast(successMessage);
+
         widget.onOrderCreated?.call();
       } else {
         setState(() {
@@ -245,16 +244,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       print('DEBUG: Error creating order: $e');
       print('DEBUG: Stack trace: $stackTrace');
 
-      // Check if error is related to KYC
       if (e.toString().contains('KYC') || e.toString().contains('403')) {
         _showKycRequiredDialog();
       } else {
-        _showSnackBar('Failed to create order: $e', Colors.red);
+        _showSnackBar('Failed to create order: ${e.toString().replaceAll('Exception: ', '')}', Colors.red);
       }
     }
   }
 
-  // Show KYC Required Dialog
   void _showKycRequiredDialog() {
     showDialog(
       context: context,
@@ -349,7 +346,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // KYC screen navigation
   void _navigateToKycScreen() async {
     if (userId == null) {
       _showSnackBar('User ID not found. Please log in again.', Colors.red);
@@ -365,7 +361,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       ),
     );
 
-    // If KYC was uploaded successfully
     if (result == true) {
       _showSnackBar(
         'KYC document uploaded successfully! You can now create orders.',
@@ -374,7 +369,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-  // Format date for API (yyyy-MM-dd)
   String _formatDateForApi(String dateString) {
     try {
       final parts = dateString.split('/');
@@ -387,7 +381,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     return dateString;
   }
 
-  // Enhanced success toast message
   void _showSuccessToast(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -427,7 +420,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           ),
         ),
         backgroundColor: Colors.green,
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 5),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -443,7 +436,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Pick image from gallery or camera
   Future<void> _pickImage() async {
     showModalBottomSheet(
       context: context,
@@ -467,10 +459,18 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                   ),
                 ),
                 const Text(
-                  'Add Package Photo',
+                  'Add Package Photos',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'You can add multiple photos',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -495,7 +495,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          _getImage(ImageSource.gallery);
+                          _getImages(ImageSource.gallery);
                           Navigator.of(context).pop();
                         },
                         icon: const Icon(Icons.photo_library),
@@ -528,13 +528,43 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
       if (image != null) {
         setState(() {
-          _selectedImage = File(image.path);
-          imageUrlController.text = 'https://example.com/image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          _selectedImages.add(File(image.path));
         });
+        _showSnackBar('Image added (${_selectedImages.length} total)', Colors.green);
       }
     } catch (e) {
       _showSnackBar('Error picking image: $e', Colors.red);
     }
+  }
+
+  Future<void> _getImages(ImageSource source) async {
+    try {
+      if (source == ImageSource.gallery) {
+        final List<XFile> images = await _picker.pickMultiImage(
+          maxWidth: 1024,
+          maxHeight: 1024,
+          imageQuality: 80,
+        );
+
+        if (images.isNotEmpty) {
+          setState(() {
+            _selectedImages.addAll(images.map((img) => File(img.path)));
+          });
+          _showSnackBar('${images.length} images added (${_selectedImages.length} total)', Colors.green);
+        }
+      } else {
+        await _getImage(source);
+      }
+    } catch (e) {
+      _showSnackBar('Error picking images: $e', Colors.red);
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
+    _showSnackBar('Image removed', Colors.orange);
   }
 
   bool _validateAllFields() {
@@ -565,10 +595,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     destinationController.clear();
     dateController.clear();
     weightController.clear();
-    imageUrlController.clear();
     specialInstructionsController.clear();
     setState(() {
-      _selectedImage = null;
+      _selectedImages.clear();
       originPosition = null;
       destinationPosition = null;
     });
@@ -603,7 +632,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show loading indicator while fetching userId
     if (_isLoadingUser) {
       return Scaffold(
         body: Center(
@@ -625,7 +653,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       );
     }
 
-    // Show error if userId couldn't be loaded
     if (userId == null) {
       return Scaffold(
         body: Center(
@@ -667,16 +694,12 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       );
     }
 
-    // Normal UI when userId is loaded
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // Header with progress
             _buildHeader(),
-            // Progress indicator
             _buildProgressIndicator(),
-            // Step content
             Expanded(
               child: PageView(
                 controller: _pageController,
@@ -687,15 +710,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                   });
                 },
                 children: [
-                  _buildStep1(), // Origin Location
-                  _buildStep2(), // Destination Location
-                  _buildStep3(), // Delivery Date
-                  _buildStep4(), // Weight
-                  _buildStep5(), // Image URL and Special Instructions
+                  _buildStep1(),
+                  _buildStep2(),
+                  _buildStep3(),
+                  _buildStep4(),
+                  _buildStep5(),
                 ],
               ),
             ),
-            // Navigation buttons
             _buildNavigationButtons(),
           ],
         ),
@@ -771,7 +793,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Step 1: Origin Location with Enhanced Field
   Widget _buildStep1() {
     return _buildStepContainer(
       title: '📍 Origin Location',
@@ -923,7 +944,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Step 2: Destination Location with Enhanced Field
   Widget _buildStep2() {
     return _buildStepContainer(
       title: '🎯 Destination Location',
@@ -972,7 +992,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Step 3: Delivery Date
   Widget _buildStep3() {
     return _buildStepContainer(
       title: '📅 Delivery Date',
@@ -1018,7 +1037,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Step 4: Weight
   Widget _buildStep4() {
     return _buildStepContainer(
       title: '⚖️ Package Weight',
@@ -1063,94 +1081,138 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Step 5: Image URL and Special Instructions
   Widget _buildStep5() {
     return _buildStepContainer(
       title: '📸 Additional Details',
-      subtitle: 'Add image and special instructions (optional)',
+      subtitle: 'Add images and special instructions (optional)',
       child: Column(
         children: [
           const SizedBox(height: 20),
-          // Image section
-          GestureDetector(
-            onTap: _pickImage,
-            child: Container(
-              width: double.infinity,
-              height: 200,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _selectedImage != null
-                  ? ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  _selectedImage!,
-                  fit: BoxFit.cover,
+          // Multiple images display
+          if (_selectedImages.isEmpty)
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                width: double.infinity,
+                height: 200,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!, width: 2, style: BorderStyle.solid),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              )
-                  : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.add_photo_alternate,
-                    size: 48,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add Package Photo',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_photo_alternate,
+                      size: 48,
+                      color: Colors.grey[400],
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tap to add photo (Optional)',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12,
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add Package Photos',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap to add photos (Optional)',
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_selectedImage != null)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextButton.icon(
-                  onPressed: _pickImage,
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Change Photo'),
+                Text(
+                  '${_selectedImages.length} image(s) selected',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
                 ),
-                const SizedBox(width: 16),
-                TextButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _selectedImage = null;
-                      imageUrlController.clear();
-                    });
+                const SizedBox(height: 12),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: _selectedImages.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == _selectedImages.length) {
+                      return GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!, width: 2, style: BorderStyle.solid),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add, color: Colors.grey[400], size: 32),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Add More',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    return Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            _selectedImages[index],
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () => _removeImage(index),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
                   },
-                  icon: const Icon(Icons.delete),
-                  label: const Text('Remove'),
-                  style: TextButton.styleFrom(foregroundColor: Colors.red),
                 ),
               ],
             ),
           const SizedBox(height: 24),
-          _buildStepInputField(
-            controller: imageUrlController,
-            icon: Icons.link,
-            label: 'Image URL (Optional)',
-            hint: 'Enter image URL',
-            helperText: 'Or upload an image using the photo picker above',
-          ),
-          const SizedBox(height: 16),
           _buildStepInputField(
             controller: specialInstructionsController,
             icon: Icons.note,

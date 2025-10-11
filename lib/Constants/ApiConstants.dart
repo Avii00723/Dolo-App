@@ -1,6 +1,7 @@
 class ApiConstants {
 
   static const String baseUrl = 'http://51.20.193.95:3000/api';
+  static const String imagebaseUrl = 'http://51.20.193.95:3000';
 
   // User
   static const String login = '$baseUrl/users/login';

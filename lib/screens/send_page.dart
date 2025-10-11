@@ -1,3 +1,4 @@
+import 'package:dolo/Constants/ApiConstants.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart'; // ✅ ADD THIS IMPORT
@@ -1316,7 +1317,7 @@ class CompactOrderCard extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.network(
-                      order.imageUrl,
+                      "${ApiConstants.imagebaseUrl}${order.imageUrl}",
                       height: 180,
                       width: double.infinity,
                       fit: BoxFit.cover,

@@ -1,3 +1,4 @@
+import 'package:dolo/Constants/ApiConstants.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../Controllers/OrderService.dart';
@@ -251,7 +252,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           estimatedDistance: order.distanceKm,
           expectedPrice: order.expectedPrice,
           notes: order.specialInstructions,
-          imageUrl: order.imageUrl,
+          imageUrl: "${ApiConstants.imagebaseUrl}${order.imageUrl}",
         ));
       }
 
@@ -844,7 +845,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         destinationLongitude: updatedOrder.destinationLongitude!,
         deliveryDate: _formatDateForApi(updatedOrder.date),
         weight: updatedOrder.weight,
-        imageUrl: updatedOrder.imageUrl,
+        imageUrl: "${ApiConstants.imagebaseUrl}${updatedOrder.imageUrl}",
         specialInstructions: updatedOrder.notes,
       );
 

@@ -45,7 +45,7 @@ class Order {
     return Order(
       id: json['id'] ?? 0,
       userName: json['user_name'] ?? '',
-      itemDescription: json['item_description'] ?? 'Package', // ✅ FIXED: Default to "Package"
+      itemDescription: json['item_description'] ?? 'Package',
       origin: json['origin'] ?? '',
       originLatitude: _parseDouble(json['origin_latitude']),
       originLongitude: _parseDouble(json['origin_longitude']),
@@ -106,7 +106,6 @@ class Order {
   }
 }
 
-// Rest of the classes remain the same...
 class OrderCreateRequest {
   final int userId;
   final String origin;
@@ -117,7 +116,7 @@ class OrderCreateRequest {
   final double destinationLongitude;
   final String deliveryDate;
   final double weight;
-  final String imageUrl;
+  final List<dynamic> images;
   final String? specialInstructions;
 
   OrderCreateRequest({
@@ -130,7 +129,7 @@ class OrderCreateRequest {
     required this.destinationLongitude,
     required this.deliveryDate,
     required this.weight,
-    required this.imageUrl,
+    this.images = const [],
     this.specialInstructions,
   });
 
@@ -145,7 +144,6 @@ class OrderCreateRequest {
       'destination_longitude': destinationLongitude,
       'delivery_date': deliveryDate,
       'weight': weight,
-      'image_url': imageUrl,
     };
 
     if (specialInstructions != null && specialInstructions!.isNotEmpty) {
@@ -157,20 +155,45 @@ class OrderCreateRequest {
   }
 }
 
+// ✅ MODIFIED: Enhanced to handle both image_url (string) and image_urls (array)
 class OrderCreateResponse {
   final String message;
   final int orderId;
+  final List<String>? imageUrls;
 
   OrderCreateResponse({
     required this.message,
     required this.orderId,
+    this.imageUrls,
   });
 
   factory OrderCreateResponse.fromJson(Map<String, dynamic> json) {
+    List<String>? urls;
+
+    // Handle image_urls (array) - for multiple images
+    if (json['image_urls'] != null && json['image_urls'] is List) {
+      urls = List<String>.from(json['image_urls']);
+      print('📸 Parsed image_urls (array): $urls');
+    }
+    // Handle image_url (string) - for single image (backward compatibility)
+    else if (json['image_url'] != null && json['image_url'] is String) {
+      urls = [json['image_url'] as String];
+      print('📸 Parsed image_url (string): ${json['image_url']}');
+    }
+
     return OrderCreateResponse(
       message: json['message'] ?? '',
       orderId: json['orderId'] ?? 0,
+      imageUrls: urls,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'message': message,
+      'orderId': orderId,
+      'image_urls': imageUrls,
+    };
   }
 }
 
