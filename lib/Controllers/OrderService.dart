@@ -31,7 +31,8 @@ class OrderService {
       request.fields['destination_longitude'] = order.destinationLongitude.toString();
       request.fields['delivery_date'] = order.deliveryDate;
       request.fields['weight'] = order.weight.toString();
-      request.fields['category'] = order.category; // ✅ Added category field
+      request.fields['category'] = order.category; // ✅ Separate category field
+      request.fields['subcategory'] = order.subcategory; // ✅ Separate subcategory field
 
       if (order.specialInstructions != null && order.specialInstructions!.isNotEmpty) {
         request.fields['special_instructions'] = order.specialInstructions!;

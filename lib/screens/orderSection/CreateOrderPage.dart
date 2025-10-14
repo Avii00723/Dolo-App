@@ -187,10 +187,15 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         _isCreatingOrder = true;
       });
 
-      String orderCategory = '${_selectedMainCategory!.name},${_selectedSubCategory!.name}';
+      // ✅ NEW: Use separate API values for category and subcategory
+      String apiCategory = _selectedMainCategory!.apiValue; // e.g., 'technology', 'documents', 'fragile'
+      String apiSubcategory = _selectedSubCategory!.apiValue; // e.g., 'Electronics', 'Furniture', 'Documents', 'Others'
 
       print('DEBUG: Starting order creation process');
-      print('DEBUG: Category: $orderCategory');
+      print('DEBUG: Category (API): $apiCategory');
+      print('DEBUG: Subcategory (API): $apiSubcategory');
+      print('DEBUG: Display Category: ${_selectedMainCategory!.name}');
+      print('DEBUG: Display Subcategory: ${_selectedSubCategory!.name}');
       print('DEBUG: Uploading ${_selectedImages.length} images');
 
       final orderRequest = OrderCreateRequest(
@@ -203,14 +208,17 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         destinationLongitude: destinationPosition!.longitude,
         deliveryDate: _formatDateForApi(dateController.text.trim()),
         weight: double.parse(weightController.text.trim()),
-        category: orderCategory,
+        category: apiCategory, // ✅ Sends API category value
+        subcategory: apiSubcategory, // ✅ Sends API subcategory value
         images: _selectedImages,
         specialInstructions: specialInstructionsController.text.trim().isEmpty
             ? null
             : specialInstructionsController.text.trim(),
       );
 
-      print('DEBUG: Order request prepared with category: $orderCategory');
+      print('DEBUG: Order request prepared');
+      print('DEBUG: API Category: $apiCategory');
+      print('DEBUG: API Subcategory: $apiSubcategory');
 
       final response = await _orderService.createOrder(orderRequest);
 
