@@ -31,6 +31,7 @@ class OrderService {
       request.fields['destination_longitude'] = order.destinationLongitude.toString();
       request.fields['delivery_date'] = order.deliveryDate;
       request.fields['weight'] = order.weight.toString();
+      request.fields['category'] = order.category; // ✅ Added category field
 
       if (order.specialInstructions != null && order.specialInstructions!.isNotEmpty) {
         request.fields['special_instructions'] = order.specialInstructions!;
@@ -124,7 +125,6 @@ class OrderService {
         print('Error: ${response.error}');
         print('Status Code: ${response.statusCode}');
 
-        // Handle specific errors
         if (response.statusCode == 403 && response.error?.contains('KYC') == true) {
           throw Exception('KYC_NOT_APPROVED');
         }
@@ -171,7 +171,6 @@ class OrderService {
         print('Error: ${response.error}');
         print('Status Code: ${response.statusCode}');
 
-        // Handle specific errors
         if (response.statusCode == 403 && response.error?.contains('KYC') == true) {
           throw Exception('KYC_NOT_APPROVED');
         }

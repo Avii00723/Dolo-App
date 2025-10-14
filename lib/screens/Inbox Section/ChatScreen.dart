@@ -46,6 +46,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isRefreshing = false;
   List<File> _selectedImages = [];
   bool _isUploadingImages = false;
+  Set<int> _unseenMessageIds = {}; // Track unseen messages
 
   @override
   void initState() {
@@ -53,6 +54,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _initializeChat();
     _startAutoRefresh();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
@@ -64,9 +66,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (_autoRefreshTimer?.isActive != true) {
         _startAutoRefresh();
       }
+      _markVisibleMessagesAsSeen();
     } else if (state == AppLifecycleState.paused) {
       print('📱 App paused - stopping auto-refresh...');
       _autoRefreshTimer?.cancel();
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients) {
+      _markVisibleMessagesAsSeen();
     }
   }
 
@@ -130,16 +139,26 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (result['success'] == true) {
         final apiMessages = result['messages'] as List;
         final convertedMessages = apiMessages.map((msg) {
-          final senderId = msg['sender_id'];
+          final messageId = msg['id'];
+          final senderId = msg['user_id'] ?? msg['sender_id'];
           final senderName = msg['sender_name'] ?? 'Unknown';
           final messageText = msg['message'] ?? '';
           final mediaUrl = msg['media_url'] as String?;
           final replyToId = msg['reply_to'];
           final replyMessage = msg['reply_message'];
           final replySenderName = msg['reply_sender_name'];
+
+          // ✅ FIX: Handle both int (0/1) and bool (true/false)
+          final seen = (msg['seen'] == 1 || msg['seen'] == true);
+          final seenAt = msg['seen_at'];
+
           final hasMedia = mediaUrl != null && mediaUrl.isNotEmpty;
 
-          // ✅ Build reply object if reply exists
+          // Track unseen messages from other users
+          if (!seen && senderId != _currentUserId) {
+            _unseenMessageIds.add(messageId);
+          }
+
           Map<String, dynamic>? replyData;
           if (replyToId != null && replyMessage != null) {
             replyData = {
@@ -150,7 +169,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           }
 
           return {
-            'messageId': msg['id'].toString(),
+            'messageId': messageId,
             'message': messageText,
             'senderId': senderId,
             'senderName': senderName,
@@ -158,7 +177,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'type': hasMedia ? 'image' : 'text',
             'mediaUrl': hasMedia ? mediaUrl : null,
             'replyToId': replyToId,
-            'replyData': replyData, // ✅ Store parsed reply data
+            'replyData': replyData,
+            'seen': seen,
+            'seenAt': seenAt != null ? DateTime.parse(seenAt) : null,
           };
         }).toList();
 
@@ -217,6 +238,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           });
         }
 
+        // Mark visible messages as seen after loading
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _markVisibleMessagesAsSeen();
+        });
+
         if (!silent) {
           print('✅ Loaded ${messages.length} messages from API');
         }
@@ -252,6 +278,55 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       print('❌ Exception loading messages: $e');
     } finally {
       _isRefreshing = false;
+    }
+  }
+
+  void _markVisibleMessagesAsSeen() {
+    if (_unseenMessageIds.isEmpty || !_scrollController.hasClients) return;
+
+    final visibleMessageIds = <int>[];
+
+    for (int i = 0; i < messages.length; i++) {
+      final message = messages[messages.length - 1 - i];
+      final messageId = message['messageId'];
+      final senderId = message['senderId'];
+
+      // Only mark messages from other users
+      if (senderId != _currentUserId && _unseenMessageIds.contains(messageId)) {
+        visibleMessageIds.add(messageId);
+      }
+    }
+
+    if (visibleMessageIds.isNotEmpty) {
+      _markMessagesAsSeen(visibleMessageIds);
+    }
+  }
+
+  Future<void> _markMessagesAsSeen(List<int> messageIds) async {
+    try {
+      final chatIdInt = int.tryParse(widget.chatId);
+      if (chatIdInt == null || _currentUserId == null) return;
+
+      // final result = await ChatService.markMessagesAsSeen(
+      //   chatId: chatIdInt,
+      //   messageIds: messageIds,
+      // );
+      //
+      // if (result['success'] == true) {
+      //   setState(() {
+      //     _unseenMessageIds.removeAll(messageIds);
+      //     // Update seen status in local messages
+      //     for (var msg in messages) {
+      //       if (messageIds.contains(msg['messageId'])) {
+      //         msg['seen'] = true;
+      //         msg['seenAt'] = DateTime.now();
+      //       }
+      //     }
+      //   });
+      //   print('✅ Marked ${messageIds.length} messages as seen');
+      // }
+    } catch (e) {
+      print('❌ Error marking messages as seen: $e');
     }
   }
 
@@ -536,7 +611,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             key: Key('${message['messageId']}_$index'),
             direction: DismissDirection.horizontal,
             confirmDismiss: (direction) async {
-              _setReplyMessage(message['messageId'], message);
+              _setReplyMessage(message['messageId'].toString(), message);
               return false;
             },
             background: Container(
@@ -559,10 +634,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
             child: ModernMessageBubble(
               message: message,
-              messageId: message['messageId'],
+              messageId: message['messageId'].toString(),
               isMe: isMe,
               currentUserId: _currentUserId,
-              onReply: (messageData) => _setReplyMessage(message['messageId'], messageData),
+              onReply: (messageData) => _setReplyMessage(message['messageId'].toString(), messageData),
               onCopy: _copyMessage,
               onLaunchUrl: _launchUrl,
               onDownloadImage: _downloadImage,
@@ -1049,7 +1124,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-// ✅ ENHANCED: Modern Message Bubble Widget with WhatsApp-style Reply Display
+// ✅ ENHANCED: Modern Message Bubble Widget with Seen Status
 class ModernMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final String messageId;
@@ -1082,6 +1157,7 @@ class ModernMessageBubble extends StatelessWidget {
     final messageType = message['type'] ?? 'text';
     final mediaUrl = message['mediaUrl'];
     final hasReply = message['replyData'] != null;
+    final seen = message['seen'] ?? false;
 
     return GestureDetector(
       onLongPress: () => _showMessageOptions(context),
@@ -1102,7 +1178,7 @@ class ModernMessageBubble extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: isMe
                       ? LinearGradient(
-                    colors: [Colors.blue.shade600, Colors.blue.shade500],
+                    colors: [Colors.blueGrey.shade600, Colors.blueGrey.shade500],
                   )
                       : null,
                   color: isMe ? null : Colors.white,
@@ -1135,7 +1211,6 @@ class ModernMessageBubble extends StatelessWidget {
                           ),
                         ),
                       ),
-                    // ✅ ENHANCED: WhatsApp-style Reply Section
                     if (hasReply) _buildWhatsAppStyleReplySection(),
                     if (messageType == 'image' && mediaUrl != null)
                       _buildImageMessage(mediaUrl),
@@ -1153,6 +1228,15 @@ class ModernMessageBubble extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
+                        // ✅ Show seen status for sent messages
+                        if (isMe) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            seen ? Icons.done_all : Icons.done,
+                            size: 16,
+                            color: seen ? Colors.lightBlueAccent : Colors.white70,
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -1195,7 +1279,6 @@ class ModernMessageBubble extends StatelessWidget {
     );
   }
 
-  // ✅ ENHANCED: WhatsApp-style Reply Section - Now uses replyData from API
   Widget _buildWhatsAppStyleReplySection() {
     final replyData = message['replyData'];
     if (replyData == null) return const SizedBox.shrink();
@@ -1203,8 +1286,6 @@ class ModernMessageBubble extends StatelessWidget {
     final replyText = replyData['message'] ?? '';
     final replySenderName = replyData['sender_name'] ?? 'Unknown';
 
-    // Determine if the replied message is from the current user by checking the sender name
-    // Since we don't have sender_id in replyData, we compare names
     final currentUserName = message['senderName'];
     final isReplyFromMe = replySenderName == currentUserName;
     final displayName = isReplyFromMe ? 'You' : replySenderName;
@@ -1235,7 +1316,6 @@ class ModernMessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Sender name with color coding
             Text(
               displayName,
               style: TextStyle(
@@ -1249,7 +1329,6 @@ class ModernMessageBubble extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            // Reply message content
             Text(
               replyText.isNotEmpty ? replyText : '📷 Photo',
               style: TextStyle(

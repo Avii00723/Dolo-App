@@ -1,3 +1,5 @@
+// Save this as: Pages/CreateOrderPage.dart
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -24,7 +26,7 @@ class CreateOrderPage extends StatefulWidget {
 class _CreateOrderPageState extends State<CreateOrderPage> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
-  final int _totalSteps = 5;
+  final int _totalSteps = 6;
 
   final OrderService _orderService = OrderService();
 
@@ -37,7 +39,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   Position? originPosition;
   Position? destinationPosition;
 
-  // Changed to support multiple images
+  OrderMainCategory? _selectedMainCategory;
+  OrderSubCategory? _selectedSubCategory;
+
   List<File> _selectedImages = [];
   final ImagePicker _picker = ImagePicker();
   bool _isCreatingOrder = false;
@@ -96,7 +100,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         _currentStep++;
       });
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 400),
         curve: Curves.easeInOut,
       );
     }
@@ -108,7 +112,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         _currentStep--;
       });
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 400),
         curve: Curves.easeInOut,
       );
     }
@@ -154,6 +158,16 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         }
         return true;
       case 4:
+        if (_selectedMainCategory == null) {
+          _showSnackBar('Please select a category', Colors.orange);
+          return false;
+        }
+        if (_selectedSubCategory == null) {
+          _showSnackBar('Please select a specific item type', Colors.orange);
+          return false;
+        }
+        return true;
+      case 5:
         return true;
       default:
         return true;
@@ -172,7 +186,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       setState(() {
         _isCreatingOrder = true;
       });
+
+      String orderCategory = '${_selectedMainCategory!.name},${_selectedSubCategory!.name}';
+
       print('DEBUG: Starting order creation process');
+      print('DEBUG: Category: $orderCategory');
       print('DEBUG: Uploading ${_selectedImages.length} images');
 
       final orderRequest = OrderCreateRequest(
@@ -185,13 +203,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         destinationLongitude: destinationPosition!.longitude,
         deliveryDate: _formatDateForApi(dateController.text.trim()),
         weight: double.parse(weightController.text.trim()),
-        images: _selectedImages, // Pass File objects directly
+        category: orderCategory,
+        images: _selectedImages,
         specialInstructions: specialInstructionsController.text.trim().isEmpty
             ? null
             : specialInstructionsController.text.trim(),
       );
 
-      print('DEBUG: Order request prepared with ${_selectedImages.length} images');
+      print('DEBUG: Order request prepared with category: $orderCategory');
 
       final response = await _orderService.createOrder(orderRequest);
 
@@ -200,14 +219,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         print('DEBUG: Message: ${response.message}');
         print('DEBUG: Order ID: ${response.orderId}');
 
-        // Enhanced logging for images
         if (response.imageUrls != null && response.imageUrls!.isNotEmpty) {
-          print('DEBUG: ✅ ${response.imageUrls!.length} image(s) uploaded successfully:');
-          for (int i = 0; i < response.imageUrls!.length; i++) {
-            print('DEBUG:   Image ${i + 1}: ${response.imageUrls![i]}');
-          }
-        } else {
-          print('DEBUG: ℹ️ No images were uploaded (optional)');
+          print('DEBUG: ✅ ${response.imageUrls!.length} image(s) uploaded successfully');
         }
 
         _clearAllFields();
@@ -222,7 +235,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           curve: Curves.easeInOut,
         );
 
-        // Enhanced success message with image count
         String successMessage = 'Order ID: #${response.orderId}';
         if (response.imageUrls != null && response.imageUrls!.isNotEmpty) {
           successMessage += '\n📸 ${response.imageUrls!.length} image(s) uploaded';
@@ -571,7 +583,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     if (originController.text.trim().isEmpty ||
         destinationController.text.trim().isEmpty ||
         dateController.text.trim().isEmpty ||
-        weightController.text.trim().isEmpty) {
+        weightController.text.trim().isEmpty ||
+        _selectedMainCategory == null ||
+        _selectedSubCategory == null) {
       _showSnackBar('Please fill all required fields', Colors.red);
       return false;
     }
@@ -600,6 +614,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       _selectedImages.clear();
       originPosition = null;
       destinationPosition = null;
+      _selectedMainCategory = null;
+      _selectedSubCategory = null;
     });
   }
 
@@ -695,111 +711,321 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
 
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildHeader(),
-            _buildProgressIndicator(),
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentStep = index;
-                  });
-                },
-                children: [
-                  _buildStep1(),
-                  _buildStep2(),
-                  _buildStep3(),
-                  _buildStep4(),
-                  _buildStep5(),
-                ],
-              ),
+            // Main Content
+            PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              onPageChanged: (index) {
+                setState(() {
+                  _currentStep = index;
+                });
+              },
+              children: [
+                _buildStep1(),
+                _buildStep2(),
+                _buildStep3(),
+                _buildStep4(),
+                _buildStep5(),
+                _buildStep6(),
+              ],
             ),
-            _buildNavigationButtons(),
+
+            // Floating Header
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _buildFloatingHeader(),
+            ),
+
+            // Floating Navigation Buttons
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _buildFloatingNavigation(),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildFloatingHeader() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           if (_currentStep > 0)
-            IconButton(
-              onPressed: _previousStep,
-              icon: const Icon(Icons.arrow_back_ios),
-              padding: EdgeInsets.zero,
-            ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Create Order',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+            GestureDetector(
+              onTap: _previousStep,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 18,
                   color: AppColors.primary,
                 ),
               ),
-              Text(
-                'Step ${_currentStep + 1} of $_totalSteps',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
+            ),
+          if (_currentStep > 0) const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getStepTitle(),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: List.generate(_totalSteps, (index) {
+                          return Expanded(
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: index <= _currentStep
+                                    ? AppColors.primary
+                                    : Colors.grey[300],
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${_currentStep + 1}/$_totalSteps',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProgressIndicator() {
+  String _getStepTitle() {
+    switch (_currentStep) {
+      case 0:
+        return 'Pickup Location';
+      case 1:
+        return 'Delivery Location';
+      case 2:
+        return 'Delivery Date';
+      case 3:
+        return 'Package Weight';
+      case 4:
+        return 'Package Category';
+      case 5:
+        return 'Additional Details';
+      default:
+        return 'Create Order';
+    }
+  }
+
+  Widget _buildFloatingNavigation() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
       child: Row(
-        children: List.generate(_totalSteps, (index) {
-          return Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              height: 4,
-              decoration: BoxDecoration(
-                color: index <= _currentStep ? AppColors.primary : Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+        children: [
+          if (_currentStep > 0)
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _previousStep,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: BorderSide(color: AppColors.primary, width: 2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Back',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
-          );
-        }),
+          if (_currentStep > 0) const SizedBox(width: 12),
+          Expanded(
+            flex: _currentStep == 0 ? 1 : 1,
+            child: ElevatedButton(
+              onPressed: _currentStep == _totalSteps - 1
+                  ? _createOrder
+                  : () {
+                if (_validateCurrentStep()) {
+                  _nextStep();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: _isCreatingOrder
+                  ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+                  : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _currentStep == _totalSteps - 1 ? 'Create Order' : 'Continue',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.arrow_forward,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepPage({
+    required String emoji,
+    required String title,
+    required String subtitle,
+    required Widget child,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(top: 100, bottom: 100, left: 16, right: 16),
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    emoji,
+                    style: const TextStyle(fontSize: 48),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              child,
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildStep1() {
-    return _buildStepContainer(
-      title: '📍 Origin Location',
+    return _buildStepPage(
+      emoji: '📍',
+      title: 'Pickup Location',
       subtitle: 'Where should we collect the package?',
       child: Column(
         children: [
-          const SizedBox(height: 40),
           EnhancedLocationInputField(
             controller: originController,
             label: 'Origin Address',
@@ -826,7 +1052,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Tap the field above to open location search. You can use current location or search for an address.',
+                    'Tap the field above to search for your pickup location or use current location.',
                     style: TextStyle(
                       color: Colors.blue[700],
                       fontSize: 13,
@@ -841,116 +1067,13 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  Widget _buildStepContainer({
-    required String title,
-    required String subtitle,
-    required Widget child,
-  }) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavigationButtons() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, -1),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          if (_currentStep > 0)
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _previousStep,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: BorderSide(color: AppColors.primary),
-                ),
-                child: Text(
-                  'Previous',
-                  style: TextStyle(color: AppColors.primary),
-                ),
-              ),
-            ),
-          if (_currentStep > 0) const SizedBox(width: 16),
-          Expanded(
-            flex: _currentStep > 0 ? 1 : 2,
-            child: ElevatedButton(
-              onPressed: _currentStep == _totalSteps - 1
-                  ? _createOrder
-                  : () {
-                if (_validateCurrentStep()) {
-                  _nextStep();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: _isCreatingOrder
-                  ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-                  : Text(
-                _currentStep == _totalSteps - 1 ? 'Create Order' : 'Next',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStep2() {
-    return _buildStepContainer(
-      title: '🎯 Destination Location',
+    return _buildStepPage(
+      emoji: '🎯',
+      title: 'Delivery Location',
       subtitle: 'Where should the package be delivered?',
       child: Column(
         children: [
-          const SizedBox(height: 40),
           EnhancedLocationInputField(
             controller: destinationController,
             label: 'Destination Address',
@@ -977,7 +1100,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Tap the field above to open location search. Ensure the delivery address is complete.',
+                    'Make sure the delivery address is complete and accurate.',
                     style: TextStyle(
                       color: Colors.green[700],
                       fontSize: 13,
@@ -993,12 +1116,12 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   }
 
   Widget _buildStep3() {
-    return _buildStepContainer(
-      title: '📅 Delivery Date',
+    return _buildStepPage(
+      emoji: '📅',
+      title: 'Delivery Date',
       subtitle: 'When do you need this delivered?',
       child: Column(
         children: [
-          const SizedBox(height: 40),
           _buildStepInputField(
             controller: dateController,
             icon: Icons.calendar_today,
@@ -1038,12 +1161,12 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   }
 
   Widget _buildStep4() {
-    return _buildStepContainer(
-      title: '⚖️ Package Weight',
+    return _buildStepPage(
+      emoji: '⚖️',
+      title: 'Package Weight',
       subtitle: 'Tell us about the package weight',
       child: Column(
         children: [
-          const SizedBox(height: 40),
           _buildStepInputField(
             controller: weightController,
             icon: Icons.scale,
@@ -1082,13 +1205,268 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   }
 
   Widget _buildStep5() {
-    return _buildStepContainer(
-      title: '📸 Additional Details',
+    return _buildStepPage(
+      emoji: '📦',
+      title: 'Package Category',
+      subtitle: 'Select category and specific item',
+      child: Column(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: DropdownButtonFormField<OrderMainCategory>(
+              value: _selectedMainCategory,
+              hint: Row(
+                children: const [
+                  Icon(Icons.category, color: Colors.grey),
+                  SizedBox(width: 12),
+                  Text(
+                    'Select category',
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                ],
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              icon: const Icon(Icons.keyboard_arrow_down),
+              isExpanded: true,
+              menuMaxHeight: 400,
+              itemHeight: null,
+              items: orderCategories.map((category) {
+                return DropdownMenuItem<OrderMainCategory>(
+                  value: category,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: category.color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(category.icon, style: const TextStyle(fontSize: 16)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        category.name,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (OrderMainCategory? newValue) {
+                setState(() {
+                  _selectedMainCategory = newValue;
+                  _selectedSubCategory = null;
+                });
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_selectedMainCategory != null)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonFormField<OrderSubCategory>(
+                  value: _selectedSubCategory,
+                  hint: Row(
+                    children: const [
+                      Icon(Icons.inventory_2, color: Colors.grey),
+                      SizedBox(width: 12),
+                      Text(
+                        'Select specific item',
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                  isExpanded: true,
+                  menuMaxHeight: 400,
+                  itemHeight: null,
+                  isDense: false,
+                  items: _selectedMainCategory!.subCategories.map((subCategory) {
+                    return DropdownMenuItem<OrderSubCategory>(
+                      value: subCategory,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 45,
+                              height: 45,
+                              decoration: BoxDecoration(
+                                color: _selectedMainCategory!.color.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  subCategory.icon,
+                                  style: const TextStyle(fontSize: 22),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    subCategory.name,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    subCategory.description,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                      height: 1.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (OrderSubCategory? newValue) {
+                    setState(() {
+                      _selectedSubCategory = newValue;
+                    });
+                  },
+                ),
+              ),
+            ),
+          const SizedBox(height: 20),
+          if (_selectedMainCategory != null && _selectedSubCategory != null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _selectedMainCategory!.color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _selectedMainCategory!.color.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: _selectedMainCategory!.color,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _selectedSubCategory!.icon,
+                        style: const TextStyle(fontSize: 32),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Selected Item',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _selectedSubCategory!.name,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _selectedMainCategory!.color,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_selectedMainCategory!.name} • ${_selectedSubCategory!.description}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.check_circle,
+                    color: _selectedMainCategory!.color,
+                    size: 32,
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue[700]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'First select a category, then choose the specific item you\'re transporting.',
+                    style: TextStyle(
+                      color: Colors.blue[700],
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep6() {
+    return _buildStepPage(
+      emoji: '📸',
+      title: 'Additional Details',
       subtitle: 'Add images and special instructions (optional)',
       child: Column(
         children: [
-          const SizedBox(height: 20),
-          // Multiple images display
           if (_selectedImages.isEmpty)
             GestureDetector(
               onTap: _pickImage,
