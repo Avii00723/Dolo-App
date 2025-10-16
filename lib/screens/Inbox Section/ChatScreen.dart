@@ -46,7 +46,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isRefreshing = false;
   List<File> _selectedImages = [];
   bool _isUploadingImages = false;
-  Set<int> _unseenMessageIds = {}; // Track unseen messages
+  Set<int> _unseenMessageIds = {};
 
   @override
   void initState() {
@@ -100,7 +100,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
 
-    print('🔍 Current User ID: $_currentUserId');
+    print('🔐 Current User ID: $_currentUserId');
     await _loadMessages();
   }
 
@@ -148,15 +148,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           final replyMessage = msg['reply_message'];
           final replySenderName = msg['reply_sender_name'];
 
-          // ✅ FIX: Handle both int (0/1) and bool (true/false)
-          final seen = (msg['seen'] == 1 || msg['seen'] == true);
+          // ✅ CORRECTED: Handle seen status - 1 = read, 0 = not read
+          final seenValue = msg['seen'];
+          final seen = (seenValue == 1 || seenValue == true);
           final seenAt = msg['seen_at'];
 
           final hasMedia = mediaUrl != null && mediaUrl.isNotEmpty;
 
-          // Track unseen messages from other users
+          // Track unseen messages from other users (seen = 0 means not read)
           if (!seen && senderId != _currentUserId) {
             _unseenMessageIds.add(messageId);
+          } else if (seen && _unseenMessageIds.contains(messageId)) {
+            // Remove from unseen if it was marked as seen
+            _unseenMessageIds.remove(messageId);
           }
 
           Map<String, dynamic>? replyData;
@@ -178,7 +182,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'mediaUrl': hasMedia ? mediaUrl : null,
             'replyToId': replyToId,
             'replyData': replyData,
-            'seen': seen,
+            'seen': seen, // true if seen = 1, false if seen = 0
             'seenAt': seenAt != null ? DateTime.parse(seenAt) : null,
           };
         }).toList();
@@ -238,13 +242,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           });
         }
 
-        // Mark visible messages as seen after loading
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _markVisibleMessagesAsSeen();
         });
 
         if (!silent) {
           print('✅ Loaded ${messages.length} messages from API');
+          print('📊 Unseen messages: ${_unseenMessageIds.length}');
         }
       } else {
         if (!silent) {
@@ -291,7 +295,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final messageId = message['messageId'];
       final senderId = message['senderId'];
 
-      // Only mark messages from other users
       if (senderId != _currentUserId && _unseenMessageIds.contains(messageId)) {
         visibleMessageIds.add(messageId);
       }
@@ -307,6 +310,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final chatIdInt = int.tryParse(widget.chatId);
       if (chatIdInt == null || _currentUserId == null) return;
 
+      // Uncomment when backend API is ready
       // final result = await ChatService.markMessagesAsSeen(
       //   chatId: chatIdInt,
       //   messageIds: messageIds,
@@ -318,7 +322,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       //     // Update seen status in local messages
       //     for (var msg in messages) {
       //       if (messageIds.contains(msg['messageId'])) {
-      //         msg['seen'] = true;
+      //         msg['seen'] = true; // Mark as read (1)
       //         msg['seenAt'] = DateTime.now();
       //       }
       //     }
@@ -1124,7 +1128,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-// ✅ ENHANCED: Modern Message Bubble Widget with Seen Status
+// ✅ ENHANCED: Modern Message Bubble Widget with Proper Seen Status (1 = read, 0 = not read)
 class ModernMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final String messageId;
@@ -1157,7 +1161,9 @@ class ModernMessageBubble extends StatelessWidget {
     final messageType = message['type'] ?? 'text';
     final mediaUrl = message['mediaUrl'];
     final hasReply = message['replyData'] != null;
-    final seen = message['seen'] ?? false;
+
+    // ✅ Get seen status: true if seen = 1, false if seen = 0
+    final seen = message['seen'] == true;
 
     return GestureDetector(
       onLongPress: () => _showMessageOptions(context),
@@ -1228,7 +1234,8 @@ class ModernMessageBubble extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        // ✅ Show seen status for sent messages
+                        // ✅ Show seen indicator only for messages sent by current user
+                        // Single checkmark = sent (seen = 0), Double checkmark = read (seen = 1)
                         if (isMe) ...[
                           const SizedBox(width: 4),
                           Icon(
