@@ -41,4 +41,27 @@ class TripRequestService {
     );
     return response.success ? (response.data as List<TripRequest>) : [];
   }
+
+  // ✅ NEW: Delete a trip request
+  Future<bool> deleteTripRequest(int tripRequestId) async {
+    try {
+      print('🗑️ Deleting trip request ID: $tripRequestId');
+
+      final response = await _api.delete(
+        '${ApiConstants.deleteTripRequest}/$tripRequestId',
+        parser: (json) => json['message'] as String,
+      );
+
+      if (response.success) {
+        print('✅ Trip request deleted successfully');
+        return true;
+      } else {
+        print('❌ Failed to delete trip request: ${response.error}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error deleting trip request: $e');
+      rethrow;
+    }
+  }
 }

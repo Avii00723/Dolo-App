@@ -8,8 +8,8 @@ class ApiConstants {
   static const String verifyOtp = '$baseUrl/users/verify-otp';
   static const String completeProfile = '$baseUrl/users/complete-profile';
   static const String startKyc = '$baseUrl/users/start-kyc';
-  static const String getUserProfile = '$baseUrl/users/profile'; // add userId as path param
-  static const String updateUserProfile = '$baseUrl/users/profile'; // add userId as path param
+  static const String getUserProfile = '$baseUrl/users/profile';
+  static const String updateUserProfile = '$baseUrl/users/profile';
   static const String uploadKyc = '$baseUrl/users/upload-kyc';
 
   // Orders
@@ -18,16 +18,16 @@ class ApiConstants {
   static const String updateOrder = '$baseUrl/orders/update';
   static const String myOrders = '$baseUrl/orders/myorders';
   static const String completeOrder = '$baseUrl/orders/complete';
-  static const String deleteOrder = '$baseUrl/orders/delete'; // ✅ NEW\
-
+  static const String deleteOrder = '$baseUrl/orders/delete';
 
   // Trip Requests
   static const String sendTripRequest = '$baseUrl/trip-requests/send';
   static const String acceptTripRequest = '$baseUrl/trip-requests/accept';
   static const String getMyTripRequests = '$baseUrl/trip-requests/mytrip';
+  static const String deleteTripRequest = '$baseUrl/trip-requests'; // ✅ NEW - Base path for delete
 
   // Chat
-  static const String getChatInbox = '$baseUrl/chat/inbox'; // append /{userId}
+  static const String getChatInbox = '$baseUrl/chat/inbox';
   static const String sendChatMessage = '$baseUrl/chat/send';
-  static const String getChatMessages = '$baseUrl/chat'; // append /{chat_id}/{use
+  static const String getChatMessages = '$baseUrl/chat';
 }

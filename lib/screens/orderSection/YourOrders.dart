@@ -11,6 +11,7 @@ import '../../screens/orderSection/OrderCard.dart';
 import 'TravellerCard.dart';
 
 // Local models for UI display
+// Local models for UI display
 class OrderDisplay {
   final int id;
   final int userId;
@@ -34,6 +35,7 @@ class OrderDisplay {
   final String? requestStatus;
   final String? notes;
   final String? imageUrl;
+  final int? tripRequestId; // ✅ ADD THIS LINE
 
   OrderDisplay({
     required this.id,
@@ -58,6 +60,7 @@ class OrderDisplay {
     this.requestStatus,
     this.notes,
     this.imageUrl,
+    this.tripRequestId, // ✅ ADD THIS LINE
   });
 }
 
@@ -361,8 +364,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           status: request.status,
           orderType: 'receive',
           requestStatus: request.status,
-          notes: request.vehicleInfo,
+          notes: '${request.vehicleInfo} • Pickup: ${request.pickupTime} • Dropoff: ${request.dropoffTime}',
+          tripRequestId: request.id, // ✅ ADD THIS LINE - Store the trip request ID
         ));
+
+        print('✅ Added order ${request.orderId} with Trip Request ID: ${request.id}');
       }
 
       if (mounted) {
@@ -914,6 +920,92 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       return dateString;
     }
   }
+  Future<void> _deleteTripRequest(int orderId) async {
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User ID not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Canceling request...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // ✅ Find the trip request ID for this order
+      final tripRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
+      final tripRequest = tripRequests.firstWhere(
+            (tr) => tr.orderId == orderId && tr.travelerId == currentUserId,
+        orElse: () => throw Exception('Trip request not found'),
+      );
+
+      final success = await _tripRequestService.deleteTripRequest(tripRequest.id);
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Request canceled successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        // ✅ Immediate refresh
+        await _loadAllData();
+      }
+    } catch (e) {
+      print('Error deleting trip request: $e');
+      if (mounted) {
+        String errorMessage = 'Failed to cancel request';
+
+        if (e.toString().contains('Cannot delete an accepted')) {
+          errorMessage = 'Cannot cancel an accepted or completed trip request';
+        } else if (e.toString().contains('Trip request not found')) {
+          errorMessage = 'Trip request not found';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(errorMessage)),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
 
   Future<void> _deleteOrder(int orderId) async {
     if (currentUserId == null) {
@@ -1300,12 +1392,12 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           return ModernTravellerOrderCard(
             order: myRequestedOrders[index],
             onTrackOrder: () => _openOrderTracking(myRequestedOrders[index]),
+            onDeleteRequest: _deleteTripRequest, // ✅ ADD THIS
           );
         },
       ),
     );
   }
-
   Widget _buildEmptyState({
     required IconData icon,
     required String title,

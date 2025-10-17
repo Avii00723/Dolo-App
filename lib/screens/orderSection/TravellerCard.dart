@@ -5,11 +5,13 @@ import 'YourOrders.dart';
 class ModernTravellerOrderCard extends StatelessWidget {
   final OrderDisplay order;
   final VoidCallback? onTrackOrder;
+  final Function(int)? onDeleteRequest; // ✅ Callback for delete
 
   const ModernTravellerOrderCard({
     Key? key,
     required this.order,
     this.onTrackOrder,
+    this.onDeleteRequest,
   }) : super(key: key);
 
   @override
@@ -256,7 +258,6 @@ class ModernTravellerOrderCard extends StatelessWidget {
           details[keyValue[0].trim()] = keyValue[1].trim();
         }
       } else {
-        // Assume first part without colon is vehicle info
         details['Vehicle Info'] = part.trim();
       }
     }
@@ -424,7 +425,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
 
-                      // ✅ NEW: Your Trip Request Section
+                      // Your Trip Request Section
                       if (tripDetails.isNotEmpty) ...[
                         const Text(
                           'Your Trip Request',
@@ -653,7 +654,6 @@ class ModernTravellerOrderCard extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: Trip detail row widget
   Widget _buildTripDetailRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -758,31 +758,60 @@ class ModernTravellerOrderCard extends StatelessWidget {
   Widget _buildModalActions(BuildContext context) {
     final status = order.requestStatus ?? 'pending';
 
+    // ✅ DEBUG: Print to verify
+    print('🔍 Modal Actions - Status: $status, Trip Request ID: ${order.tripRequestId}');
+
     switch (status) {
       case 'pending':
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.orange[50],
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.orange[200]!),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.schedule, color: Colors.orange[600], size: 20),
-              const SizedBox(width: 12),
-              Text(
-                'Request Pending Approval',
-                style: TextStyle(
-                  color: Colors.orange[700],
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+        return Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.schedule, color: Colors.orange[600], size: 20),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Request Pending Approval',
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // ✅ DELETE BUTTON
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  print('🗑️ Delete button pressed - Trip Request ID: ${order.tripRequestId}');
+                  Navigator.pop(context);
+                  _showDeleteConfirmation(context);
+                },
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Cancel Request'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red[600],
+                  side: BorderSide(color: Colors.red[300]!),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         );
 
       case 'accepted':
@@ -862,6 +891,64 @@ class ModernTravellerOrderCard extends StatelessWidget {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  // ✅ FIXED: Delete confirmation dialog - use tripRequestId
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 28),
+            const SizedBox(width: 12),
+            const Text(
+              'Cancel Request',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to cancel this trip request? This action cannot be undone.',
+          style: TextStyle(fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Keep Request'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // ✅ FIXED: Use tripRequestId instead of order.id
+              if (order.tripRequestId != null) {
+                print('✅ Calling onDeleteRequest with Trip Request ID: ${order.tripRequestId}');
+                onDeleteRequest?.call(order.tripRequestId!);
+              } else {
+                print('❌ Trip Request ID is null!');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Trip request ID not found'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[600],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Cancel Request',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Color _getRequestStatusColor(String status) {
