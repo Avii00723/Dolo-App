@@ -6,7 +6,7 @@ import '../../Controllers/ProfileService.dart';
 
 class ProfileDetailsPage extends StatefulWidget {
   final UserProfile userProfile;
-  final int userId;
+  final String userId;
 
   const ProfileDetailsPage({
     Key? key,

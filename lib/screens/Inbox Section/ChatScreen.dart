@@ -35,7 +35,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _imagePicker = ImagePicker();
 
-  int? _currentUserId;
+  String? _currentUserId;
   Map<String, dynamic> otherUserData = {};
   List<Map<String, dynamic>> messages = [];
   bool isLoading = true;
@@ -117,19 +117,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
 
     try {
-      final chatIdInt = int.tryParse(widget.chatId);
-      if (chatIdInt == null) {
-        if (!silent) {
-          setState(() {
-            isLoading = false;
-            _errorMessage = 'Invalid chat ID';
-          });
-        }
-        _isRefreshing = false;
-        return;
-      }
-
-      final result = await ChatService.getChatMessages(chatId: chatIdInt);
+      final result = await ChatService.getChatMessages(chatId: widget.chatId);
 
       if (!mounted) {
         _isRefreshing = false;
@@ -930,12 +918,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final message = _messageController.text.trim();
     if (message.isEmpty && _selectedImages.isEmpty) return;
 
-    final chatIdInt = int.tryParse(widget.chatId);
-    if (chatIdInt == null) {
-      _showSnackBar('Invalid chat ID', Colors.red);
-      return;
-    }
-
     _messageController.clear();
     final imagesToSend = List<File>.from(_selectedImages);
     final replyToId = replyingToMessageId != null ? int.tryParse(replyingToMessageId!) : null;
@@ -952,7 +934,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     try {
       final result = await ChatService.sendMessage(
-        chatId: chatIdInt,
+        chatId: widget.chatId,
         message: message.isNotEmpty ? message : null,
         images: imagesToSend.isNotEmpty ? imagesToSend : null,
         replyTo: replyToId,
@@ -1133,7 +1115,7 @@ class ModernMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final String messageId;
   final bool isMe;
-  final int? currentUserId;
+  final String? currentUserId;
   final Function(Map<String, dynamic>) onReply;
   final Function(String) onCopy;
   final Function(String) onLaunchUrl;

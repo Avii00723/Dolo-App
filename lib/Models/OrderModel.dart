@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 
 class Order {
-  final int id;
+  final String id;
   final String userName;
   final String itemDescription;
   final String origin;
@@ -48,7 +48,7 @@ class Order {
 
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
-      id: json['id'] ?? 0,
+      id: json['id']?.toString() ?? '',
       userName: json['user_name'] ?? '',
       itemDescription: json['item_description'] ?? 'Package',
       origin: json['origin'] ?? '',
@@ -240,7 +240,7 @@ final List<OrderMainCategory> orderCategories = [
 ];
 
 class OrderCreateRequest {
-  final int userId;
+  final String userHashedId;
   final String origin;
   final double originLatitude;
   final double originLongitude;
@@ -255,7 +255,7 @@ class OrderCreateRequest {
   final String? specialInstructions;
 
   OrderCreateRequest({
-    required this.userId,
+    required this.userHashedId,
     required this.origin,
     required this.originLatitude,
     required this.originLongitude,
@@ -272,7 +272,7 @@ class OrderCreateRequest {
 
   Map<String, dynamic> toJson() {
     final map = {
-      'userId': userId,
+      'userHashedId': userHashedId,
       'origin': origin,
       'origin_latitude': originLatitude,
       'origin_longitude': originLongitude,
@@ -296,7 +296,7 @@ class OrderCreateRequest {
 
 class OrderCreateResponse {
   final String message;
-  final int orderId;
+  final String orderId;
   final List<String>? imageUrls;
 
   OrderCreateResponse({
@@ -317,7 +317,7 @@ class OrderCreateResponse {
 
     return OrderCreateResponse(
       message: json['message'] ?? '',
-      orderId: json['orderId'] ?? 0,
+      orderId: json['orderId']?.toString() ?? '',
       imageUrls: urls,
     );
   }
@@ -332,7 +332,7 @@ class OrderCreateResponse {
 }
 
 class OrderUpdateRequest {
-  final int userId;
+  final String userHashedId;
   final String origin;
   final double originLatitude;
   final double originLongitude;
@@ -347,7 +347,7 @@ class OrderUpdateRequest {
   final String? specialInstructions;
 
   OrderUpdateRequest({
-    required this.userId,
+    required this.userHashedId,
     required this.origin,
     required this.originLatitude,
     required this.originLongitude,
@@ -364,7 +364,7 @@ class OrderUpdateRequest {
 
   Map<String, dynamic> toJson() {
     final map = {
-      'userId': userId,
+      'userHashedId': userHashedId,
       'origin': origin,
       'origin_latitude': originLatitude,
       'origin_longitude': originLongitude,
@@ -396,12 +396,12 @@ class OrderUpdateRequest {
 }
 
 class OrderDeleteRequest {
-  final int userId;
+  final String userHashedId;
 
-  OrderDeleteRequest({required this.userId});
+  OrderDeleteRequest({required this.userHashedId});
 
   Map<String, dynamic> toJson() {
-    return {'userId': userId};
+    return {'userHashedId': userHashedId};
   }
 }
 

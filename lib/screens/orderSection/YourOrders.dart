@@ -13,8 +13,8 @@ import 'TravellerCard.dart';
 // Local models for UI display
 // Local models for UI display
 class OrderDisplay {
-  final int id;
-  final int userId;
+  final String id;
+  final String userId;
   final String userName;
   final String senderInitial;
   final String origin;
@@ -24,7 +24,7 @@ class OrderDisplay {
   final double weight;
   final String status;
   final String? profileImageUrl;
-  final int? matchedTravellerId;
+  final String? matchedTravellerId;
   final double? originLatitude;
   final double? originLongitude;
   final double? destinationLatitude;
@@ -35,7 +35,7 @@ class OrderDisplay {
   final String? requestStatus;
   final String? notes;
   final String? imageUrl;
-  final int? tripRequestId; // ✅ ADD THIS LINE
+  final String? tripRequestId; // ✅ ADD THIS LINE
 
   OrderDisplay({
     required this.id,
@@ -65,9 +65,9 @@ class OrderDisplay {
 }
 
 class TripRequestDisplay {
-  final int id;
-  final int orderId;
-  final int travellerId;
+  final String id;
+  final String orderId;
+  final String travellerId;
   final String travellerName;
   final String vehicleInfo;
   final String pickupTime;
@@ -102,14 +102,14 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   // Services
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
-  int? currentUserId;
+  String? currentUserId;
   late TabController _tabController;
   Timer? _refreshTimer;
 
   // Data
   List<OrderDisplay> myOrders = [];
   List<OrderDisplay> myRequestedOrders = [];
-  Map<int, List<TripRequestDisplay>> tripRequestsByOrder = {};
+  Map<String, List<TripRequestDisplay>> tripRequestsByOrder = {};
   bool isLoadingMyOrders = false;
   bool isLoadingMyRequests = false;
 
@@ -281,7 +281,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
-  Future<void> _loadTripRequestsForOrders(List<int> orderIds) async {
+  Future<void> _loadTripRequestsForOrders(List<String> orderIds) async {
     if (currentUserId == null) return;
 
     try {
@@ -289,7 +289,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       final allRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
       print('📦 Got ${allRequests.length} total trip requests');
 
-      Map<int, List<TripRequestDisplay>> requestsByOrder = {};
+      Map<String, List<TripRequestDisplay>> requestsByOrder = {};
 
       for (var request in allRequests) {
         if (request.status == 'pending' && orderIds.contains(request.orderId)) {
@@ -339,7 +339,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       print('📦 Found ${tripRequests.length} trip requests');
 
       final List<OrderDisplay> displayOrders = [];
-      final Set<int> processedOrderIds = {};
+      final Set<String> processedOrderIds = {};
 
       for (var request in tripRequests) {
         if (request.travelerId != currentUserId) {
@@ -842,7 +842,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       );
 
       final updateRequest = OrderModels.OrderUpdateRequest(
-        userId: currentUserId!,
+        userHashedId: currentUserId!,
         origin: updatedOrder.origin,
         originLatitude: updatedOrder.originLatitude!,
         originLongitude: updatedOrder.originLongitude!,
@@ -920,7 +920,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       return dateString;
     }
   }
-  Future<void> _deleteTripRequest(int orderId) async {
+  Future<void> _deleteTripRequest(String orderId) async {
     if (currentUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1007,7 +1007,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
-  Future<void> _deleteOrder(int orderId) async {
+  Future<void> _deleteOrder(String orderId) async {
     if (currentUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1099,7 +1099,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   }
 
   Future<void> _acceptTripRequest(
-      TripRequestDisplay request, int orderId) async {
+      TripRequestDisplay request, String orderId) async {
     if (currentUserId == null) return;
 
     final confirmed = await _showAcceptConfirmationDialog(request);

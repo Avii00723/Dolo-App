@@ -17,7 +17,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin {
   final ProfileService _profileService = ProfileService();
   UserProfile? userProfile;
-  int? userId;
+  String? userId;
   bool isLoading = true;
   bool profileExists = false;
   bool notificationsEnabled = true;

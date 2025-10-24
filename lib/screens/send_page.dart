@@ -50,7 +50,7 @@ class _SendPageState extends State<SendPage> {
 
   Position? originPosition;
   Position? destinationPosition;
-  int? currentUserId;
+  String? currentUserId;
 
   @override
   void initState() {
@@ -712,7 +712,7 @@ class _SendPageState extends State<SendPage> {
   }
 
   void _showSuccessDialog({
-    required int tripRequestId,
+    required String tripRequestId,
     required String orderOwner,
   }) {
     showDialog(

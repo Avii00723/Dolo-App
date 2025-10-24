@@ -26,10 +26,10 @@ class TripRequestService {
   }
 
   // Get all trip requests for a user
-  Future<List<TripRequest>> getMyTripRequests(int userId) async {
+  Future<List<TripRequest>> getMyTripRequests(String userHashedId) async {
     final response = await _api.get(
       ApiConstants.getMyTripRequests,
-      queryParameters: {'user_id': userId.toString()},
+      queryParameters: {'userHashedId': userHashedId},
       parser: (json) {
         if (json['tripRequests'] is List) {
           return (json['tripRequests'] as List)
@@ -43,7 +43,7 @@ class TripRequestService {
   }
 
   // ✅ NEW: Delete a trip request
-  Future<bool> deleteTripRequest(int tripRequestId) async {
+  Future<bool> deleteTripRequest(String tripRequestId) async {
     try {
       print('🗑️ Deleting trip request ID: $tripRequestId');
 

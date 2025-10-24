@@ -15,7 +15,7 @@ class _InboxScreenState extends State<InboxScreen> {
   List<Map<String, dynamic>> _conversations = [];
   bool _isLoading = true;
   String? _errorMessage;
-  int? _currentUserId;
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -304,7 +304,7 @@ class _InboxScreenState extends State<InboxScreen> {
 // ModernChatCard widget remains the same
 class ModernChatCard extends StatelessWidget {
   final Map<String, dynamic> conversation;
-  final int currentUserId;
+  final String currentUserId;
   final VoidCallback onTap;
 
   const ModernChatCard({

@@ -17,11 +17,11 @@ class AuthService {
 
   // Save user session after successful login/signup
   static Future<void> saveUserSession({
-    required int userId,
+    required String userId,
     required String phone,
   }) async {
     try {
-      await _storage.write(key: _userIdKey, value: userId.toString());
+      await _storage.write(key: _userIdKey, value: userId);
       await _storage.write(key: _phoneKey, value: phone);
       await _storage.write(key: _isLoggedInKey, value: 'true');
       print('✅ User session saved securely: userId=$userId, phone=$phone');
@@ -32,13 +32,10 @@ class AuthService {
   }
 
   // Get saved user ID
-  static Future<int?> getUserId() async {
+  static Future<String?> getUserId() async {
     try {
       final userIdString = await _storage.read(key: _userIdKey);
-      if (userIdString != null) {
-        return int.tryParse(userIdString);
-      }
-      return null;
+      return userIdString;
     } catch (e) {
       print('❌ Error getting user ID: $e');
       return null;

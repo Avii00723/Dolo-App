@@ -7,12 +7,12 @@ import 'YourOrders.dart';
 class ModernSenderOrderCard extends StatelessWidget {
   final OrderDisplay order;
   final List<TripRequestDisplay>? tripRequests;
-  final Function(TripRequestDisplay, int)? onAcceptRequest;
+  final Function(TripRequestDisplay, String)? onAcceptRequest;
   final VoidCallback? onTrackOrder;
   final VoidCallback? onMarkReceived;
   final VoidCallback? onCompleteOrder;
   final Function(OrderDisplay)? onUpdateOrder;
-  final Function(int)? onDeleteOrder;
+  final Function(String)? onDeleteOrder;
 
   const ModernSenderOrderCard({
     Key? key,

@@ -1,7 +1,7 @@
 class LoginResponse {
   final String message;
   final String otp;
-  final int userId;
+  final String userId;
 
   LoginResponse({
     required this.message,
@@ -11,16 +11,16 @@ class LoginResponse {
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
-      message: json['message'] ?? '',
-      otp: json['otp'] ?? '',
-      userId: json['userId'] ?? 0,
+      message: json['message']?.toString() ?? '',
+      otp: json['otp']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
     );
   }
 }
 
 class VerifyOtpResponse {
   final String message;
-  final int userId;
+  final String userId;
   final String kycStatus;
   final bool showProfilePrompt;
 
@@ -33,9 +33,9 @@ class VerifyOtpResponse {
 
   factory VerifyOtpResponse.fromJson(Map<String, dynamic> json) {
     return VerifyOtpResponse(
-      message: json['message'] ?? '',
-      userId: json['userId'] ?? 0,
-      kycStatus: json['kycStatus'] ?? '',
+      message: json['message']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      kycStatus: json['kycStatus']?.toString() ?? '',
       showProfilePrompt: json['showProfilePrompt'] ?? false,
     );
   }
@@ -44,7 +44,7 @@ class VerifyOtpResponse {
 // For completing profile request and response
 
 class ProfileUpdateRequest {
-  final int userId;
+  final String userId;
   final String name;
   final String email;
   final String aadhaar;
@@ -100,7 +100,7 @@ class KycStartResponse {
   }
 }
 class UserProfile {
-  final int id;
+  final String id;
   final String name;
   final String email;
   final String phone;
@@ -120,7 +120,7 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
-      id: json['id'] ?? 0,
+      id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',

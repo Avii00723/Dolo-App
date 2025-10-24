@@ -44,16 +44,16 @@ class LoginService {
   }
 
   // Start KYC process
-  Future<KycStartResponse?> startKyc(int userId) async {
+  Future<KycStartResponse?> startKyc(String userId) async {
     final response = await _api.get(
       ApiConstants.startKyc,
-      queryParameters: {'userId': userId.toString()},
+      queryParameters: {'userId': userId},
       parser: (json) => KycStartResponse.fromJson(json),
     );
     return response.success ? response.data : null;
   }
 
-  Future<UserProfile?> getUserProfile(int userId) async {
+  Future<UserProfile?> getUserProfile(String userId) async {
     final response = await _api.get(
       '${ApiConstants.getUserProfile}/$userId',
       parser: (json) => UserProfile.fromJson(json['profile']),
@@ -62,7 +62,7 @@ class LoginService {
   }
 
   // Update User Profile by userId
-  Future<bool> updateUserProfile(int userId, ProfileUpdateRequest data) async {
+  Future<bool> updateUserProfile(String userId, ProfileUpdateRequest data) async {
     final response = await _api.put(
       '${ApiConstants.updateUserProfile}/$userId',
       body: data.toJson(),
@@ -71,7 +71,7 @@ class LoginService {
   }
 
   // Upload KYC Document - FIXED VERSION WITH PROPER MIME TYPE
-  Future<KycUploadResponse?> uploadKycDocument(int userId, File document) async {
+  Future<KycUploadResponse?> uploadKycDocument(String userId, File document) async {
     try {
       // Build the full URL
       final url = '${ApiConstants.baseUrl}/users/upload-kyc';
@@ -95,7 +95,7 @@ class LoginService {
       var request = http.MultipartRequest('POST', Uri.parse(url));
 
       // Add userId field
-      request.fields['userId'] = userId.toString();
+      request.fields['userId'] = userId;
 
       // Determine content type based on file extension
       MediaType? contentType;

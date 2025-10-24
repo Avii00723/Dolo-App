@@ -7,13 +7,13 @@ import '../Controllers/AuthService.dart';
 
 class ChatService {
   // Get current user ID from AuthService
-  static Future<int?> _getCurrentUserId() async {
+  static Future<String?> _getCurrentUserId() async {
     return await AuthService.getUserId();
   }
 
   // ✅ UPDATED: Send a chat message with optional images and reply_to support
   static Future<Map<String, dynamic>> sendMessage({
-    required int chatId,
+    required String chatId,
     String? message,
     int? negotiatedPrice,
     List<File>? images,
@@ -35,8 +35,8 @@ class ChatService {
       );
 
       // Add required fields
-      request.fields['chat_id'] = chatId.toString();
-      request.fields['user_id'] = userId.toString();
+      request.fields['chat_id'] = chatId;
+      request.fields['user_id'] = userId;
 
       // Add optional message
       if (message != null && message.isNotEmpty) {
@@ -137,7 +137,7 @@ class ChatService {
 
   // ✅ Get all messages for a specific chat
   static Future<Map<String, dynamic>> getChatMessages({
-    required int chatId,
+    required String chatId,
   }) async {
     try {
       final userId = await _getCurrentUserId();
@@ -246,7 +246,7 @@ class ChatService {
 
   // Send message with price negotiation
   static Future<Map<String, dynamic>> sendNegotiationMessage({
-    required int chatId,
+    required String chatId,
     required String message,
     required int negotiatedPrice,
   }) async {
@@ -259,7 +259,7 @@ class ChatService {
 
   // ✅ NEW: Send only images without text message
   static Future<Map<String, dynamic>> sendImages({
-    required int chatId,
+    required String chatId,
     required List<File> images,
     int? replyTo, // ✅ Added reply support
   }) async {
@@ -272,7 +272,7 @@ class ChatService {
 
   // ✅ NEW: Send message with both text and images
   static Future<Map<String, dynamic>> sendMessageWithImages({
-    required int chatId,
+    required String chatId,
     required String message,
     required List<File> images,
     int? replyTo, // ✅ Added reply support
@@ -287,7 +287,7 @@ class ChatService {
 
   // ✅ NEW: Send reply to a message
   static Future<Map<String, dynamic>> sendReply({
-    required int chatId,
+    required String chatId,
     required int replyToMessageId,
     String? message,
     List<File>? images,

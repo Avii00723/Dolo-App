@@ -27,7 +27,7 @@ class KycUploadResponse {
 class KycService {
   // Upload KYC document
   Future<KycUploadResponse?> uploadKyc({
-    required int userId,
+    required String userId,
     required File file,
     Function(double)? onProgress,
   }) async {
@@ -49,7 +49,7 @@ class KycService {
       );
 
       // Add userId field
-      request.fields['userId'] = userId.toString();
+      request.fields['userId'] = userId;
 
       // Get file extension and name
       String fileName = file.path.split('/').last;

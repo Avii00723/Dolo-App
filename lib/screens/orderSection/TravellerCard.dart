@@ -5,7 +5,7 @@ import 'YourOrders.dart';
 class ModernTravellerOrderCard extends StatelessWidget {
   final OrderDisplay order;
   final VoidCallback? onTrackOrder;
-  final Function(int)? onDeleteRequest; // ✅ Callback for delete
+  final Function(String)? onDeleteRequest; // ✅ Callback for delete
 
   const ModernTravellerOrderCard({
     Key? key,

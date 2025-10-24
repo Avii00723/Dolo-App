@@ -46,7 +46,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   final ImagePicker _picker = ImagePicker();
   bool _isCreatingOrder = false;
 
-  int? userId;
+  String? userId;
   bool _isLoadingUser = true;
 
   @override
@@ -199,7 +199,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       print('DEBUG: Uploading ${_selectedImages.length} images');
 
       final orderRequest = OrderCreateRequest(
-        userId: userId!,
+        userHashedId: userId!,
         origin: originController.text.trim(),
         originLatitude: originPosition!.latitude,
         originLongitude: originPosition!.longitude,

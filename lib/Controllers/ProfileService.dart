@@ -9,7 +9,7 @@ class ProfileService {
   final ApiService _api = ApiService();
 
   // Get user profile by userId with error handling
-  Future<UserProfile?> getUserProfile(int userId) async {
+  Future<UserProfile?> getUserProfile(String userId) async {
     try {
       final response = await _api.get(
         '${ApiConstants.getUserProfile}/$userId',
@@ -37,7 +37,7 @@ class ProfileService {
   }
 
   // Update user profile by userId
-  Future<bool> updateUserProfile(int userId, Map<String, dynamic> updates) async {
+  Future<bool> updateUserProfile(String userId, Map<String, dynamic> updates) async {
     try {
       final response = await _api.put(
         '${ApiConstants.updateUserProfile}/$userId',

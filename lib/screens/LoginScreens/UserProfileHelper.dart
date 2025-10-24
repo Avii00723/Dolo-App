@@ -12,23 +12,34 @@ class UserProfileHelper {
   // Check if user exists and handle navigation accordingly via API
   static Future<void> checkUserAndNavigate(
       BuildContext context, {
-        required int userId,
+        required String userId,
         String? kycStatus,
         bool? showProfilePrompt,
       }) async {
     try {
-      if (userId == 0) {
+      if (userId.isEmpty) {
         _showErrorAndNavigateToLogin(context, 'User not authenticated');
         return;
       }
 
       // Save userId to SharedPreferences for later use
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('userId', userId);
+      await prefs.setString('userId', userId);
 
       // Use the flags from login/verify API if provided
       if (showProfilePrompt == true) {
         _showProfileCreationDialog(context, userId);
+        return;
+      }
+
+      // If showProfilePrompt is false and kycStatus is provided,
+      // the backend is indicating profile is complete - skip profile fetch
+      if (showProfilePrompt == false && kycStatus != null) {
+        debugPrint('✅ Profile already complete (from verify-otp), navigating to home');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+        );
         return;
       }
 
@@ -79,10 +90,10 @@ class UserProfileHelper {
   static Future<bool> checkProfileForAction(
       BuildContext context,
       String action,
-      int userId,
+      String userId,
       ) async {
     try {
-      if (userId == 0) {
+      if (userId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please login first'),
@@ -144,7 +155,7 @@ class UserProfileHelper {
         profile.phone.isNotEmpty;
   }
 
-  static void _showProfileCreationDialog(BuildContext context, int userId) {
+  static void _showProfileCreationDialog(BuildContext context, String userId) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -184,7 +195,7 @@ class UserProfileHelper {
     );
   }
 
-  static void _showProfileCompletionDialog(BuildContext context, int userId) {
+  static void _showProfileCompletionDialog(BuildContext context, String userId) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -228,7 +239,7 @@ class UserProfileHelper {
       BuildContext context,
       String action,
       bool isKycRequired,
-      int userId,
+      String userId,
       ) {
     final actionText = action == 'create_order' ? 'create an order' : 'create a trip';
     showDialog(
@@ -281,7 +292,7 @@ class UserProfileHelper {
     );
   }
 
-  static void _showKycRejectedDialog(BuildContext context, int userId) {
+  static void _showKycRejectedDialog(BuildContext context, String userId) {
     showDialog(
       context: context,
       builder: (context) {
@@ -314,7 +325,7 @@ class UserProfileHelper {
     );
   }
 
-  static void _showKycRecommendedDialog(BuildContext context, int userId) {
+  static void _showKycRecommendedDialog(BuildContext context, String userId) {
     showDialog(
       context: context,
       builder: (context) {
@@ -347,7 +358,7 @@ class UserProfileHelper {
     );
   }
 
-  static void _navigateToSignup(BuildContext context, bool isKycRequired, int userId) {
+  static void _navigateToSignup(BuildContext context, bool isKycRequired, String userId) {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(

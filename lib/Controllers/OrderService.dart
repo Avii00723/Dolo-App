@@ -22,7 +22,7 @@ class OrderService {
       );
 
       // Add text fields
-      request.fields['userId'] = order.userId.toString();
+      request.fields['userHashedId'] = order.userHashedId;
       request.fields['origin'] = order.origin;
       request.fields['origin_latitude'] = order.originLatitude.toString();
       request.fields['origin_longitude'] = order.originLongitude.toString();
@@ -102,18 +102,18 @@ class OrderService {
   }
 
   // Mark order as completed/delivered
-  Future<bool> completeOrder(int orderId, int userId) async {
+  Future<bool> completeOrder(String orderId, String userHashedId) async {
     final endpoint = '${ApiConstants.completeOrder}/$orderId';
     print('=== COMPLETE ORDER API CALL ===');
     print('Endpoint: $endpoint');
     print('Order ID: $orderId');
-    print('User ID: $userId');
+    print('User Hashed ID: $userHashedId');
 
     try {
       final response = await _api.put(
         endpoint,
-        body: {
-          'userId': userId,
+        queryParameters: {
+          'userHashedId': userHashedId,
         },
         parser: (json) => json,
       );
@@ -148,18 +148,18 @@ class OrderService {
   }
 
   // Delete order using query parameters
-  Future<bool> deleteOrder(int orderId, int userId) async {
+  Future<bool> deleteOrder(String orderId, String userHashedId) async {
     final endpoint = '${ApiConstants.deleteOrder}/$orderId';
     print('=== DELETE ORDER API CALL ===');
     print('Endpoint: $endpoint');
     print('Order ID: $orderId');
-    print('User ID: $userId');
+    print('User Hashed ID: $userHashedId');
 
     try {
       final response = await _api.delete(
         endpoint,
         queryParameters: {
-          'userId': userId.toString(),
+          'userHashedId': userHashedId,
         },
         parser: (json) => OrderDeleteResponse.fromJson(json),
       );
@@ -206,7 +206,7 @@ class OrderService {
     required double originLongitude,
     required String vehicle,
     required double timeHours,
-    required int userId,
+    required String userId,
   }) async {
     print('=== SEARCH ORDERS API CALL ===');
     print('Endpoint: ${ApiConstants.searchOrders}');
@@ -231,7 +231,7 @@ class OrderService {
           'origin_longitude': originLongitude.toString(),
           'vehicle': vehicle,
           'time_hours': timeHours.toString(),
-          'userId': userId.toString(),
+          'userId': userId,
         },
         parser: (json) {
           print('Raw JSON Response: $json');
@@ -264,7 +264,7 @@ class OrderService {
   }
 
   // Update order
-  Future<OrderUpdateResponse?> updateOrder(int orderId, OrderUpdateRequest order) async {
+  Future<OrderUpdateResponse?> updateOrder(String orderId, OrderUpdateRequest order) async {
     final endpoint = '${ApiConstants.updateOrder}/$orderId';
     print('=== UPDATE ORDER API CALL ===');
     print('Endpoint: $endpoint');
@@ -296,15 +296,15 @@ class OrderService {
   }
 
   // Get user's orders
-  Future<List<Order>> getMyOrders(int userId) async {
+  Future<List<Order>> getMyOrders(String userHashedId) async {
     print('=== GET MY ORDERS API CALL ===');
     print('Endpoint: ${ApiConstants.myOrders}');
-    print('User ID: $userId');
+    print('User Hashed ID: $userHashedId');
 
     try {
       final response = await _api.get(
         ApiConstants.myOrders,
-        queryParameters: {'userId': userId.toString()},
+        queryParameters: {'userHashedId': userHashedId},
         parser: (json) {
           print('Raw JSON Response: $json');
           if (json['orders'] is List) {

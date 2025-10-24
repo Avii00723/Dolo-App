@@ -9,7 +9,7 @@ import 'package:dolo/screens/home/homepage.dart';
 
 class SignupScreen extends StatefulWidget {
   final bool isKycRequired;
-  final int? userId;
+  final String? userId;
 
   const SignupScreen({
     Key? key,
@@ -36,7 +36,7 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _documentName;
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
-  int? _currentUserId;
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -56,7 +56,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _loadUserId() async {
     try {
       // First check if userId was passed as parameter
-      if (widget.userId != null && widget.userId! > 0) {
+      if (widget.userId != null && widget.userId!.isNotEmpty) {
         setState(() {
           _currentUserId = widget.userId;
         });
@@ -168,15 +168,15 @@ class _SignupScreenState extends State<SignupScreen> {
 
     try {
       // Get userId from multiple sources
-      int userId = _currentUserId ?? widget.userId ?? 0;
-      if (userId == 0) {
-        userId = (await AuthService.getUserId()) ?? 0;
+      String? userId = _currentUserId ?? widget.userId;
+      if (userId == null || userId.isEmpty) {
+        userId = await AuthService.getUserId();
       }
 
       debugPrint('=== Submit Profile Started ===');
       debugPrint('UserId: $userId');
 
-      if (userId == 0) {
+      if (userId == null || userId.isEmpty) {
         _showSnackBar('User not authenticated. Please login again.', isError: true);
         setState(() {
           _isLoading = false;

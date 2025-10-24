@@ -5,7 +5,7 @@ import 'UserProfileHelper.dart';
 
 class OTPScreen extends StatefulWidget {
   final String phoneNumber;
-  final int userId;
+  final String userId;
 
   const OTPScreen({
     Key? key,

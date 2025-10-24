@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await _loginService.sendOtp(phoneNumber);
-      if (response != null && response.userId > 0) {
+      if (response != null && response.userId.isNotEmpty) {
         if (mounted) {
           Navigator.push(
             context,

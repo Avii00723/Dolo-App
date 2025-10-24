@@ -5,7 +5,7 @@ import '../../Controllers/KYCService.dart';
 import '../../Constants/colorconstant.dart';
 
 class KycUploadScreen extends StatefulWidget {
-  final int userId;
+  final String userId;
 
   const KycUploadScreen({
     Key? key,
