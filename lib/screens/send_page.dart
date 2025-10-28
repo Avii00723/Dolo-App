@@ -29,12 +29,12 @@ class _SendPageState extends State<SendPage> {
   String? selectedVehicle;
   final List<String> vehicleOptions = [
     'Car',
-    'SUV',
+    // 'SUV',
     'Bike',
-    'Auto Rickshaw',
-    'Tempo',
+    // 'Auto Rickshaw',
+    // 'Tempo',
     'Pickup Truck',
-    'Mini Truck',
+    // 'Mini Truck',
     'Truck',
     'Bus',
     'Train',

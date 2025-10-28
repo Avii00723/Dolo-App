@@ -263,10 +263,26 @@ Your Node.js backend must emit events in this format:
 
 ### Typing Event
 ```javascript
-// When receiving 'typing'
+// ✅ UPDATED: When receiving 'typing' with roomId and userId
+socket.on('typing', (data) => {
+  const { roomId, userId } = data;
+
+  // Broadcast to room (excluding sender)
+  socket.to(roomId).emit('userTyping', {
+    userId: userId,  // The actual user ID who is typing
+    roomId: roomId
+  });
+
+  console.log(`User ${userId} is typing in room ${roomId}`);
+});
+```
+
+**OLD FORMAT (Don't use):**
+```javascript
+// ❌ OLD - This won't work properly
 socket.on('typing', (roomId) => {
   socket.to(roomId).emit('userTyping', {
-    userId: socket.id  // Or use authenticated user ID
+    userId: socket.id  // Socket ID is not the same as user ID
   });
 });
 ```

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
+import '../../Controllers/SocketService.dart';
 import 'ChatScreen.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -16,11 +18,24 @@ class _InboxScreenState extends State<InboxScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   String? _currentUserId;
+  final SocketService _socketService = SocketService();
+
+  // Track typing status for each chat
+  Map<String, bool> _typingStatus = {};
+  Map<String, Timer?> _typingTimers = {};
 
   @override
   void initState() {
     super.initState();
     _initializeAndLoadInbox();
+    _initializeWebSocket();
+  }
+
+  @override
+  void dispose() {
+    // Cancel all typing timers
+    _typingTimers.values.forEach((timer) => timer?.cancel());
+    super.dispose();
   }
 
   Future<void> _initializeAndLoadInbox() async {
@@ -80,6 +95,49 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
+  // Initialize WebSocket for real-time typing indicators
+  Future<void> _initializeWebSocket() async {
+    try {
+      await _socketService.connect();
+
+      if (_socketService.isConnected) {
+        // Listen for typing indicators
+        _socketService.onUserTyping((data) {
+          final typingUserId = data['userId'] as String?;
+          final roomId = data['roomId'] as String?;
+
+          if (typingUserId != null && roomId != null && typingUserId != _currentUserId) {
+            setState(() {
+              _typingStatus[roomId] = true;
+            });
+
+            // Auto-hide typing indicator after 3 seconds
+            _typingTimers[roomId]?.cancel();
+            _typingTimers[roomId] = Timer(const Duration(seconds: 3), () {
+              if (mounted) {
+                setState(() {
+                  _typingStatus[roomId] = false;
+                });
+              }
+            });
+
+            print('⌨️  User $typingUserId is typing in room $roomId');
+          }
+        });
+
+        // Listen for new messages to refresh inbox
+        _socketService.onReceiveMessage((data) {
+          print('📬 New message received, refreshing inbox');
+          _loadInbox();
+        });
+
+        print('✅ Inbox WebSocket initialized');
+      }
+    } catch (e) {
+      print('❌ Error initializing inbox WebSocket: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -135,9 +193,13 @@ class _InboxScreenState extends State<InboxScreen> {
         itemCount: _conversations.length,
         itemBuilder: (context, index) {
           final conversation = _conversations[index];
+          final chatId = conversation['chat_id']?.toString() ?? '';
+          final isTyping = _typingStatus[chatId] ?? false;
+
           return ModernChatCard(
             conversation: conversation,
             currentUserId: _currentUserId!,
+            isOtherUserTyping: isTyping,
             onTap: () => _openChat(conversation),
           );
         },
@@ -305,12 +367,14 @@ class _InboxScreenState extends State<InboxScreen> {
 class ModernChatCard extends StatelessWidget {
   final Map<String, dynamic> conversation;
   final String currentUserId;
+  final bool isOtherUserTyping;
   final VoidCallback onTap;
 
   const ModernChatCard({
     Key? key,
     required this.conversation,
     required this.currentUserId,
+    this.isOtherUserTyping = false,
     required this.onTap,
   }) : super(key: key);
 
@@ -429,17 +493,44 @@ class ModernChatCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      // Last Message
-                      Text(
-                        lastMessage,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                          height: 1.3,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      // Last Message or Typing Indicator
+                      isOtherUserTyping
+                          ? Row(
+                              children: [
+                                Text(
+                                  'typing',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.green.shade600,
+                                    fontStyle: FontStyle.italic,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                SizedBox(
+                                  width: 20,
+                                  height: 10,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      _buildTypingDot(0),
+                                      _buildTypingDot(200),
+                                      _buildTypingDot(400),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              lastMessage,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade600,
+                                height: 1.3,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                       // Status indicator if accepted
                       if (acceptedBy != null) ...[
                         const SizedBox(height: 8),
@@ -533,6 +624,43 @@ class ModernChatCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  // Build animated typing dots
+  static Widget _buildTypingDot(int delay) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      builder: (context, value, child) {
+        return FutureBuilder(
+          future: Future.delayed(Duration(milliseconds: delay)),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade300,
+                  shape: BoxShape.circle,
+                ),
+              );
+            }
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: value > 0.5 ? Colors.green.shade600 : Colors.green.shade300,
+                shape: BoxShape.circle,
+              ),
+            );
+          },
+        );
+      },
+      onEnd: () {
+        // Animation will naturally loop via TweenAnimationBuilder
+      },
     );
   }
 

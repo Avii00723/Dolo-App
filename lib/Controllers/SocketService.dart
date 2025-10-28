@@ -145,8 +145,13 @@ class SocketService {
       return;
     }
 
-    _socket!.emit('typing', chatId);
-    debugPrint('⌨️  Typing indicator sent for room: $chatId');
+    final data = {
+      'roomId': chatId,
+      'userId': _currentUserId,
+    };
+
+    _socket!.emit('typing', data);
+    debugPrint('⌨️  Typing indicator sent for room: $chatId, userId: $_currentUserId');
   }
 
   // Listen for typing indicators
