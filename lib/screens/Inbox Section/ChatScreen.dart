@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import '../../Constants/ApiConstants.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
+import '../../Controllers/SocketService.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -34,6 +35,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _imagePicker = ImagePicker();
+  final SocketService _socketService = SocketService();
 
   String? _currentUserId;
   Map<String, dynamic> otherUserData = {};
@@ -48,13 +50,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isUploadingImages = false;
   Set<int> _unseenMessageIds = {};
 
+  // WebSocket typing indicator states
+  bool _isOtherUserTyping = false;
+  Timer? _typingTimer;
+  Timer? _typingIndicatorTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeChat();
+    _initializeWebSocket();
     _startAutoRefresh();
     _scrollController.addListener(_onScroll);
+    _messageController.addListener(_onTextChanged);
   }
 
   @override
@@ -102,6 +111,65 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     print('🔐 Current User ID: $_currentUserId');
     await _loadMessages();
+  }
+
+  // Initialize WebSocket connection
+  Future<void> _initializeWebSocket() async {
+    try {
+      await _socketService.connect();
+
+      if (_socketService.isConnected) {
+        // Join the chat room
+        _socketService.joinRoom(widget.chatId);
+
+        // Listen for incoming messages via WebSocket
+        _socketService.onReceiveMessage((data) {
+          print('📬 Received message via WebSocket: $data');
+          // Refresh messages to show the new message
+          _loadMessages(silent: true);
+        });
+
+        // Listen for typing indicators
+        _socketService.onUserTyping((data) {
+          final typingUserId = data['userId'] as String?;
+          if (typingUserId != null && typingUserId != _currentUserId) {
+            setState(() {
+              _isOtherUserTyping = true;
+            });
+
+            // Auto-hide typing indicator after 3 seconds
+            _typingIndicatorTimer?.cancel();
+            _typingIndicatorTimer = Timer(const Duration(seconds: 3), () {
+              if (mounted) {
+                setState(() {
+                  _isOtherUserTyping = false;
+                });
+              }
+            });
+          }
+        });
+
+        print('✅ WebSocket initialized and listening');
+      }
+    } catch (e) {
+      print('❌ Error initializing WebSocket: $e');
+    }
+  }
+
+  // Send typing indicator with debounce
+  void _onTextChanged() {
+    if (_messageController.text.isEmpty) {
+      _typingTimer?.cancel();
+      return;
+    }
+
+    // Debounce: Only send typing indicator every 2 seconds while typing
+    _typingTimer?.cancel();
+    _typingTimer = Timer(const Duration(milliseconds: 500), () {
+      if (_socketService.isConnected) {
+        _socketService.sendTypingIndicator(widget.chatId);
+      }
+    });
   }
 
   Future<void> _loadMessages({bool silent = false}) async {
@@ -506,12 +574,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
                 Row(
                   children: [
-                    Text(
-                      'Order #${widget.orderId}',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                    Flexible(
+                      child: Text(
+                        'Order #${widget.orderId}',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -594,9 +666,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         controller: _scrollController,
         reverse: true,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: messages.length,
+        itemCount: messages.length + (_isOtherUserTyping ? 1 : 0),
         itemBuilder: (context, index) {
-          final message = messages[messages.length - 1 - index];
+          // Show typing indicator as first item (bottom of reversed list)
+          if (index == 0 && _isOtherUserTyping) {
+            return _buildTypingIndicator();
+          }
+
+          // Adjust index if typing indicator is shown
+          final messageIndex = _isOtherUserTyping ? index - 1 : index;
+          final message = messages[messages.length - 1 - messageIndex];
           final isMe = message['senderId'] == _currentUserId;
 
           return Dismissible(
@@ -1100,12 +1179,100 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  // Build typing indicator widget
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${otherUserData['name'] ?? 'User'} is typing',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 20,
+                  height: 10,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildDot(0),
+                      _buildDot(200),
+                      _buildDot(400),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build animated dot for typing indicator
+  Widget _buildDot(int delay) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 600),
+      builder: (context, value, child) {
+        return FutureBuilder(
+          future: Future.delayed(Duration(milliseconds: delay)),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  shape: BoxShape.circle,
+                ),
+              );
+            }
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: value > 0.5 ? Colors.grey.shade600 : Colors.grey.shade400,
+                shape: BoxShape.circle,
+              ),
+            );
+          },
+        );
+      },
+      onEnd: () {
+        // Restart animation
+        if (mounted && _isOtherUserTyping) {
+          setState(() {});
+        }
+      },
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _autoRefreshTimer?.cancel();
+    _typingTimer?.cancel();
+    _typingIndicatorTimer?.cancel();
+    _messageController.removeListener(_onTextChanged);
     _messageController.dispose();
     _scrollController.dispose();
+    _socketService.leaveRoom();
     super.dispose();
   }
 }

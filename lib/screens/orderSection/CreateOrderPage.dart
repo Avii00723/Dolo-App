@@ -40,7 +40,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   Position? destinationPosition;
 
   OrderMainCategory? _selectedMainCategory;
-  OrderSubCategory? _selectedSubCategory;
+  String? _selectedWeightRange;
 
   List<File> _selectedImages = [];
   final ImagePicker _picker = ImagePicker();
@@ -118,6 +118,22 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
+  // Helper function to convert weight range to numeric value for API
+  double _getWeightFromRange(String range) {
+    switch (range) {
+      case 'Below 2 kg':
+        return 1.0; // Representative value
+      case '2–5 kg':
+        return 3.5; // Middle of range
+      case '5–10 kg':
+        return 7.5; // Middle of range
+      case 'More than 10 kg':
+        return 15.0; // Representative value
+      default:
+        return 5.0; // Default fallback
+    }
+  }
+
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 0:
@@ -147,23 +163,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         }
         return true;
       case 3:
-        if (weightController.text.trim().isEmpty) {
-          _showSnackBar('Please enter weight', Colors.orange);
-          return false;
-        }
-        final weight = double.tryParse(weightController.text.trim());
-        if (weight == null || weight <= 0) {
-          _showSnackBar('Please enter valid weight', Colors.orange);
+        if (_selectedWeightRange == null) {
+          _showSnackBar('Please select weight range', Colors.orange);
           return false;
         }
         return true;
       case 4:
         if (_selectedMainCategory == null) {
           _showSnackBar('Please select a category', Colors.orange);
-          return false;
-        }
-        if (_selectedSubCategory == null) {
-          _showSnackBar('Please select a specific item type', Colors.orange);
           return false;
         }
         return true;
@@ -187,15 +194,13 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         _isCreatingOrder = true;
       });
 
-      // ✅ NEW: Use separate API values for category and subcategory
+      // ✅ NEW: Use API value for category only
       String apiCategory = _selectedMainCategory!.apiValue; // e.g., 'technology', 'documents', 'fragile'
-      String apiSubcategory = _selectedSubCategory!.apiValue; // e.g., 'Electronics', 'Furniture', 'Documents', 'Others'
 
       print('DEBUG: Starting order creation process');
       print('DEBUG: Category (API): $apiCategory');
-      print('DEBUG: Subcategory (API): $apiSubcategory');
       print('DEBUG: Display Category: ${_selectedMainCategory!.name}');
-      print('DEBUG: Display Subcategory: ${_selectedSubCategory!.name}');
+      print('DEBUG: Weight Range: $_selectedWeightRange');
       print('DEBUG: Uploading ${_selectedImages.length} images');
 
       final orderRequest = OrderCreateRequest(
@@ -207,9 +212,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         destinationLatitude: destinationPosition!.latitude,
         destinationLongitude: destinationPosition!.longitude,
         deliveryDate: _formatDateForApi(dateController.text.trim()),
-        weight: double.parse(weightController.text.trim()),
+        weight: _getWeightFromRange(_selectedWeightRange!),
         category: apiCategory, // ✅ Sends API category value
-        subcategory: apiSubcategory, // ✅ Sends API subcategory value
+        subcategory: _selectedWeightRange!, // ✅ Use weight range as subcategory
         images: _selectedImages,
         specialInstructions: specialInstructionsController.text.trim().isEmpty
             ? null
@@ -218,7 +223,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
       print('DEBUG: Order request prepared');
       print('DEBUG: API Category: $apiCategory');
-      print('DEBUG: API Subcategory: $apiSubcategory');
+      print('DEBUG: Weight Range: $_selectedWeightRange');
 
       final response = await _orderService.createOrder(orderRequest);
 
@@ -591,21 +596,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     if (originController.text.trim().isEmpty ||
         destinationController.text.trim().isEmpty ||
         dateController.text.trim().isEmpty ||
-        weightController.text.trim().isEmpty ||
-        _selectedMainCategory == null ||
-        _selectedSubCategory == null) {
+        _selectedWeightRange == null ||
+        _selectedMainCategory == null) {
       _showSnackBar('Please fill all required fields', Colors.red);
       return false;
     }
 
     if (originPosition == null || destinationPosition == null) {
       _showSnackBar('Please ensure both origin and destination coordinates are set', Colors.red);
-      return false;
-    }
-
-    final weight = double.tryParse(weightController.text.trim());
-    if (weight == null || weight <= 0) {
-      _showSnackBar('Please enter valid weight', Colors.red);
       return false;
     }
 
@@ -616,14 +614,13 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     originController.clear();
     destinationController.clear();
     dateController.clear();
-    weightController.clear();
     specialInstructionsController.clear();
     setState(() {
       _selectedImages.clear();
       originPosition = null;
       destinationPosition = null;
       _selectedMainCategory = null;
-      _selectedSubCategory = null;
+      _selectedWeightRange = null;
     });
   }
 
@@ -1168,21 +1165,119 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
+  // Build innovative weight range selector
+  Widget _buildWeightRangeSelector() {
+    final weightRanges = [
+      {'label': 'Below 2 kg', 'icon': '📦', 'color': Colors.green, 'description': 'Light packages'},
+      {'label': '2–5 kg', 'icon': '📦📦', 'color': Colors.blue, 'description': 'Medium packages'},
+      {'label': '5–10 kg', 'icon': '📦📦📦', 'color': Colors.orange, 'description': 'Heavy packages'},
+      {'label': 'More than 10 kg', 'icon': '📦📦📦📦', 'color': Colors.red, 'description': 'Very heavy packages'},
+    ];
+
+    return Column(
+      children: weightRanges.map((range) {
+        final isSelected = _selectedWeightRange == range['label'];
+        final color = range['color'] as Color;
+
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedWeightRange = range['label'] as String;
+            });
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isSelected ? color.withOpacity(0.1) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSelected ? color : Colors.grey[300]!,
+                width: isSelected ? 2 : 1,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: color.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Row(
+              children: [
+                // Icon container
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: isSelected ? color : color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      range['icon'] as String,
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Label and description
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        range['label'] as String,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          color: isSelected ? color : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        range['description'] as String,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Check icon
+                if (isSelected)
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildStep4() {
     return _buildStepPage(
       emoji: '⚖️',
       title: 'Package Weight',
-      subtitle: 'Tell us about the package weight',
+      subtitle: 'Select the weight range of your package',
       child: Column(
         children: [
-          _buildStepInputField(
-            controller: weightController,
-            icon: Icons.scale,
-            label: 'Weight (kg)',
-            hint: 'Enter weight in kg',
-            keyboardType: TextInputType.number,
-            helperText: 'Approximate weight of the package',
-          ),
+          _buildWeightRangeSelector(),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(16),
@@ -1197,7 +1292,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Enter weight as a decimal number (e.g., 2.5 for 2.5 kg)',
+                    'Select the weight range that best matches your package',
                     style: TextStyle(
                       color: Colors.purple[700],
                       fontSize: 13,
@@ -1216,7 +1311,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     return _buildStepPage(
       emoji: '📦',
       title: 'Package Category',
-      subtitle: 'Select category and specific item',
+      subtitle: 'Select the category of your package',
       child: Column(
         children: [
           Container(
@@ -1272,130 +1367,35 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               onChanged: (OrderMainCategory? newValue) {
                 setState(() {
                   _selectedMainCategory = newValue;
-                  _selectedSubCategory = null;
                 });
               },
             ),
           ),
           const SizedBox(height: 20),
           if (_selectedMainCategory != null)
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonFormField<OrderSubCategory>(
-                  value: _selectedSubCategory,
-                  hint: Row(
-                    children: const [
-                      Icon(Icons.inventory_2, color: Colors.grey),
-                      SizedBox(width: 12),
-                      Text(
-                        'Select specific item',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    ],
-                  ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
-                  icon: const Icon(Icons.keyboard_arrow_down),
-                  isExpanded: true,
-                  menuMaxHeight: 400,
-                  itemHeight: null,
-                  isDense: false,
-                  items: _selectedMainCategory!.subCategories.map((subCategory) {
-                    return DropdownMenuItem<OrderSubCategory>(
-                      value: subCategory,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 45,
-                              height: 45,
-                              decoration: BoxDecoration(
-                                color: _selectedMainCategory!.color.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  subCategory.icon,
-                                  style: const TextStyle(fontSize: 22),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    subCategory.name,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.2,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    subCategory.description,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                      height: 1.2,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (OrderSubCategory? newValue) {
-                    setState(() {
-                      _selectedSubCategory = newValue;
-                    });
-                  },
-                ),
-              ),
-            ),
-          const SizedBox(height: 20),
-          if (_selectedMainCategory != null && _selectedSubCategory != null)
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: _selectedMainCategory!.color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: _selectedMainCategory!.color.withOpacity(0.3),
+                  width: 2,
                 ),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 70,
+                    height: 70,
                     decoration: BoxDecoration(
                       color: _selectedMainCategory!.color,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Center(
                       child: Text(
-                        _selectedSubCategory!.icon,
-                        style: const TextStyle(fontSize: 32),
+                        _selectedMainCategory!.icon,
+                        style: const TextStyle(fontSize: 36),
                       ),
                     ),
                   ),
@@ -1405,36 +1405,36 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Selected Item',
+                          'Selected Category',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _selectedSubCategory!.name,
+                          _selectedMainCategory!.name,
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: _selectedMainCategory!.color,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${_selectedMainCategory!.name} • ${_selectedSubCategory!.description}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[700],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.check_circle,
-                    color: _selectedMainCategory!.color,
-                    size: 32,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _selectedMainCategory!.color,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                   ),
                 ],
               ),
@@ -1453,7 +1453,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'First select a category, then choose the specific item you\'re transporting.',
+                    'Select the category that best describes the type of package you\'re sending.',
                     style: TextStyle(
                       color: Colors.blue[700],
                       fontSize: 13,

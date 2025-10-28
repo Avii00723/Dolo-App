@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../Controllers/LoginService.dart';
-import '../../Controllers/AuthService.dart'; // ✅ Import AuthService
+import '../../Controllers/AuthService.dart';
 import 'UserProfileHelper.dart';
 
 class OTPScreen extends StatefulWidget {
@@ -52,7 +53,6 @@ class _OTPScreenState extends State<OTPScreen> {
       final verifyResponse = await _loginService.verifyOtp(widget.phoneNumber, otp);
 
       if (verifyResponse != null) {
-        // ✅ SAVE TO SECURE STORAGE USING AUTHSERVICE
         await AuthService.saveUserSession(
           userId: verifyResponse.userId,
           phone: widget.phoneNumber,
@@ -61,7 +61,6 @@ class _OTPScreenState extends State<OTPScreen> {
         debugPrint('✅ UserId saved to secure storage: ${verifyResponse.userId}');
 
         if (mounted) {
-          // Use helper for routing depending on user profile/kyc status
           UserProfileHelper.checkUserAndNavigate(
             context,
             userId: verifyResponse.userId,
@@ -142,63 +141,79 @@ class _OTPScreenState extends State<OTPScreen> {
                 ),
               ),
               const SizedBox(height: 48),
-              // Replace the OTP input Row section with this:
+              // ✅ Updated OTP input section with proper backspace handling
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: List.generate(
                   6,
                       (index) => SizedBox(
                     width: 50,
-                    height: 60,  // Increased height
-                    child: TextField(
-                      controller: _otpControllers[index],
-                      focusNode: _otpFocusNodes[index],
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      maxLength: 1,
-                      enabled: !_isLoading,
-                      style: const TextStyle(
-                        fontSize: 24,  // Slightly larger for better visibility
-                        fontWeight: FontWeight.bold,
-                        height: 1.2,  // Add line height to prevent cutoff
-                      ),
-                      decoration: InputDecoration(
-                        counterText: '',
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 16,  // Add vertical padding
-                          horizontal: 0,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF001127),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                      ),
-                      onChanged: (value) {
-                        if (value.isNotEmpty && index < 5) {
-                          _otpFocusNodes[index + 1].requestFocus();
-                        } else if (value.isEmpty && index > 0) {
-                          _otpFocusNodes[index - 1].requestFocus();
-                        }
-                        if (index == 5 && value.isNotEmpty) {
-                          String completeOTP = _otpControllers.map((c) => c.text).join();
-                          if (completeOTP.length == 6) {
-                            _verifyOTP();
+                    height: 60,
+                    child: RawKeyboardListener(
+                      focusNode: FocusNode(),
+                      onKey: (RawKeyEvent event) {
+                        // ✅ Detect backspace key press
+                        if (event is RawKeyDownEvent) {
+                          if (event.logicalKey == LogicalKeyboardKey.backspace) {
+                            // If current field is empty, move to previous field and clear it
+                            if (_otpControllers[index].text.isEmpty && index > 0) {
+                              _otpControllers[index - 1].clear();
+                              _otpFocusNodes[index - 1].requestFocus();
+                            }
                           }
                         }
                       },
+                      child: TextField(
+                        controller: _otpControllers[index],
+                        focusNode: _otpFocusNodes[index],
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        maxLength: 1,
+                        enabled: !_isLoading,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                        ),
+                        decoration: InputDecoration(
+                          counterText: '',
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 0,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF001127),
+                              width: 2,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        onChanged: (value) {
+                          // ✅ Move to next field when number is entered
+                          if (value.isNotEmpty && index < 5) {
+                            _otpFocusNodes[index + 1].requestFocus();
+                          }
+
+                          // ✅ Auto-verify when last digit is entered
+                          if (index == 5 && value.isNotEmpty) {
+                            String completeOTP = _otpControllers.map((c) => c.text).join();
+                            if (completeOTP.length == 6) {
+                              _verifyOTP();
+                            }
+                          }
+                        },
+                      ),
                     ),
                   ),
                 ),

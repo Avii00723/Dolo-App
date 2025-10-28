@@ -399,6 +399,7 @@ class ModernChatCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Flexible(
+                              flex: 2,
                               child: Text(
                                 '$origin → $destination',
                                 style: TextStyle(
@@ -411,12 +412,17 @@ class ModernChatCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              '#$orderId',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.blue.shade600,
-                                fontWeight: FontWeight.w600,
+                            Flexible(
+                              flex: 1,
+                              child: Text(
+                                '#$orderId',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.blue.shade600,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
