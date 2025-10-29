@@ -39,6 +39,7 @@ dependencies:
   google_places_flutter: ^2.1.1
   device_info_plus: ^10.1.2
   swipe_to: ^1.0.6
+  just_audio: ^0.9.40
 
 
 dev_dependencies:
