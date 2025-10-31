@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Controllers/ProfileService.dart';
 import '../../Controllers/AuthService.dart';
+import '../../Controllers/tutorial_service.dart';
 import '../LoginScreens/LoginSignupScreen.dart';
 import '../LoginScreens/signup_page.dart';
 import 'ProfileDetailPage.dart';
@@ -298,6 +299,70 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       },
     );
   }
+
+  /// Reset tutorial - allows user to replay all tutorials
+  Future<void> _resetTutorial() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.refresh, color: Color(0xFF001127)),
+              SizedBox(width: 12),
+              Text('Reset Tutorial'),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('This will reset all tutorial progress and show the tutorials again when you navigate through the app.'),
+              SizedBox(height: 8),
+              Text(
+                'This is useful if you want to learn about the app features again.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+
+                // Reset all tutorials
+                await TutorialService.resetAllTutorials();
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Tutorial reset successfully! Navigate through the app to see tutorials again.'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF001127),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Reset Tutorial'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 // ✅ NEW: Build gradient avatar with initials
   Widget _buildGradientAvatar(String name, double radius) {
     // Generate initials
@@ -806,6 +871,23 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                     ],
                   ),
                   const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _resetTutorial,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reset Tutorial'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF001127),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: Color(0xFF001127)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(

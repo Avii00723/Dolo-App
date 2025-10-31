@@ -33,4 +33,10 @@ class ApiConstants {
 
   // Media - TTS
   static const String ttsStreamUrl = 'https://api.dzdx.in/v1/media/tts/stream';
+
+  // Google Maps API Key
+  // ⚠️ IMPORTANT: Replace this with your actual Google Maps API Key
+  // Get it from: https://console.cloud.google.com/
+  // Required APIs: Directions API, Geocoding API, Maps SDK for Android/iOS
+  static const String googleMapsApiKey = 'AIzaSyDQtNoIW22hko1eCS4ItjsO2JvtwDHJwkY';
 }

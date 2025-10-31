@@ -22,6 +22,7 @@ class Order {
   final double? distanceKm;
   final double? calculatedPrice;
   final String? createdAt;
+  final String transportMode;
 
   Order({
     required this.id,
@@ -44,6 +45,7 @@ class Order {
     this.distanceKm,
     this.calculatedPrice,
     this.createdAt,
+    this.transportMode = 'Car',
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -68,6 +70,7 @@ class Order {
       distanceKm: json['distance_km'] != null ? _parseDouble(json['distance_km']) : null,
       calculatedPrice: json['calculated_price'] != null ? _parseDouble(json['calculated_price']) : null,
       createdAt: json['created_at'],
+      transportMode: json['transport_mode'] ?? 'Car',
     );
   }
 
@@ -109,6 +112,7 @@ class Order {
       'distance_km': distanceKm,
       'calculated_price': calculatedPrice,
       'created_at': createdAt,
+      'transport_mode': transportMode,
     };
   }
 }

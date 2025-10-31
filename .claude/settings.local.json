@@ -4,7 +4,9 @@
       "Bash(find:*)",
       "Bash(flutter analyze:*)",
       "Read(//e/Dolo (3)/**)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(flutter build:*)"
     ],
     "deny": [],
     "ask": []

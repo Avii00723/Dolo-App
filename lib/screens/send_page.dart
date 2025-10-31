@@ -1,15 +1,14 @@
-import 'package:dolo/Constants/ApiConstants.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import '../Constants/colorconstant.dart';
-import '../../Services/LocationService.dart';
 import '../../Models/OrderModel.dart';
 import '../../Models/TripRequestModel.dart';
 import '../Controllers/OrderService.dart';
 import '../Controllers/TripRequestService.dart';
 import '../Controllers/AuthService.dart';
 import 'LocationinputField.dart';
+import 'CustomRouteMapScreen.dart';
 import 'orderSection/SearchResultPage.dart';
 import 'orderSection/YourOrders.dart';
 
@@ -29,12 +28,8 @@ class _SendPageState extends State<SendPage> {
   String? selectedVehicle;
   final List<String> vehicleOptions = [
     'Car',
-    // 'SUV',
     'Bike',
-    // 'Auto Rickshaw',
-    // 'Tempo',
     'Pickup Truck',
-    // 'Mini Truck',
     'Truck',
     'Bus',
     'Train',
@@ -56,6 +51,15 @@ class _SendPageState extends State<SendPage> {
   void initState() {
     super.initState();
     _initializeUser();
+  }
+
+  @override
+  void dispose() {
+    fromController.dispose();
+    toController.dispose();
+    dateController.dispose();
+    hoursController.dispose();
+    super.dispose();
   }
 
   String _formatDateForDisplay(String isoDate) {
@@ -86,6 +90,41 @@ class _SendPageState extends State<SendPage> {
       print('❌ Error initializing user: $e');
       if (mounted) {
         _showSnackBar('Error loading user data: $e', Colors.red);
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ✨ NEW METHOD: Show Route Map
+  // ═══════════════════════════════════════════════════════════════════
+  Future<void> _showRouteMap() async {
+    if (originPosition == null || destinationPosition == null) {
+      _showSnackBar('Please select both origin and destination', Colors.orange);
+      return;
+    }
+
+    final selectedRoute = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomRouteMapScreen(
+          originCity: fromController.text,
+          destinationCity: toController.text,
+          originLatitude: originPosition!.latitude,
+          originLongitude: originPosition!.longitude,
+          destinationLatitude: destinationPosition!.latitude,
+          destinationLongitude: destinationPosition!.longitude,
+        ),
+      ),
+    );
+
+    // If user selected a route, show confirmation
+    if (selectedRoute != null) {
+      _showSnackBar('Route selected: ${selectedRoute.distance}, ${selectedRoute.duration}', Colors.green);
+      print('✅ User selected route: ${selectedRoute.distance}, ${selectedRoute.duration}');
+      print('   Route summary: ${selectedRoute.summary}');
+      print('   Cities along route (${selectedRoute.cities.length}):');
+      for (var city in selectedRoute.cities) {
+        print('     - ${city.name} (${city.category} - ${city.type})');
       }
     }
   }
@@ -229,9 +268,8 @@ class _SendPageState extends State<SendPage> {
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: EdgeInsets.zero,
-        content: Container(
-          width: MediaQuery.of(dialogContext).size.width * 0.9,
-          constraints: const BoxConstraints(maxHeight: 650),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.9,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -239,12 +277,7 @@ class _SendPageState extends State<SendPage> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primary.withOpacity(0.7),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                    colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
                   ),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
@@ -257,37 +290,24 @@ class _SendPageState extends State<SendPage> {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 28,
+                      child: const Icon(Icons.send, color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Send Trip Request',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 15),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Send Trip Request',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Fill in your travel details',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(dialogContext),
                     ),
                   ],
                 ),
@@ -298,103 +318,23 @@ class _SendPageState extends State<SendPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.blue.shade50,
-                              Colors.blue.shade50.withOpacity(0.5),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.blue.shade200,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  color: Colors.blue.shade700,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Order Details',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    color: Colors.blue.shade900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            _buildOrderDetailRow(
-                              Icons.location_on,
-                              'Route',
-                              '${order.origin} → ${order.destination}',
-                              Colors.green,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildOrderDetailRow(
-                              Icons.calendar_today,
-                              'Date',
-                              _formatDateForDisplay(order.deliveryDate),
-                              Colors.orange,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildOrderDetailRow(
-                              Icons.inventory_2,
-                              'Item',
-                              order.itemDescription,
-                              Colors.purple,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildOrderDetailRow(
-                              Icons.scale,
-                              'Weight',
-                              '${order.weight} kg',
-                              Colors.red,
-                            ),
-                            if (order.calculatedPrice != null) ...[
-                              const SizedBox(height: 8),
-                              _buildOrderDetailRow(
-                                Icons.currency_rupee,
-                                'Estimated Price',
-                                '₹${order.calculatedPrice!.toStringAsFixed(2)}',
-                                Colors.green.shade700,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Your Travel Information',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
+                      _buildReadOnlyField(
+                        label: 'From',
+                        value: order.origin,
+                        icon: Icons.trip_origin,
                       ),
                       const SizedBox(height: 15),
                       _buildReadOnlyField(
-                        label: 'Vehicle Type',
-                        value: selectedVehicle ?? 'Not selected',
-                        icon: Icons.directions_car,
+                        label: 'To',
+                        value: order.destination,
+                        icon: Icons.location_on,
                       ),
                       const SizedBox(height: 15),
                       _buildEnhancedTextField(
                         controller: vehicleInfoController,
-                        label: 'Vehicle Number',
-                        hint: 'e.g., XX XX XX XXXX',
-                        icon: Icons.info_outline,
+                        label: 'Vehicle Information',
+                        hint: 'e.g., Honda City, MH01AB1234',
+                        icon: Icons.directions_car,
                         isRequired: true,
                       ),
                       const SizedBox(height: 15),
@@ -526,9 +466,6 @@ class _SendPageState extends State<SendPage> {
                             print('DEBUG: Sending trip request...');
                             print('DEBUG: Traveler ID: $currentUserId');
                             print('DEBUG: Order ID: ${order.id}');
-                            print('DEBUG: Vehicle Info: ${vehicleInfoController.text}');
-                            print('DEBUG: Pickup Time: ${startTimeController.text}');
-                            print('DEBUG: Dropoff Time: ${endTimeController.text}');
 
                             final response = await _tripRequestService.sendTripRequest(tripRequest);
 
@@ -614,43 +551,17 @@ class _SendPageState extends State<SendPage> {
             children: [
               Icon(icon, color: AppColors.primary, size: 20),
               const SizedBox(width: 12),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
                 ),
               ),
             ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOrderDetailRow(IconData icon, String label, String value, Color color) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 8),
-        Text(
-          '$label: ',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
-            ),
           ),
         ),
       ],
@@ -805,23 +716,22 @@ class _SendPageState extends State<SendPage> {
                     selectedVehicle = null;
                     originPosition = null;
                     destinationPosition = null;
-                    availableOrders = [];
                   });
                 });
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
               child: const Text(
-                'View My Requests',
+                'View Your Orders',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -831,21 +741,9 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (currentUserId == null) {
+    if (isLoading) {
       return Scaffold(
         backgroundColor: Colors.grey[50],
         body: const Center(
@@ -929,6 +827,78 @@ class _SendPageState extends State<SendPage> {
                         });
                       },
                     ),
+
+                    // ═══════════════════════════════════════════════════════════════
+                    // ✨ NEW: View Route Button (Shows when both locations selected)
+                    // ═══════════════════════════════════════════════════════════════
+                    if (originPosition != null && destinationPosition != null) ...[
+                      const SizedBox(height: 15),
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.blue[400]!, Colors.blue[600]!],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _showRouteMap,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.map,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'View Route on Map',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Text(
+                                      'NEW',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 15),
                     GestureDetector(
                       onTap: () => _selectDate(context),
@@ -1056,20 +1026,12 @@ class _SendPageState extends State<SendPage> {
       case 'Car':
         icon = Icons.directions_car;
         break;
-      case 'SUV':
-        icon = Icons.airport_shuttle;
-        break;
       case 'Bike':
         icon = Icons.two_wheeler;
         break;
-      case 'Auto Rickshaw':
-        icon = Icons.electric_rickshaw;
-        break;
-      case 'Tempo':
       case 'Pickup Truck':
         icon = Icons.local_shipping;
         break;
-      case 'Mini Truck':
       case 'Truck':
         icon = Icons.local_shipping;
         color = Colors.orange;
@@ -1094,81 +1056,158 @@ class _SendPageState extends State<SendPage> {
 
   Widget _buildAvailableOrdersList() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
+      children: availableOrders.map((order) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.search, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Found ${availableOrders.length} Order${availableOrders.length > 1 ? 's' : ''}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Order #${order.id}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Available',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${order.origin} → ${order.destination}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _formatDateForDisplay(order.deliveryDate),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  if (order.calculatedPrice != null)
+                    Text(
+                      '₹${order.calculatedPrice!.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _sendRequestToSender(order),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Send Request',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 15),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: availableOrders.length,
-          itemBuilder: (context, index) {
-            final order = availableOrders[index];
-            return CompactOrderCard(
-              order: order,
-              onSendRequest: () => _sendRequestToSender(order),
-            );
-          },
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
 
   Widget _buildEmptyState() {
-    return Padding(
+    return Container(
+      margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: Image.asset(
-              'assets/images/truck.png',
-              height: 130,
-              fit: BoxFit.contain,
-            ),
+          Icon(
+            Icons.search_off,
+            size: 80,
+            color: Colors.grey[300],
           ),
           const SizedBox(height: 20),
-          const Text(
-            'How it works',
+          Text(
+            'No Orders Yet',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: Colors.grey[600],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
-            'Search for package delivery orders by selecting your route and travel date. Send requests to earn money by delivering packages.',
-            textAlign: TextAlign.center,
+            'Start searching to find available orders',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[600],
-              height: 1.5,
+              color: Colors.grey[500],
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget buildInputBox(String label, TextEditingController controller, IconData icon,
-      {TextInputType keyboardType = TextInputType.text}) {
+  Widget buildInputBox(
+      String label,
+      TextEditingController controller,
+      IconData icon, {
+        TextInputType keyboardType = TextInputType.text,
+      }) {
     return Container(
       height: 55,
       padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -1177,838 +1216,57 @@ class _SendPageState extends State<SendPage> {
         border: Border.all(color: Colors.grey.shade300, width: 1),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Center(
-        child: TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          style: const TextStyle(fontSize: 16, color: Colors.black),
-          decoration: InputDecoration(
-            labelText: label,
-            labelStyle: TextStyle(color: Colors.grey[600]),
-            icon: Icon(icon, color: AppColors.primary, size: 20),
-            border: InputBorder.none,
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    fromController.dispose();
-    toController.dispose();
-    dateController.dispose();
-    hoursController.dispose();
-    super.dispose();
-  }
-}
-
-// ✅ NEW: Compact Order Card that navigates to Detail Screen
-class CompactOrderCard extends StatelessWidget {
-  final Order order;
-  final VoidCallback onSendRequest;
-
-  const CompactOrderCard({
-    Key? key,
-    required this.order,
-    required this.onSendRequest,
-  }) : super(key: key);
-
-  String _formatDateForCard(String isoDate) {
-    try {
-      DateTime dateTime = DateTime.parse(isoDate);
-      return DateFormat('dd MMM yyyy').format(dateTime);
-    } catch (e) {
-      return isoDate;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 2,
-      shadowColor: Colors.black26,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OrderDetailScreen(
-                order: order,
-                onSendRequest: onSendRequest,
-              ),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white,
-                Colors.green.shade50.withOpacity(0.3),
-              ],
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AppColors.primary.withOpacity(0.1),
-                      child: Text(
-                        order.userName.isNotEmpty
-                            ? order.userName[0].toUpperCase()
-                            : 'S',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            order.userName,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            'Package Sender',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_forward_ios,
-                        color: AppColors.primary,
-                        size: 16,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Route Section (Compact)
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Column(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: Colors.green[600],
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          Container(
-                            width: 2,
-                            height: 20,
-                            color: Colors.grey[300],
-                          ),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: Colors.red[600],
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              order.origin,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              order.destination,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // Date and Price Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.calendar_today, size: 14, color: Colors.blue),
-                          const SizedBox(width: 6),
-                          Text(
-                            _formatDateForCard(order.deliveryDate),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[800],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: order.calculatedPrice != null && order.calculatedPrice! > 0
-                              ? [Colors.green.shade50, Colors.green.shade100]
-                              : [Colors.grey.shade100, Colors.grey.shade200],
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: order.calculatedPrice != null && order.calculatedPrice! > 0
-                              ? Colors.green.shade300
-                              : Colors.grey.shade400,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.currency_rupee,
-                            color: order.calculatedPrice != null && order.calculatedPrice! > 0
-                                ? Colors.green[800]
-                                : Colors.grey[700],
-                            size: 16,
-                          ),
-                          Text(
-                            order.calculatedPrice != null
-                                ? '₹${order.calculatedPrice!.toStringAsFixed(0)}'
-                                : 'TBD',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: order.calculatedPrice != null && order.calculatedPrice! > 0
-                                  ? Colors.green[800]
-                                  : Colors.grey[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ✅ NEW: Separate Order Detail Screen
-class OrderDetailScreen extends StatelessWidget {
-  final Order order;
-  final VoidCallback onSendRequest;
-
-  const OrderDetailScreen({
-    Key? key,
-    required this.order,
-    required this.onSendRequest,
-  }) : super(key: key);
-
-  String _formatDateForDisplay(String isoDate) {
-    try {
-      DateTime dateTime = DateTime.parse(isoDate);
-      return DateFormat('dd MMM yyyy').format(dateTime);
-    } catch (e) {
-      return isoDate;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Order Details',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header Section
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primary,
-                          AppColors.primary.withOpacity(0.8),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 32,
-                          backgroundColor: Colors.white.withOpacity(0.3),
-                          child: Text(
-                            order.userName.isNotEmpty
-                                ? order.userName[0].toUpperCase()
-                                : 'S',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              fontSize: 28,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                order.userName,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Package Sender',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Package Image
-                  if (order.imageUrl.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.network(
-                          "${ApiConstants.imagebaseUrl}${order.imageUrl}",
-                          height: 220,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              height: 220,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                      : null,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              height: 220,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    Colors.blue.shade100,
-                                    Colors.purple.shade100,
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.inventory_2_outlined,
-                                    size: 80,
-                                    color: Colors.grey[700],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Package Image',
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-
-                  const SizedBox(height: 24),
-
-                  // Route Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Route Details',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey[200]!),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Column(
-                                children: [
-                                  Container(
-                                    width: 14,
-                                    height: 14,
-                                    decoration: BoxDecoration(
-                                      color: Colors.green[600],
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2),
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 3,
-                                    height: 50,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [Colors.green[600]!, Colors.red[600]!],
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 14,
-                                    height: 14,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red[600],
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(Icons.trip_origin, size: 18, color: Colors.green[600]),
-                                        const SizedBox(width: 8),
-                                        const Text(
-                                          'From',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      order.origin,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 20),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.location_on, size: 18, color: Colors.red[600]),
-                                        const SizedBox(width: 8),
-                                        const Text(
-                                          'To',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      order.destination,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Package Details
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Package Details',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildDetailCard(
-                          icon: Icons.inventory_2,
-                          label: 'Item Description',
-                          value: order.itemDescription,
-                          color: Colors.purple,
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildDetailCard(
-                                icon: Icons.scale,
-                                label: 'Weight',
-                                value: '${order.weight.toStringAsFixed(1)} kg',
-                                color: Colors.orange,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _buildDetailCard(
-                                icon: Icons.calendar_today,
-                                label: 'Delivery Date',
-                                value: _formatDateForDisplay(order.deliveryDate),
-                                color: Colors.blue,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (order.distanceKm != null && order.distanceKm! > 0) ...[
-                          const SizedBox(height: 10),
-                          _buildDetailCard(
-                            icon: Icons.social_distance,
-                            label: 'Distance',
-                            value: '${order.distanceKm!.toStringAsFixed(1)} km',
-                            color: Colors.teal,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Price Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: order.calculatedPrice != null && order.calculatedPrice! > 0
-                              ? [Colors.green.shade50, Colors.green.shade100]
-                              : [Colors.grey.shade100, Colors.grey.shade200],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: order.calculatedPrice != null && order.calculatedPrice! > 0
-                              ? Colors.green.shade300
-                              : Colors.grey.shade400,
-                          width: 2,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Estimated Earning',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.currency_rupee,
-                                    color: order.calculatedPrice != null && order.calculatedPrice! > 0
-                                        ? Colors.green[800]
-                                        : Colors.grey[700],
-                                    size: 32,
-                                  ),
-                                  Text(
-                                    order.calculatedPrice != null
-                                        ? order.calculatedPrice!.toStringAsFixed(0)
-                                        : 'TBD',
-                                    style: TextStyle(
-                                      fontSize: 36,
-                                      fontWeight: FontWeight.bold,
-                                      color: order.calculatedPrice != null && order.calculatedPrice! > 0
-                                          ? Colors.green[800]
-                                          : Colors.grey[700],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Icon(
-                            Icons.currency_rupee,
-                            size: 60,
-                            color: order.calculatedPrice != null && order.calculatedPrice! > 0
-                                ? Colors.green.shade400
-                                : Colors.grey.shade400,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-                ],
-              ),
-            ),
-          ),
-
-          // Send Request Button (Fixed at bottom)
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    onSendRequest();
-                  },
-                  icon: const Icon(Icons.send, size: 22),
-                  label: const Text(
-                    'Send Request to Sender',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 3,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 24, color: color),
-          ),
-          const SizedBox(width: 14),
+          Icon(icon, color: AppColors.primary, size: 20),
+          const SizedBox(width: 15),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
+            child: TextField(
+              controller: controller,
+              keyboardType: keyboardType,
+              decoration: InputDecoration(
+                hintText: label,
+                hintStyle: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 13,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
+                border: InputBorder.none,
+              ),
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.black,
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              color == Colors.green
+                  ? Icons.check_circle
+                  : color == Colors.red
+                  ? Icons.error_outline
+                  : Icons.info_outline,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: color,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }

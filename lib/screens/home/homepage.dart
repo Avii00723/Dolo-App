@@ -4,10 +4,10 @@ import 'package:dolo/screens/ProfileSection/profilescreen.dart';
 import 'package:dolo/screens/orderSection/CreateOrderPage.dart';
 import 'package:dolo/screens/orderSection/YourOrders.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../screens/send_page.dart';
-import 'home.dart';
+import '../../Controllers/tutorial_service.dart';
+import '../../widgets/tutorial_helper.dart';
 
 class HomePageWithNav extends StatefulWidget {
   const HomePageWithNav({super.key});
@@ -18,11 +18,20 @@ class HomePageWithNav extends StatefulWidget {
 
 class _HomePageWithNavState extends State<HomePageWithNav> with WidgetsBindingObserver {
   int _selectedIndex = 0;
+  TutorialCoachMark? _tutorialCoachMark;
+
+  // GlobalKeys for tutorial targets
+  final GlobalKey _createButtonKey = GlobalKey();
+  final GlobalKey _searchButtonKey = GlobalKey();
+  final GlobalKey _ordersButtonKey = GlobalKey();
+  final GlobalKey _inboxButtonKey = GlobalKey();
+  final GlobalKey _profileButtonKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _checkAndShowTutorial();
   }
 
   @override
@@ -50,32 +59,47 @@ class _HomePageWithNavState extends State<HomePageWithNav> with WidgetsBindingOb
   }
 
   // Fixed navigation items - same for all users
-  List<BottomNavigationBarItem> get _navItems {
-    return const [
+  List<BottomNavigationBarItem> _navItems() {
+    return [
       BottomNavigationBarItem(
-        icon: Icon(Icons.add_circle_outline),
+        icon: Container(
+          key: _createButtonKey,
+          child: const Icon(Icons.add_circle_outline),
+        ),
         label: 'Create',
-        activeIcon: Icon(Icons.add_circle, size: 28),
+        activeIcon: const Icon(Icons.add_circle, size: 28),
       ),
       BottomNavigationBarItem(
-        icon: Icon(Icons.search),
+        icon: Container(
+          key: _searchButtonKey,
+          child: const Icon(Icons.search),
+        ),
         label: 'Search',
-        activeIcon: Icon(Icons.search, size: 28),
+        activeIcon: const Icon(Icons.search, size: 28),
       ),
       BottomNavigationBarItem(
-        icon: Icon(Icons.bookmark_border),
+        icon: Container(
+          key: _ordersButtonKey,
+          child: const Icon(Icons.bookmark_border),
+        ),
         label: 'Your Orders',
-        activeIcon: Icon(Icons.bookmark, size: 28),
+        activeIcon: const Icon(Icons.bookmark, size: 28),
       ),
       BottomNavigationBarItem(
-        icon: Icon(Icons.chat_bubble_outline),
+        icon: Container(
+          key: _inboxButtonKey,
+          child: const Icon(Icons.chat_bubble_outline),
+        ),
         label: 'Inbox',
-        activeIcon: Icon(Icons.chat_bubble, size: 28),
+        activeIcon: const Icon(Icons.chat_bubble, size: 28),
       ),
       BottomNavigationBarItem(
-        icon: Icon(Icons.person_outline),
+        icon: Container(
+          key: _profileButtonKey,
+          child: const Icon(Icons.person_outline),
+        ),
         label: 'Profile',
-        activeIcon: Icon(Icons.person, size: 28),
+        activeIcon: const Icon(Icons.person, size: 28),
       ),
     ];
   }
@@ -86,6 +110,82 @@ class _HomePageWithNavState extends State<HomePageWithNav> with WidgetsBindingOb
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  /// Check if tutorial should be shown for new users
+  Future<void> _checkAndShowTutorial() async {
+    // Wait for the widget to be built
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    // Check if home tutorial has been completed
+    final isCompleted = await TutorialService.isHomeTutorialCompleted();
+
+    if (!isCompleted) {
+      _showTutorial();
+    }
+  }
+
+  /// Show the home page tutorial
+  void _showTutorial() {
+    final targets = [
+      TutorialHelper.createTarget(
+        key: _createButtonKey,
+        title: 'Create Order',
+        description: 'Tap here to create a new delivery order. You can send packages, documents, or any items you need delivered.',
+        order: 1,
+        align: ContentAlign.top,
+      ),
+      TutorialHelper.createTarget(
+        key: _searchButtonKey,
+        title: 'Search Trips',
+        description: 'Find available delivery trips posted by other users. You can join trips going in your direction to save money.',
+        order: 2,
+        align: ContentAlign.top,
+      ),
+      TutorialHelper.createTarget(
+        key: _ordersButtonKey,
+        title: 'Your Orders',
+        description: 'View all your delivery orders and trip requests. Track the status of your deliveries and manage them easily.',
+        order: 3,
+        align: ContentAlign.top,
+      ),
+      TutorialHelper.createTarget(
+        key: _inboxButtonKey,
+        title: 'Inbox & Chat',
+        description: 'Communicate with other users about your orders. Get real-time updates and notifications about your deliveries.',
+        order: 4,
+        align: ContentAlign.top,
+      ),
+      TutorialHelper.createFinalTarget(
+        key: _profileButtonKey,
+        title: 'Your Profile',
+        description: 'Manage your account settings, view your delivery history, and update your personal information.',
+        order: 5,
+        align: ContentAlign.top,
+        onFinish: () async {
+          await TutorialService.markHomeTutorialCompleted();
+        },
+      ),
+    ];
+
+    _tutorialCoachMark = TutorialCoachMark(
+      targets: targets,
+      colorShadow: const Color(0xFF001127),
+      paddingFocus: 10,
+      opacityShadow: 0.8,
+      hideSkip: false,
+      onSkip: () {
+        TutorialService.markHomeTutorialCompleted();
+        return true;
+      },
+      onFinish: () {
+        TutorialService.markHomeTutorialCompleted();
+      },
+    );
+
+    _tutorialCoachMark?.show(context: context);
   }
 
   @override
@@ -137,7 +237,7 @@ class _HomePageWithNavState extends State<HomePageWithNav> with WidgetsBindingOb
             unselectedLabelStyle: const TextStyle(
               fontWeight: FontWeight.w400,
             ),
-            items: _navItems,
+            items: _navItems(),
           ),
         ),
       ),

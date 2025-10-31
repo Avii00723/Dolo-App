@@ -106,22 +106,36 @@ class _InboxScreenState extends State<InboxScreen> {
           final typingUserId = data['userId'] as String?;
           final roomId = data['roomId'] as String?;
 
+          print('🔍 InboxScreen - Typing event: userId=$typingUserId, roomId=$roomId, currentUserId=$_currentUserId');
+
           if (typingUserId != null && roomId != null && typingUserId != _currentUserId) {
-            setState(() {
-              _typingStatus[roomId] = true;
-            });
+            if (mounted) {
+              setState(() {
+                _typingStatus[roomId] = true;
+              });
 
-            // Auto-hide typing indicator after 3 seconds
-            _typingTimers[roomId]?.cancel();
-            _typingTimers[roomId] = Timer(const Duration(seconds: 3), () {
-              if (mounted) {
-                setState(() {
-                  _typingStatus[roomId] = false;
-                });
-              }
-            });
+              // Auto-hide typing indicator after 3 seconds
+              _typingTimers[roomId]?.cancel();
+              _typingTimers[roomId] = Timer(const Duration(seconds: 3), () {
+                if (mounted) {
+                  setState(() {
+                    _typingStatus[roomId] = false;
+                  });
+                }
+              });
 
-            print('⌨️  User $typingUserId is typing in room $roomId');
+              print('⌨️  User $typingUserId is typing in room $roomId');
+            }
+          } else {
+            if (roomId == null) {
+              print('⚠️ InboxScreen - roomId is null, cannot show typing indicator');
+            }
+            if (typingUserId == null) {
+              print('⚠️ InboxScreen - typingUserId is null');
+            }
+            if (typingUserId == _currentUserId) {
+              print('⚠️ InboxScreen - Ignoring own typing event');
+            }
           }
         });
 

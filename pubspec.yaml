@@ -40,6 +40,7 @@ dependencies:
   device_info_plus: ^10.1.2
   swipe_to: ^1.0.6
   just_audio: ^0.9.40
+  tutorial_coach_mark: ^1.2.11
 
 
 dev_dependencies:

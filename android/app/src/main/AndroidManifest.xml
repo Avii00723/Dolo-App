@@ -63,7 +63,7 @@
             android:value="2" />
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="YOUR_API_KEY_HERE"/>
+            android:value="AIzaSyDQtNoIW22hko1eCS4ItjsO2JvtwDHJwkY"/>
         <!-- Provider for file_picker -->
         <provider
             android:name="androidx.core.content.FileProvider"

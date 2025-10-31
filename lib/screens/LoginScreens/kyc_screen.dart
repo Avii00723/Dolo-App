@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../../Controllers/KYCService.dart';
-import '../../Constants/colorconstant.dart';
 
 class KycUploadScreen extends StatefulWidget {
   final String userId;

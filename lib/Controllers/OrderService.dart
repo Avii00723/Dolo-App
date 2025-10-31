@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -42,18 +41,16 @@ class OrderService {
       if (order.images.isNotEmpty) {
         print('📸 Adding ${order.images.length} images to request');
         for (var image in order.images) {
-          if (image is File) {
-            var stream = http.ByteStream(image.openRead());
-            var length = await image.length();
-            var multipartFile = http.MultipartFile(
-              'images',
-              stream,
-              length,
-              filename: image.path.split('/').last,
-            );
-            request.files.add(multipartFile);
-            print('✅ Added image: ${image.path.split('/').last}');
-          }
+          var stream = http.ByteStream(image.openRead());
+          var length = await image.length();
+          var multipartFile = http.MultipartFile(
+            'images',
+            stream,
+            length,
+            filename: image.path.split('/').last,
+          );
+          request.files.add(multipartFile);
+          print('✅ Added image: ${image.path.split('/').last}');
         }
       } else {
         print('⚠️ No images to upload');
@@ -83,7 +80,7 @@ class OrderService {
 
         return OrderCreateResponse.fromJson(jsonData);
       } else if (response.statusCode == 403) {
-        final jsonData = json.decode(response.body);
+        json.decode(response.body);
         print('❌ CREATE ORDER FAILED - KYC NOT APPROVED');
         throw Exception('KYC_NOT_APPROVED');
       } else if (response.statusCode == 400) {

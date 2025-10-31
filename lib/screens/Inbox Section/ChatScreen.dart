@@ -9,10 +9,13 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../Constants/ApiConstants.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
 import '../../Controllers/SocketService.dart';
+import '../../Controllers/tutorial_service.dart';
+import '../../widgets/tutorial_helper.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -55,6 +58,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Timer? _typingTimer;
   Timer? _typingIndicatorTimer;
 
+  // Tutorial keys
+  TutorialCoachMark? _tutorialCoachMark;
+  final GlobalKey _messageInputKey = GlobalKey();
+  final GlobalKey _imagePickerKey = GlobalKey();
+  final GlobalKey _sendButtonKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +73,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _startAutoRefresh();
     _scrollController.addListener(_onScroll);
     _messageController.addListener(_onTextChanged);
+    _checkAndShowTutorial();
   }
 
   @override
@@ -132,20 +142,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         // Listen for typing indicators
         _socketService.onUserTyping((data) {
           final typingUserId = data['userId'] as String?;
-          if (typingUserId != null && typingUserId != _currentUserId) {
-            setState(() {
-              _isOtherUserTyping = true;
-            });
+          print('🔍 ChatScreen - Typing event received: userId=$typingUserId, currentUserId=$_currentUserId, mounted=$mounted');
 
-            // Auto-hide typing indicator after 3 seconds
-            _typingIndicatorTimer?.cancel();
-            _typingIndicatorTimer = Timer(const Duration(seconds: 3), () {
-              if (mounted) {
-                setState(() {
-                  _isOtherUserTyping = false;
-                });
-              }
-            });
+          if (typingUserId != null && typingUserId != _currentUserId) {
+            if (mounted) {
+              print('✅ ChatScreen - Showing typing indicator for user: $typingUserId');
+              setState(() {
+                _isOtherUserTyping = true;
+              });
+
+              // Auto-hide typing indicator after 3 seconds
+              _typingIndicatorTimer?.cancel();
+              _typingIndicatorTimer = Timer(const Duration(seconds: 3), () {
+                if (mounted) {
+                  print('⏰ ChatScreen - Hiding typing indicator (timeout)');
+                  setState(() {
+                    _isOtherUserTyping = false;
+                  });
+                }
+              });
+            } else {
+              print('⚠️ ChatScreen - Not mounted, skipping typing indicator');
+            }
+          } else {
+            print('⚠️ ChatScreen - Ignoring typing: userId is null or is current user');
           }
         });
 
@@ -170,6 +190,68 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _socketService.sendTypingIndicator(widget.chatId);
       }
     });
+  }
+
+  /// Check if tutorial should be shown for new users
+  Future<void> _checkAndShowTutorial() async {
+    // Wait for the widget to be built and messages to load
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    // Check if chat tutorial has been completed
+    final isCompleted = await TutorialService.isChatTutorialCompleted();
+
+    if (!isCompleted) {
+      _showTutorial();
+    }
+  }
+
+  /// Show the chat screen tutorial
+  void _showTutorial() {
+    final targets = [
+      TutorialHelper.createTarget(
+        key: _messageInputKey,
+        title: 'Type Your Message',
+        description: 'Type your message here to communicate with the other user. The other person will see a typing indicator when you are typing.',
+        order: 1,
+        align: ContentAlign.top,
+      ),
+      TutorialHelper.createTarget(
+        key: _imagePickerKey,
+        title: 'Send Images',
+        description: 'Tap this button to attach images from your gallery or camera. You can send photos of items, documents, or any visual information.',
+        order: 2,
+        align: ContentAlign.top,
+      ),
+      TutorialHelper.createFinalTarget(
+        key: _sendButtonKey,
+        title: 'Send Message',
+        description: 'Tap this button to send your message. You can also swipe on messages to reply to specific messages in the conversation.',
+        order: 3,
+        align: ContentAlign.top,
+        onFinish: () async {
+          await TutorialService.markChatTutorialCompleted();
+        },
+      ),
+    ];
+
+    _tutorialCoachMark = TutorialCoachMark(
+      targets: targets,
+      colorShadow: const Color(0xFF001127),
+      paddingFocus: 10,
+      opacityShadow: 0.8,
+      hideSkip: false,
+      onSkip: () {
+        TutorialService.markChatTutorialCompleted();
+        return true;
+      },
+      onFinish: () {
+        TutorialService.markChatTutorialCompleted();
+      },
+    );
+
+    _tutorialCoachMark?.show(context: context);
   }
 
   Future<void> _loadMessages({bool silent = false}) async {
@@ -670,6 +752,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         itemBuilder: (context, index) {
           // Show typing indicator as first item (bottom of reversed list)
           if (index == 0 && _isOtherUserTyping) {
+            print('🎨 Building typing indicator widget (index: $index, _isOtherUserTyping: $_isOtherUserTyping)');
             return _buildTypingIndicator();
           }
 
@@ -936,12 +1019,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Row(
           children: [
             IconButton(
+              key: _imagePickerKey,
               icon: Icon(Icons.image, color: Colors.blue.shade600),
               onPressed: _showImagePickerOptions,
               tooltip: 'Add Images',
             ),
             Expanded(
               child: Container(
+                key: _messageInputKey,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(24),
@@ -967,6 +1052,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(width: 8),
             Container(
+              key: _sendButtonKey,
               decoration: BoxDecoration(
                 color: _isUploadingImages
                     ? Colors.grey
