@@ -75,8 +75,19 @@ class Order {
       }
     }
 
+    // Parse ID with fallback and logging
+    final parsedId = json['hashed_id']?.toString() ?? json['id']?.toString() ?? '';
+    if (parsedId.isEmpty) {
+      print('⚠️ WARNING: Order parsed with empty ID');
+      print('  Available keys in JSON: ${json.keys.toList()}');
+      print('  hashed_id: ${json['hashed_id']}');
+      print('  id: ${json['id']}');
+      print('  origin: ${json['origin']}');
+      print('  destination: ${json['destination']}');
+    }
+
     return Order(
-      id: json['hashed_id']?.toString() ?? json['id']?.toString() ?? '',
+      id: parsedId,
       userName: json['user_name'] ?? '',
       itemDescription: json['item_description'] ?? 'Package',
       origin: json['origin'] ?? '',

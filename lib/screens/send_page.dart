@@ -318,6 +318,14 @@ class _SendPageState extends State<SendPage> {
       return;
     }
 
+    // Validate that the order has an ID
+    if (order.id.isEmpty) {
+      _showSnackBar('Invalid order: Missing order ID. Please refresh and try again.', Colors.red);
+      print('❌ ERROR: Order ID is empty');
+      print('DEBUG: Order details - Origin: ${order.origin}, Destination: ${order.destination}');
+      return;
+    }
+
     final vehicleInfoController = TextEditingController();
     final startTimeController = TextEditingController();
     final endTimeController = TextEditingController();
