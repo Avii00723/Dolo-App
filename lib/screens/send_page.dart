@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:google_places_autocomplete_text_field/google_places_autocomplete_text_field.dart';
 import '../Constants/colorconstant.dart';
 import '../../Models/OrderModel.dart';
 import '../../Models/TripRequestModel.dart';
@@ -23,6 +24,7 @@ class _SendPageState extends State<SendPage> {
   final TextEditingController fromController = TextEditingController();
   final TextEditingController toController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
+  final TextEditingController timeController = TextEditingController(); // Time for delivery_time API param
   final TextEditingController hoursController = TextEditingController();
 
   String? selectedVehicle;
@@ -47,6 +49,9 @@ class _SendPageState extends State<SendPage> {
   Position? destinationPosition;
   String? currentUserId;
 
+  // Stopover management
+  List<Map<String, dynamic>> stopovers = [];
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +63,7 @@ class _SendPageState extends State<SendPage> {
     fromController.dispose();
     toController.dispose();
     dateController.dispose();
+    timeController.dispose();
     hoursController.dispose();
     super.dispose();
   }
@@ -103,6 +109,7 @@ class _SendPageState extends State<SendPage> {
       return;
     }
 
+    // Pass stopovers to CustomRouteMapScreen
     final selectedRoute = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -113,6 +120,7 @@ class _SendPageState extends State<SendPage> {
           originLongitude: originPosition!.longitude,
           destinationLatitude: destinationPosition!.latitude,
           destinationLongitude: destinationPosition!.longitude,
+          stopovers: stopovers, // Pass stopovers list
         ),
       ),
     );
@@ -126,7 +134,53 @@ class _SendPageState extends State<SendPage> {
       for (var city in selectedRoute.cities) {
         print('     - ${city.name} (${city.category} - ${city.type})');
       }
+
+      // Show stopovers if any
+      if (stopovers.isNotEmpty) {
+        print('📍 Stopovers (${stopovers.length}):');
+        for (var stopover in stopovers) {
+          print('     - ${stopover['city']}');
+        }
+      }
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ✨ STOPOVER MANAGEMENT
+  // ═══════════════════════════════════════════════════════════════════
+  void _addStopover(String cityName, double latitude, double longitude) {
+    setState(() {
+      stopovers.add({
+        'city': cityName,
+        'latitude': latitude,
+        'longitude': longitude,
+      });
+    });
+    _showSnackBar('Stopover added: $cityName', Colors.green);
+  }
+
+  void _removeStopover(int index) {
+    setState(() {
+      stopovers.removeAt(index);
+    });
+    _showSnackBar('Stopover removed', Colors.orange);
+  }
+
+  Future<void> _showAddStopoverDialog() async {
+    final stopoverController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _AddStopoverBottomSheet(
+        controller: stopoverController,
+        onAdd: (cityName, latitude, longitude) {
+          _addStopover(cityName, latitude, longitude);
+          Navigator.pop(context);
+        },
+      ),
+    );
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -144,6 +198,22 @@ class _SendPageState extends State<SendPage> {
     }
   }
 
+  Future<void> _selectTime(BuildContext context) async {
+    TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+
+    if (picked != null) {
+      setState(() {
+        // Format time as HH:mm:ss for API
+        final hour = picked.hour.toString().padLeft(2, '0');
+        final minute = picked.minute.toString().padLeft(2, '0');
+        timeController.text = '$hour:$minute:00';
+      });
+    }
+  }
+
   Future<void> _searchAvailableOrders() async {
     if (currentUserId == null) {
       _showSnackBar('Please log in to search orders', Colors.red);
@@ -153,6 +223,7 @@ class _SendPageState extends State<SendPage> {
     if (fromController.text.trim().isEmpty ||
         toController.text.trim().isEmpty ||
         dateController.text.trim().isEmpty ||
+        timeController.text.trim().isEmpty ||
         selectedVehicle == null ||
         hoursController.text.trim().isEmpty) {
       _showSnackBar('Please fill all required fields', Colors.red);
@@ -189,6 +260,7 @@ class _SendPageState extends State<SendPage> {
         origin: fromController.text.trim(),
         destination: toController.text.trim(),
         deliveryDate: dateController.text.trim(),
+        deliveryTime: timeController.text.trim(), // Required delivery_time
         originLatitude: originPosition!.latitude,
         originLongitude: originPosition!.longitude,
         vehicle: selectedVehicle!,
@@ -814,6 +886,115 @@ class _SendPageState extends State<SendPage> {
                         });
                       },
                     ),
+
+                    // ═══════════════════════════════════════════════════════════
+                    // ✨ ADD STOPOVER BUTTON
+                    // ═══════════════════════════════════════════════════════════
+                    const SizedBox(height: 10),
+                    Center(
+                      child: GestureDetector(
+                        onTap: _showAddStopoverDialog,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.add_circle_outline,
+                                color: AppColors.primary,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Add Stopover',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // ═══════════════════════════════════════════════════════════
+                    // ✨ DISPLAY STOPOVERS LIST
+                    // ═══════════════════════════════════════════════════════════
+                    if (stopovers.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ...stopovers.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final stopover = entry.value;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.shade100,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.location_on,
+                                  color: Colors.orange,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Stopover ${index + 1}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      stopover['city'],
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                color: Colors.red,
+                                onPressed: () => _removeStopover(index),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ],
+
                     const SizedBox(height: 15),
                     EnhancedLocationInputField(
                       controller: toController,
@@ -904,6 +1085,13 @@ class _SendPageState extends State<SendPage> {
                       onTap: () => _selectDate(context),
                       child: AbsorbPointer(
                         child: buildInputBox('Date (YYYY-MM-DD)', dateController, Icons.calendar_today),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    GestureDetector(
+                      onTap: () => _selectTime(context),
+                      child: AbsorbPointer(
+                        child: buildInputBox('Delivery Time', timeController, Icons.access_time),
                       ),
                     ),
                     const SizedBox(height: 15),
@@ -1267,6 +1455,298 @@ class _SendPageState extends State<SendPage> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ✨ ADD STOPOVER BOTTOM SHEET WIDGET
+// ═══════════════════════════════════════════════════════════════════
+class _AddStopoverBottomSheet extends StatefulWidget {
+  final TextEditingController controller;
+  final Function(String cityName, double latitude, double longitude) onAdd;
+
+  const _AddStopoverBottomSheet({
+    Key? key,
+    required this.controller,
+    required this.onAdd,
+  }) : super(key: key);
+
+  @override
+  State<_AddStopoverBottomSheet> createState() => _AddStopoverBottomSheetState();
+}
+
+class _AddStopoverBottomSheetState extends State<_AddStopoverBottomSheet> {
+  final FocusNode _searchFocusNode = FocusNode();
+  Position? selectedPosition;
+  String? selectedCityName;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-focus the search field when the sheet opens
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _searchFocusNode.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.add_location_alt, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Add Stopover',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Search for stopover location',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Google Places Autocomplete
+                GooglePlacesAutoCompleteTextFormField(
+                  textEditingController: widget.controller,
+                  focusNode: _searchFocusNode,
+                  config: const GoogleApiConfig(
+                    apiKey: 'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
+                    countries: ['in'],
+                    fetchPlaceDetailsWithCoordinates: true,
+                    debounceTime: 400,
+                  ),
+                  onPredictionWithCoordinatesReceived: (prediction) {
+                    if (prediction.lat != null && prediction.lng != null) {
+                      setState(() {
+                        selectedPosition = Position(
+                          latitude: double.parse(prediction.lat.toString()),
+                          longitude: double.parse(prediction.lng.toString()),
+                          timestamp: DateTime.now(),
+                          accuracy: 0.0,
+                          altitude: 0.0,
+                          altitudeAccuracy: 0.0,
+                          heading: 0.0,
+                          headingAccuracy: 0.0,
+                          speed: 0.0,
+                          speedAccuracy: 0.0,
+                        );
+                        selectedCityName = prediction.description ?? '';
+                      });
+                    }
+                  },
+                  onSuggestionClicked: (prediction) {
+                    final description = prediction.description ?? '';
+                    widget.controller.text = description;
+                    widget.controller.selection = TextSelection.fromPosition(
+                      TextPosition(offset: description.length),
+                    );
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Search for a stopover city...',
+                    hintStyle: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 14,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                    suffixIcon: widget.controller.text.isNotEmpty
+                        ? IconButton(
+                      icon: Icon(Icons.clear, color: Colors.grey[600]),
+                      onPressed: () {
+                        setState(() {
+                          widget.controller.clear();
+                          selectedPosition = null;
+                          selectedCityName = null;
+                        });
+                      },
+                    )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                ),
+
+                // Show selected location info
+                if (selectedPosition != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.green[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Location selected',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Lat: ${selectedPosition!.latitude.toStringAsFixed(6)}, Lng: ${selectedPosition!.longitude.toStringAsFixed(6)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 20),
+
+                // Add button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: selectedPosition != null
+                        ? () {
+                      widget.onAdd(
+                        selectedCityName ?? widget.controller.text,
+                        selectedPosition!.latitude,
+                        selectedPosition!.longitude,
+                      );
+                    }
+                        : null,
+                    icon: const Icon(Icons.add_location_alt, size: 20),
+                    label: const Text(
+                      'Add Stopover',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey[300],
+                      disabledForegroundColor: Colors.grey[600],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: selectedPosition != null ? 2 : 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }

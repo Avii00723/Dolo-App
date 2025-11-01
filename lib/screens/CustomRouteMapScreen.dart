@@ -2,10 +2,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import '../Constants/colorconstant.dart';
 import '../Constants/ApiConstants.dart';
-import 'RouteMapViewScreen.dart';
 
 class CustomRouteMapScreen extends StatefulWidget {
   final String originCity;
@@ -14,6 +14,7 @@ class CustomRouteMapScreen extends StatefulWidget {
   final double? originLongitude;
   final double? destinationLatitude;
   final double? destinationLongitude;
+  final List<Map<String, dynamic>>? stopovers; // Accept stopovers
 
   const CustomRouteMapScreen({
     Key? key,
@@ -23,6 +24,7 @@ class CustomRouteMapScreen extends StatefulWidget {
     this.originLongitude,
     this.destinationLatitude,
     this.destinationLongitude,
+    this.stopovers, // Optional stopovers parameter
   }) : super(key: key);
 
   @override
@@ -67,9 +69,15 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
   int _selectedRouteIndex = 0;
   bool _isLoading = true;
   String? _errorMessage;
-  bool _isCardMinimized = false;
+  bool _isCardMinimized = true; // Start minimized
   late AnimationController _animationController;
   late Animation<double> _animation;
+  List<dynamic> _currentStopovers = []; // Store stopovers when navigating back from map
+
+  // Map related variables
+  GoogleMapController? _mapController;
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
 
   @override
   void initState() {
@@ -112,6 +120,10 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
           _isLoading = false;
         });
         _animationController.forward();
+
+        // Create markers and draw route after loading
+        _createMarkers();
+        _drawSelectedRoute();
       }
     } catch (e) {
       print('❌ Error initializing route: $e');
@@ -124,7 +136,18 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
 
   Future<void> _fetchRouteDetails() async {
     try {
-      print('🗺️  Fetching alternative routes from Google Directions API...');
+      // Build waypoints string if stopovers are present
+      String waypointsParam = '';
+      if (widget.stopovers != null && widget.stopovers!.isNotEmpty) {
+        final waypointsString = widget.stopovers!
+            .map((s) => '${s['latitude']},${s['longitude']}')
+            .join('|');
+        waypointsParam = '&waypoints=$waypointsString';
+        print('🗺️  Fetching routes with ${widget.stopovers!.length} stopovers...');
+        print('📍 Waypoints: $waypointsString');
+      } else {
+        print('🗺️  Fetching alternative routes from Google Directions API...');
+      }
 
       // Fetch multiple route options by making separate API calls
       final routeRequests = [
@@ -133,34 +156,37 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
           'url': Uri.parse(
             'https://maps.googleapis.com/maps/api/directions/json?'
             'origin=${widget.originLatitude},${widget.originLongitude}&'
-            'destination=${widget.destinationLatitude},${widget.destinationLongitude}&'
+            'destination=${widget.destinationLatitude},${widget.destinationLongitude}'
+            '$waypointsParam&'
             'alternatives=true&'
             'key=${ApiConstants.googleMapsApiKey}',
           ),
           'label': 'default routes'
         },
-        // 2. Avoid tolls
-        {
-          'url': Uri.parse(
-            'https://maps.googleapis.com/maps/api/directions/json?'
-            'origin=${widget.originLatitude},${widget.originLongitude}&'
-            'destination=${widget.destinationLatitude},${widget.destinationLongitude}&'
-            'avoid=tolls&'
-            'key=${ApiConstants.googleMapsApiKey}',
-          ),
-          'label': 'avoiding tolls'
-        },
-        // 3. Avoid highways
-        {
-          'url': Uri.parse(
-            'https://maps.googleapis.com/maps/api/directions/json?'
-            'origin=${widget.originLatitude},${widget.originLongitude}&'
-            'destination=${widget.destinationLatitude},${widget.destinationLongitude}&'
-            'avoid=highways&'
-            'key=${ApiConstants.googleMapsApiKey}',
-          ),
-          'label': 'avoiding highways'
-        },
+        // 2. Avoid tolls (only if no stopovers, as waypoints override avoid params)
+        if (widget.stopovers == null || widget.stopovers!.isEmpty)
+          {
+            'url': Uri.parse(
+              'https://maps.googleapis.com/maps/api/directions/json?'
+              'origin=${widget.originLatitude},${widget.originLongitude}&'
+              'destination=${widget.destinationLatitude},${widget.destinationLongitude}&'
+              'avoid=tolls&'
+              'key=${ApiConstants.googleMapsApiKey}',
+            ),
+            'label': 'avoiding tolls'
+          },
+        // 3. Avoid highways (only if no stopovers)
+        if (widget.stopovers == null || widget.stopovers!.isEmpty)
+          {
+            'url': Uri.parse(
+              'https://maps.googleapis.com/maps/api/directions/json?'
+              'origin=${widget.originLatitude},${widget.originLongitude}&'
+              'destination=${widget.destinationLatitude},${widget.destinationLongitude}&'
+              'avoid=highways&'
+              'key=${ApiConstants.googleMapsApiKey}',
+            ),
+            'label': 'avoiding highways'
+          },
       ];
 
       Set<String> uniqueRouteSummaries = {};
@@ -179,7 +205,6 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
 
               // Process all routes from this request
               for (var route in data['routes']) {
-                final leg = route['legs'][0];
                 final summary = route['summary'] ?? 'via ${widget.originCity}';
 
                 // Skip duplicate routes based on summary
@@ -188,22 +213,62 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
                 }
                 uniqueRouteSummaries.add(summary);
 
-                // Extract distance and duration
-                final distance = leg['distance']['text'];
-                final duration = leg['duration']['text'];
+                // Calculate total distance and duration across all legs (for routes with stopovers)
+                String totalDistance;
+                String totalDuration;
+                List<dynamic> allSteps = [];
+
+                if (route['legs'] != null && route['legs'].isNotEmpty) {
+                  int totalDistanceMeters = 0;
+                  int totalDurationSeconds = 0;
+
+                  // Sum up distance and duration from all legs
+                  for (var leg in route['legs']) {
+                    if (leg['distance'] != null && leg['distance']['value'] != null) {
+                      totalDistanceMeters += (leg['distance']['value'] as num).toInt();
+                    }
+                    if (leg['duration'] != null && leg['duration']['value'] != null) {
+                      totalDurationSeconds += (leg['duration']['value'] as num).toInt();
+                    }
+                    if (leg['steps'] != null) {
+                      allSteps.addAll(leg['steps']);
+                    }
+                  }
+
+                  // Format distance
+                  if (totalDistanceMeters >= 1000) {
+                    totalDistance = '${(totalDistanceMeters / 1000).toStringAsFixed(1)} km';
+                  } else {
+                    totalDistance = '$totalDistanceMeters m';
+                  }
+
+                  // Format duration
+                  int hours = totalDurationSeconds ~/ 3600;
+                  int minutes = (totalDurationSeconds % 3600) ~/ 60;
+                  if (hours > 0) {
+                    totalDuration = '$hours hour $minutes mins';
+                  } else {
+                    totalDuration = '$minutes mins';
+                  }
+                } else {
+                  totalDistance = 'Unknown';
+                  totalDuration = 'Unknown';
+                }
 
                 // Extract cities along this route
-                final cities = await _extractCitiesAlongRoute(leg['steps']);
+                // COMMENTED OUT: City detection not needed for basic route display
+                // final cities = await _extractCitiesAlongRoute(allSteps);
+                final cities = <CityWaypoint>[]; // Empty list - no intermediate cities
 
                 _availableRoutes.add(RouteInfo(
                   cities: cities,
-                  distance: distance,
-                  duration: duration,
+                  distance: totalDistance,
+                  duration: totalDuration,
                   summary: summary,
-                  steps: leg['steps'],
+                  steps: allSteps,
                 ));
 
-                print('   ✓ Route ${_availableRoutes.length}: $distance, $duration - $summary');
+                print('   ✓ Route ${_availableRoutes.length}: $totalDistance, $totalDuration - $summary');
               }
             }
           }
@@ -224,6 +289,159 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
     }
   }
 
+  void _createMarkers() {
+    Set<Marker> markers = {};
+
+    // Origin marker (green)
+    markers.add(
+      Marker(
+        markerId: MarkerId('origin'),
+        position: LatLng(widget.originLatitude!, widget.originLongitude!),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: InfoWindow(
+          title: widget.originCity,
+          snippet: 'Pickup Location',
+        ),
+      ),
+    );
+
+    // Destination marker (red)
+    markers.add(
+      Marker(
+        markerId: MarkerId('destination'),
+        position: LatLng(widget.destinationLatitude!, widget.destinationLongitude!),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        infoWindow: InfoWindow(
+          title: widget.destinationCity,
+          snippet: 'Delivery Location',
+        ),
+      ),
+    );
+
+    // Add stopover markers if any
+    if (widget.stopovers != null && widget.stopovers!.isNotEmpty) {
+      for (int i = 0; i < widget.stopovers!.length; i++) {
+        final stopover = widget.stopovers![i];
+        markers.add(
+          Marker(
+            markerId: MarkerId('stopover_$i'),
+            position: LatLng(stopover['latitude'], stopover['longitude']),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+            infoWindow: InfoWindow(
+              title: stopover['city'],
+              snippet: 'Stopover ${i + 1}',
+            ),
+          ),
+        );
+      }
+      print('✅ Created ${widget.stopovers!.length} stopover markers');
+    }
+
+    setState(() {
+      _markers = markers;
+    });
+  }
+
+  void _drawSelectedRoute() {
+    if (_availableRoutes.isEmpty) return;
+
+    final selectedRoute = _availableRoutes[_selectedRouteIndex];
+    final polylinePoints = _decodePolyline(selectedRoute.steps);
+
+    setState(() {
+      _polylines.clear();
+      _polylines.add(
+        Polyline(
+          polylineId: PolylineId('route_$_selectedRouteIndex'),
+          points: polylinePoints,
+          color: AppColors.primary,
+          width: 6,
+          geodesic: true,
+          startCap: Cap.roundCap,
+          endCap: Cap.roundCap,
+        ),
+      );
+    });
+
+    _fitMapToRoute();
+  }
+
+  List<LatLng> _decodePolyline(List<dynamic> steps) {
+    List<LatLng> points = [];
+
+    for (var step in steps) {
+      if (step['polyline'] != null && step['polyline']['points'] != null) {
+        final encoded = step['polyline']['points'];
+        points.addAll(_decodePolylineString(encoded));
+      }
+    }
+
+    return points;
+  }
+
+  List<LatLng> _decodePolylineString(String encoded) {
+    List<LatLng> points = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      points.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+
+    return points;
+  }
+
+  void _fitMapToRoute() {
+    if (_markers.isEmpty || _mapController == null) return;
+
+    final positions = _markers.map((m) => m.position).toList();
+
+    if (positions.isEmpty) return;
+
+    double minLat = positions[0].latitude;
+    double maxLat = positions[0].latitude;
+    double minLng = positions[0].longitude;
+    double maxLng = positions[0].longitude;
+
+    for (var pos in positions) {
+      if (pos.latitude < minLat) minLat = pos.latitude;
+      if (pos.latitude > maxLat) maxLat = pos.latitude;
+      if (pos.longitude < minLng) minLng = pos.longitude;
+      if (pos.longitude > maxLng) maxLng = pos.longitude;
+    }
+
+    final bounds = LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
+
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 100),
+    );
+  }
+
+  // COMMENTED OUT: City extraction logic not needed for basic route display
+  // Users can add stopovers manually instead
+  /*
   Future<List<CityWaypoint>> _extractCitiesAlongRoute(List<dynamic> steps) async {
     Map<String, CityWaypoint> citiesMap = {};
 
@@ -409,25 +627,63 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
       return null;
     }
   }
+  */
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Header
+            // Google Map as background
+            _isLoading
+                ? _buildLoadingState()
+                : _errorMessage != null
+                    ? _buildErrorState()
+                    : GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: LatLng(
+                            widget.originLatitude ?? 0,
+                            widget.originLongitude ?? 0,
+                          ),
+                          zoom: 6,
+                        ),
+                        markers: _markers,
+                        polylines: _polylines,
+                        onMapCreated: (controller) {
+                          _mapController = controller;
+                          _fitMapToRoute();
+                        },
+                        myLocationButtonEnabled: true,
+                        zoomControlsEnabled: true,
+                        mapToolbarEnabled: false,
+                        compassEnabled: true,
+                      ),
+
+            // Header with back button
             _buildHeader(),
 
-            // Content
-            Expanded(
-              child: _isLoading
-                  ? _buildLoadingState()
-                  : _errorMessage != null
-                      ? _buildErrorState()
-                      : _buildRouteContent(),
-            ),
+            // Floating Routes Card at bottom
+            if (!_isLoading && _errorMessage == null)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: _buildFloatingRoutesCard(),
+              ),
+
+            // Add Stopover Button - COMMENTED OUT
+            // if (!_isLoading && _errorMessage == null)
+            //   Positioned(
+            //     right: 16,
+            //     bottom: _isCardMinimized ? 140 : 400,
+            //     child: FloatingActionButton(
+            //       onPressed: _showAddStopoverDialog,
+            //       backgroundColor: AppColors.primary,
+            //       child: Icon(Icons.add_location_alt, color: Colors.white),
+            //       tooltip: 'Add Stopover',
+            //     ),
+            //   ),
           ],
         ),
       ),
@@ -435,114 +691,489 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: EdgeInsets.all(16),
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.white,
+              Colors.white.withOpacity(0.9),
+              Colors.white.withOpacity(0.7),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Route Map',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '${widget.originCity} → ${widget.destinationCity}',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingRoutesCard() {
+    if (_availableRoutes.isEmpty) return SizedBox.shrink();
+
+    final selectedRoute = _availableRoutes[_selectedRouteIndex];
+
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 2),
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 20,
+            offset: Offset(0, -4),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 44,
-              height: 44,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Minimize/Maximize Handle
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isCardMinimized = !_isCardMinimized;
+                });
+              },
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.05),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Icon(
+                      _isCardMinimized ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Route Summary - Always visible
+            Container(
+              padding: EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withOpacity(0.1),
+                    AppColors.primary.withOpacity(0.05)
+                  ],
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      // Distance
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.straighten, color: AppColors.primary, size: 18),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Distance',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              selectedRoute.distance,
+                              style: TextStyle(
+                                color: Colors.black87,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: Colors.grey[300],
+                      ),
+                      // Duration
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                SizedBox(width: 16),
+                                Icon(Icons.access_time, color: AppColors.primary, size: 18),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Duration',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 6),
+                            Padding(
+                              padding: EdgeInsets.only(left: 16),
+                              child: Text(
+                                selectedRoute.duration,
+                                style: TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Stopovers indicator
+                  if (widget.stopovers != null && widget.stopovers!.isNotEmpty) ...[
+                    SizedBox(height: 16),
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_location_alt, color: Colors.orange, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Route includes ${widget.stopovers!.length} stopover${widget.stopovers!.length > 1 ? 's' : ''}',
+                            style: TextStyle(
+                              color: Colors.orange[800],
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Expandable content
+            if (!_isCardMinimized) ...[
+              // Route options selector (if multiple routes)
+              if (_availableRoutes.length > 1)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: _buildRouteOptionsSelector(),
+                ),
+
+              // Route Summary
+              if (selectedRoute.summary.isNotEmpty)
+                Container(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.route, color: AppColors.primary, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Route:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        selectedRoute.summary,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Select Route Button
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: _buildSelectRouteButton(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // STOPOVER FUNCTIONALITY - COMMENTED OUT
+  /*
+  void _showAddStopoverDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _AddStopoverSheet(
+        onStopoverAdded: (stopoverData) {
+          setState(() {
+            _currentStopovers.add(stopoverData);
+            _createMarkers();
+          });
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Stopover added: ${stopoverData['name']}'),
                   ),
                 ],
               ),
-              child: Icon(
-                Icons.arrow_back,
-                color: Colors.white,
-                size: 24,
-              ),
+              backgroundColor: Colors.green[700],
+              duration: Duration(seconds: 2),
             ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Route Preview',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  '${widget.originCity} → ${widget.destinationCity}',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
+          );
+
+          // Refetch routes with stopovers
+          _refetchRoutesWithStopovers();
+        },
+        existingStopovers: _currentStopovers,
       ),
     );
   }
 
-  Widget _buildRouteContent() {
-    if (_availableRoutes.isEmpty) {
-      return Center(child: Text('No routes available'));
+  Future<void> _refetchRoutesWithStopovers() async {
+    if (_currentStopovers.isEmpty) {
+      // If no stopovers, just fetch normal routes
+      await _fetchRouteDetails();
+      return;
     }
 
-    return SingleChildScrollView(
-      physics: BouncingScrollPhysics(),
-      padding: EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Route options selector (if multiple routes)
-          if (_availableRoutes.length > 1) ...[
-            _buildRouteOptionsSelector(),
-            SizedBox(height: 16),
-          ],
+    try {
+      setState(() {
+        _isLoading = true;
+      });
 
-          // Distance & Duration Card
-          _buildStatsCard(),
+      // Build waypoints string for Google Directions API
+      final waypointsString = _currentStopovers
+          .map((s) => '${s['latitude']},${s['longitude']}')
+          .join('|');
 
-          SizedBox(height: 16),
+      print('🗺️  Fetching routes with ${_currentStopovers.length} stopovers...');
+      print('📍 Waypoints: $waypointsString');
 
-          // Visual Route Card
-          _buildVisualRouteCard(),
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/directions/json?'
+        'origin=${widget.originLatitude},${widget.originLongitude}&'
+        'destination=${widget.destinationLatitude},${widget.destinationLongitude}&'
+        'waypoints=$waypointsString&'
+        'alternatives=true&'
+        'key=${ApiConstants.googleMapsApiKey}',
+      );
 
-          SizedBox(height: 16),
+      final response = await http.get(url);
 
-          // Select Route Button
-          _buildSelectRouteButton(),
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
 
-          SizedBox(height: 12),
+        if (data['status'] == 'OK' && data['routes'] != null && data['routes'].isNotEmpty) {
+          _availableRoutes.clear();
+          Set<String> uniqueRouteSummaries = {};
 
-          // View in Map Button
-          _buildViewInMapButton(),
+          for (var route in data['routes']) {
+            if (route['legs'] != null && route['legs'].isNotEmpty) {
+              final summary = route['summary'] ?? 'Route ${_availableRoutes.length + 1}';
 
-          SizedBox(height: 20),
-        ],
-      ),
-    );
+              if (!uniqueRouteSummaries.contains(summary)) {
+                uniqueRouteSummaries.add(summary);
+
+                // Calculate total distance and duration across all legs (for multiple stopovers)
+                int totalDistanceMeters = 0;
+                int totalDurationSeconds = 0;
+                List<dynamic> allSteps = [];
+
+                for (var leg in route['legs']) {
+                  if (leg['distance'] != null && leg['distance']['value'] != null) {
+                    totalDistanceMeters += (leg['distance']['value'] as num).toInt();
+                  }
+                  if (leg['duration'] != null && leg['duration']['value'] != null) {
+                    totalDurationSeconds += (leg['duration']['value'] as num).toInt();
+                  }
+                  if (leg['steps'] != null) {
+                    allSteps.addAll(leg['steps']);
+                  }
+                }
+
+                // Format distance
+                String totalDistance;
+                if (totalDistanceMeters >= 1000) {
+                  totalDistance = '${(totalDistanceMeters / 1000).toStringAsFixed(1)} km';
+                } else {
+                  totalDistance = '$totalDistanceMeters m';
+                }
+
+                // Format duration
+                String totalDuration;
+                int hours = totalDurationSeconds ~/ 3600;
+                int minutes = (totalDurationSeconds % 3600) ~/ 60;
+                if (hours > 0) {
+                  totalDuration = '$hours hour ${minutes} mins';
+                } else {
+                  totalDuration = '$minutes mins';
+                }
+
+                print('📏 Total distance: $totalDistance (${route['legs'].length} legs)');
+                print('⏱️ Total duration: $totalDuration');
+
+                _availableRoutes.add(RouteInfo(
+                  cities: <CityWaypoint>[],
+                  distance: totalDistance,
+                  duration: totalDuration,
+                  summary: summary,
+                  steps: allSteps,
+                ));
+              }
+            }
+          }
+
+          print('✅ Found ${_availableRoutes.length} routes with stopovers');
+
+          setState(() {
+            _isLoading = false;
+            _selectedRouteIndex = 0;
+          });
+
+          _drawSelectedRoute();
+        } else {
+          print('⚠️ No routes found with stopovers');
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error refetching routes with stopovers: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
+  */
+  // END OF STOPOVER FUNCTIONALITY
 
   Widget _buildStatsCard() {
     final selectedRoute = _availableRoutes[_selectedRouteIndex];
@@ -1138,47 +1769,6 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
     );
   }
 
-  Widget _buildViewInMapButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () {
-          final selectedRoute = _availableRoutes[_selectedRouteIndex];
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RouteMapViewScreen(
-                originCity: widget.originCity,
-                destinationCity: widget.destinationCity,
-                originLatitude: widget.originLatitude,
-                originLongitude: widget.originLongitude,
-                destinationLatitude: widget.destinationLatitude,
-                destinationLongitude: widget.destinationLongitude,
-                routeInfo: selectedRoute,
-              ),
-            ),
-          );
-        },
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          padding: EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          side: BorderSide(color: AppColors.primary, width: 2),
-        ),
-        icon: Icon(Icons.map, size: 20),
-        label: Text(
-          'View in Map',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildRouteOptionsSelector() {
     return Container(
@@ -1242,6 +1832,8 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
           _animationController.reset();
           _animationController.forward();
         });
+        // Redraw route on map when selection changes
+        _drawSelectedRoute();
       },
       child: Container(
         margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1452,3 +2044,324 @@ class _CustomRouteMapScreenState extends State<CustomRouteMapScreen>
     );
   }
 }
+
+// Add Stopover Bottom Sheet Widget - COMMENTED OUT
+/*
+class _AddStopoverSheet extends StatefulWidget {
+  final Function(Map<String, dynamic>) onStopoverAdded;
+  final List<dynamic> existingStopovers;
+
+  const _AddStopoverSheet({
+    required this.onStopoverAdded,
+    required this.existingStopovers,
+  });
+
+  @override
+  State<_AddStopoverSheet> createState() => _AddStopoverSheetState();
+}
+
+class _AddStopoverSheetState extends State<_AddStopoverSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  List<dynamic> _searchResults = [];
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _searchPlaces(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?'
+        'input=$query&'
+        'key=${ApiConstants.googleMapsApiKey}',
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK') {
+          setState(() {
+            _searchResults = data['predictions'];
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error searching places: $e');
+    } finally {
+      setState(() {
+        _isSearching = false;
+      });
+    }
+  }
+
+  Future<void> _selectPlace(String placeId, String description) async {
+    try {
+      // Get place details to get coordinates
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/details/json?'
+        'place_id=$placeId&'
+        'fields=geometry&'
+        'key=${ApiConstants.googleMapsApiKey}',
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK') {
+          final location = data['result']['geometry']['location'];
+          final stopoverData = {
+            'name': description,
+            'latitude': location['lat'],
+            'longitude': location['lng'],
+          };
+
+          widget.onStopoverAdded(stopoverData);
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      print('❌ Error getting place details: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Header
+          Padding(
+            padding: EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Icon(Icons.add_location_alt, color: AppColors.primary, size: 28),
+                SizedBox(width: 12),
+                Text(
+                  'Add Stopover',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+
+          // Search bar
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search for a place...',
+                prefixIcon: Icon(Icons.search),
+                suffixIcon: _isSearching
+                    ? Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                ),
+              ),
+              onChanged: (value) {
+                _searchPlaces(value);
+              },
+            ),
+          ),
+
+          SizedBox(height: 16),
+
+          // Existing stopovers
+          if (widget.existingStopovers.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Current Stopovers (${widget.existingStopovers.length})',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 8),
+            Container(
+              height: 80,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                itemCount: widget.existingStopovers.length,
+                itemBuilder: (context, index) {
+                  final stopover = widget.existingStopovers[index];
+                  return Container(
+                    margin: EdgeInsets.only(right: 12),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange[200]!),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.location_on, color: Colors.orange, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              'Stop ${index + 1}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        SizedBox(
+                          width: 150,
+                          child: Text(
+                            stopover['name'],
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 16),
+          ],
+
+          // Search results
+          Expanded(
+            child: _searchResults.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search, size: 64, color: Colors.grey[300]),
+                        SizedBox(height: 16),
+                        Text(
+                          'Search for a place to add as stopover',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final result = _searchResults[index];
+                      return ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.place,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          result['structured_formatting']['main_text'],
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          result['structured_formatting']['secondary_text'] ?? '',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        onTap: () {
+                          _selectPlace(
+                            result['place_id'],
+                            result['description'],
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+*/
+// END OF STOPOVER BOTTOM SHEET WIDGET

@@ -12,8 +12,9 @@ class Order {
   final double destinationLatitude;
   final double destinationLongitude;
   final String deliveryDate;
-  final double weight;
-  final int expectedPrice;
+  final String? deliveryTime; // Delivery time (HH:mm:ss format)
+  final String weight; // Weight as string: "less than 5kg", "5-10kg", "more than 10kg"
+  final int? expectedPrice; // Optional, not always returned by API
   final String imageUrl;
   final String specialInstructions;
   final String status;
@@ -23,6 +24,8 @@ class Order {
   final double? calculatedPrice;
   final String? createdAt;
   final String transportMode;
+  final List<String>? preferenceTransport; // Preferred transport modes
+  final bool? isUrgent; // Urgent delivery flag
 
   Order({
     required this.id,
@@ -35,8 +38,9 @@ class Order {
     required this.destinationLatitude,
     required this.destinationLongitude,
     required this.deliveryDate,
+    this.deliveryTime,
     required this.weight,
-    required this.expectedPrice,
+    this.expectedPrice,
     required this.imageUrl,
     required this.specialInstructions,
     required this.status,
@@ -46,11 +50,33 @@ class Order {
     this.calculatedPrice,
     this.createdAt,
     this.transportMode = 'Car',
+    this.preferenceTransport,
+    this.isUrgent,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
+    // Parse preference_transport (can be array or single string)
+    List<String>? preferenceTransport;
+    if (json['preference_transport'] != null) {
+      if (json['preference_transport'] is String) {
+        preferenceTransport = [json['preference_transport'] as String];
+      } else if (json['preference_transport'] is List) {
+        preferenceTransport = List<String>.from(json['preference_transport']);
+      }
+    }
+
+    // Parse is_urgent (can be int 0/1 or boolean)
+    bool? isUrgent;
+    if (json['is_urgent'] != null) {
+      if (json['is_urgent'] is bool) {
+        isUrgent = json['is_urgent'] as bool;
+      } else if (json['is_urgent'] is int) {
+        isUrgent = json['is_urgent'] == 1;
+      }
+    }
+
     return Order(
-      id: json['id']?.toString() ?? '',
+      id: json['hashed_id']?.toString() ?? json['id']?.toString() ?? '',
       userName: json['user_name'] ?? '',
       itemDescription: json['item_description'] ?? 'Package',
       origin: json['origin'] ?? '',
@@ -60,8 +86,9 @@ class Order {
       destinationLatitude: _parseDouble(json['destination_latitude']),
       destinationLongitude: _parseDouble(json['destination_longitude']),
       deliveryDate: json['delivery_date'] ?? '',
-      weight: _parseDouble(json['weight']),
-      expectedPrice: _parseInt(json['expected_price']),
+      deliveryTime: json['delivery_time'],
+      weight: json['weight']?.toString() ?? '0kg',
+      expectedPrice: json['expected_price'] != null ? _parseInt(json['expected_price']) : null,
       imageUrl: json['image_url'] ?? '',
       specialInstructions: json['special_instructions'] ?? '',
       status: json['status'] ?? '',
@@ -71,6 +98,8 @@ class Order {
       calculatedPrice: json['calculated_price'] != null ? _parseDouble(json['calculated_price']) : null,
       createdAt: json['created_at'],
       transportMode: json['transport_mode'] ?? 'Car',
+      preferenceTransport: preferenceTransport,
+      isUrgent: isUrgent,
     );
   }
 
@@ -102,6 +131,7 @@ class Order {
       'destination_latitude': destinationLatitude,
       'destination_longitude': destinationLongitude,
       'delivery_date': deliveryDate,
+      'delivery_time': deliveryTime,
       'weight': weight,
       'expected_price': expectedPrice,
       'image_url': imageUrl,
@@ -113,6 +143,8 @@ class Order {
       'calculated_price': calculatedPrice,
       'created_at': createdAt,
       'transport_mode': transportMode,
+      'preference_transport': preferenceTransport,
+      'is_urgent': isUrgent,
     };
   }
 }
@@ -252,9 +284,13 @@ class OrderCreateRequest {
   final double destinationLatitude;
   final double destinationLongitude;
   final String deliveryDate;
-  final double weight;
-  final String category; // API category value (technology, documents, etc.)
-  final String subcategory; // API subcategory value (Electronics, Furniture, etc.)
+  final String deliveryTime; // Required time field (HH:mm:ss format)
+  final String weight; // String value: "less than 5kg", "5-10kg", "more than 10kg"
+  final double? actualWeight; // Required only if weight is "more than 10kg"
+  final String category; // API category value (fragile, technology, documents, food, clothing, other)
+  final String? customCategory; // Required only if category is "other"
+  final List<String>? preferenceTransport; // Optional: User's preferred transport modes (Car, Bike, Truck, etc.)
+  final bool isUrgent; // If true, order is urgent. Default false
   final List<File> images;
   final String? specialInstructions;
 
@@ -267,9 +303,13 @@ class OrderCreateRequest {
     required this.destinationLatitude,
     required this.destinationLongitude,
     required this.deliveryDate,
+    required this.deliveryTime,
     required this.weight,
+    this.actualWeight,
     required this.category,
-    required this.subcategory,
+    this.customCategory,
+    this.preferenceTransport,
+    this.isUrgent = false,
     this.images = const [],
     this.specialInstructions,
   });
@@ -284,13 +324,29 @@ class OrderCreateRequest {
       'destination_latitude': destinationLatitude,
       'destination_longitude': destinationLongitude,
       'delivery_date': deliveryDate,
+      'delivery_time': deliveryTime,
       'weight': weight,
       'category': category,
-      'subcategory': subcategory,
+      'is_urgent': isUrgent,
     };
 
+    // Add actual_weight if weight is "more than 10kg"
+    if (actualWeight != null) {
+      map['actual_weight'] = actualWeight!;
+    }
+
+    // Add customCategory if category is "other"
+    if (customCategory != null && customCategory!.isNotEmpty) {
+      map['customCategory'] = customCategory!;
+    }
+
+    // Add preference_transport if provided
+    if (preferenceTransport != null && preferenceTransport!.isNotEmpty) {
+      map['preference_transport'] = preferenceTransport!;
+    }
+
     if (specialInstructions != null && specialInstructions!.isNotEmpty) {
-      map['special_instructions'] = specialInstructions as Object;
+      map['special_instructions'] = specialInstructions!;
     }
 
     print('📤 Request JSON: $map');

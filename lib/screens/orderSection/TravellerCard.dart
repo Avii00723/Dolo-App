@@ -169,9 +169,9 @@ class ModernTravellerOrderCard extends StatelessWidget {
                     child: Row(
                       children: [
                         _buildCompactChip(Icons.calendar_today, _formatDate(order.date)),
-                        if (order.weight > 0) ...[
+                        if (order.weight.isNotEmpty && order.weight != '0kg') ...[
                           const SizedBox(width: 8),
-                          _buildCompactChip(Icons.scale, '${order.weight} kg'),
+                          _buildCompactChip(Icons.scale, order.weight),
                         ],
                         if (order.expectedPrice != null) ...[
                           const SizedBox(width: 8),
@@ -586,12 +586,12 @@ class ModernTravellerOrderCard extends StatelessWidget {
                               'Item Description',
                               order.itemDescription,
                             ),
-                            if (order.weight > 0) ...[
+                            if (order.weight.isNotEmpty && order.weight != '0kg') ...[
                               const Divider(height: 24),
                               _buildDetailRow(
                                 Icons.scale_outlined,
                                 'Weight',
-                                '${order.weight} kg',
+                                order.weight,
                               ),
                             ],
                             if (order.expectedPrice != null) ...[

@@ -29,9 +29,28 @@ class OrderService {
       request.fields['destination_latitude'] = order.destinationLatitude.toString();
       request.fields['destination_longitude'] = order.destinationLongitude.toString();
       request.fields['delivery_date'] = order.deliveryDate;
-      request.fields['weight'] = order.weight.toString();
-      request.fields['category'] = order.category; // ✅ Separate category field
-      request.fields['subcategory'] = order.subcategory; // ✅ Separate subcategory field
+      request.fields['delivery_time'] = order.deliveryTime; // Required time field
+      request.fields['weight'] = order.weight; // String value now
+      request.fields['category'] = order.category; // fragile, technology, documents, food, clothing, other
+      request.fields['is_urgent'] = order.isUrgent.toString(); // Urgent flag
+
+      // Add actual_weight if weight is "more than 10kg"
+      if (order.actualWeight != null) {
+        request.fields['actual_weight'] = order.actualWeight.toString();
+      }
+
+      // Add customCategory if category is "other"
+      if (order.customCategory != null && order.customCategory!.isNotEmpty) {
+        request.fields['customCategory'] = order.customCategory!;
+      }
+
+      // Add preference_transport if provided (array of strings)
+      if (order.preferenceTransport != null && order.preferenceTransport!.isNotEmpty) {
+        for (int i = 0; i < order.preferenceTransport!.length; i++) {
+          request.fields['preference_transport[$i]'] = order.preferenceTransport![i];
+        }
+        print('✅ Added ${order.preferenceTransport!.length} preferred transport modes');
+      }
 
       if (order.specialInstructions != null && order.specialInstructions!.isNotEmpty) {
         request.fields['special_instructions'] = order.specialInstructions!;
@@ -199,6 +218,7 @@ class OrderService {
     required String origin,
     required String destination,
     required String deliveryDate,
+    required String deliveryTime, // Required delivery time parameter
     required double originLatitude,
     required double originLongitude,
     required String vehicle,
@@ -211,6 +231,7 @@ class OrderService {
     print(' - origin: $origin');
     print(' - destination: $destination');
     print(' - delivery_date: $deliveryDate');
+    print(' - delivery_time: $deliveryTime');
     print(' - origin_latitude: $originLatitude');
     print(' - origin_longitude: $originLongitude');
     print(' - vehicle: $vehicle');
@@ -218,18 +239,22 @@ class OrderService {
     print(' - userId: $userId');
 
     try {
+      // Build query parameters
+      final queryParams = {
+        'origin': origin,
+        'destination': destination,
+        'delivery_date': deliveryDate,
+        'delivery_time': deliveryTime,
+        'origin_latitude': originLatitude.toString(),
+        'origin_longitude': originLongitude.toString(),
+        'vehicle': vehicle,
+        'time_hours': timeHours.toString(),
+        'userId': userId,
+      };
+
       final response = await _api.get(
         ApiConstants.searchOrders,
-        queryParameters: {
-          'origin': origin,
-          'destination': destination,
-          'delivery_date': deliveryDate,
-          'origin_latitude': originLatitude.toString(),
-          'origin_longitude': originLongitude.toString(),
-          'vehicle': vehicle,
-          'time_hours': timeHours.toString(),
-          'userId': userId,
-        },
+        queryParameters: queryParams,
         parser: (json) {
           print('Raw JSON Response: $json');
           if (json['orders'] is List) {

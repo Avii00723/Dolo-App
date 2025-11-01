@@ -6,7 +6,11 @@
       "Read(//e/Dolo (3)/**)",
       "Bash(ls:*)",
       "Bash(flutter pub get:*)",
-      "Bash(flutter build:*)"
+      "Bash(flutter build:*)",
+      "Bash(wc:*)",
+      "Bash(flutter run:*)",
+      "Bash(tail:*)",
+      "Bash(flutter clean:*)"
     ],
     "deny": [],
     "ask": []

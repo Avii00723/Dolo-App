@@ -20,8 +20,9 @@ class OrderDisplay {
   final String origin;
   final String destination;
   final String date;
+  final String? deliveryTime; // Delivery time (HH:mm:ss)
   final String itemDescription;
-  final double weight;
+  final String weight; // Weight as string: "less than 5kg", "5-10kg", "more than 10kg"
   final String status;
   final String? profileImageUrl;
   final String? matchedTravellerId;
@@ -35,7 +36,11 @@ class OrderDisplay {
   final String? requestStatus;
   final String? notes;
   final String? imageUrl;
-  final String? tripRequestId; // ✅ ADD THIS LINE
+  final String? tripRequestId;
+  final String? category; // Item category (fragile, technology, documents, etc.)
+  final List<String>? preferenceTransport; // Preferred transport modes
+  final bool? isUrgent; // Urgent delivery flag
+  final String? createdAt; // Order creation timestamp
 
   OrderDisplay({
     required this.id,
@@ -45,6 +50,7 @@ class OrderDisplay {
     required this.origin,
     required this.destination,
     required this.date,
+    this.deliveryTime,
     required this.itemDescription,
     required this.weight,
     required this.status,
@@ -60,7 +66,11 @@ class OrderDisplay {
     this.requestStatus,
     this.notes,
     this.imageUrl,
-    this.tripRequestId, // ✅ ADD THIS LINE
+    this.tripRequestId,
+    this.category,
+    this.preferenceTransport,
+    this.isUrgent,
+    this.createdAt,
   });
 }
 
@@ -244,6 +254,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           origin: order.origin,
           destination: order.destination,
           date: order.deliveryDate,
+          deliveryTime: order.deliveryTime,
           itemDescription: order.itemDescription,
           weight: order.weight,
           status: order.status,
@@ -256,6 +267,10 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           expectedPrice: order.expectedPrice,
           notes: order.specialInstructions,
           imageUrl: "${ApiConstants.imagebaseUrl}${order.imageUrl}",
+          category: order.category,
+          preferenceTransport: order.preferenceTransport,
+          isUrgent: order.isUrgent,
+          createdAt: order.createdAt,
         ));
       }
 
@@ -360,7 +375,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           destination: request.destination,
           date: request.travelDate,
           itemDescription: 'Package delivery',
-          weight: 0.0,
+          weight: '0kg',
           status: request.status,
           orderType: 'receive',
           requestStatus: request.status,
@@ -853,7 +868,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         destinationLatitude: updatedOrder.destinationLatitude!,
         destinationLongitude: updatedOrder.destinationLongitude!,
         deliveryDate: _formatDateForApi(updatedOrder.date),
-        weight: updatedOrder.weight,
+        weight: double.tryParse(updatedOrder.weight) ?? 0.0,
         imageUrl: "${ApiConstants.imagebaseUrl}${updatedOrder.imageUrl}",
         specialInstructions: updatedOrder.notes,
       );

@@ -452,7 +452,7 @@ class CompactOrderCard extends StatelessWidget {
                       child: _buildInfoItem(
                         icon: Icons.scale,
                         label: 'Weight',
-                        value: '${order.weight.toStringAsFixed(1)} kg',
+                        value: order.weight,
                         color: Colors.orange,
                       ),
                     ),

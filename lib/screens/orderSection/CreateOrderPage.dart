@@ -30,8 +30,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   final TextEditingController originController = TextEditingController();
   final TextEditingController destinationController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
+  final TextEditingController timeController = TextEditingController(); // New time controller
   final TextEditingController weightController = TextEditingController();
+  final TextEditingController actualWeightController = TextEditingController(); // For "more than 10kg"
   final TextEditingController specialInstructionsController = TextEditingController();
+  final TextEditingController customCategoryController = TextEditingController(); // For "other" category
 
   Position? originPosition;
   Position? destinationPosition;
@@ -39,12 +42,27 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   OrderMainCategory? _selectedMainCategory;
   String? _selectedWeightRange;
 
+  // New fields for API
+  List<String> _selectedTransportModes = []; // preference_transport
+  bool _isUrgent = false; // is_urgent flag
+
   List<File> _selectedImages = [];
   final ImagePicker _picker = ImagePicker();
   bool _isCreatingOrder = false;
 
   String? userId;
   bool _isLoadingUser = true;
+
+  // Available transport modes
+  final List<String> _transportModes = [
+    'Car',
+    'Bike',
+    'Pickup Truck',
+    'Truck',
+    'Bus',
+    'Train',
+    'Plane',
+  ];
 
   @override
   void initState() {
@@ -86,8 +104,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     originController.dispose();
     destinationController.dispose();
     dateController.dispose();
+    timeController.dispose();
     weightController.dispose();
+    actualWeightController.dispose();
     specialInstructionsController.dispose();
+    customCategoryController.dispose();
     super.dispose();
   }
 
@@ -115,19 +136,19 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-  // Helper function to convert weight range to numeric value for API
-  double _getWeightFromRange(String range) {
+  // Helper function to convert weight range to API string format
+  String _getWeightStringForApi(String range) {
     switch (range) {
       case 'Below 2 kg':
-        return 1.0; // Representative value
+        return 'less than 5kg'; // API format
       case '2–5 kg':
-        return 3.5; // Middle of range
+        return '5-10kg'; // API format
       case '5–10 kg':
-        return 7.5; // Middle of range
+        return '5-10kg'; // API format
       case 'More than 10 kg':
-        return 15.0; // Representative value
+        return 'more than 10kg'; // API format
       default:
-        return 5.0; // Default fallback
+        return '5-10kg'; // Default fallback
     }
   }
 
@@ -170,6 +191,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           _showSnackBar('Please select a category', Colors.orange);
           return false;
         }
+        // Check if custom category is required and provided
+        if (_selectedMainCategory!.apiValue == 'other' && customCategoryController.text.trim().isEmpty) {
+          _showSnackBar('Please enter a custom category', Colors.orange);
+          return false;
+        }
         return true;
       case 5:
         return true;
@@ -200,6 +226,26 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       print('DEBUG: Weight Range: $_selectedWeightRange');
       print('DEBUG: Uploading ${_selectedImages.length} images');
 
+      // Get weight string for API
+      String weightString = _getWeightStringForApi(_selectedWeightRange!);
+
+      // Get actual weight if "more than 10kg"
+      double? actualWeight;
+      if (weightString == 'more than 10kg' && actualWeightController.text.trim().isNotEmpty) {
+        actualWeight = double.tryParse(actualWeightController.text.trim());
+      }
+
+      // Get custom category if category is "other"
+      String? customCategory;
+      if (apiCategory == 'other' && customCategoryController.text.trim().isNotEmpty) {
+        customCategory = customCategoryController.text.trim();
+      }
+
+      // Default time if not provided
+      String deliveryTime = timeController.text.trim().isEmpty
+          ? '12:00:00'
+          : timeController.text.trim();
+
       final orderRequest = OrderCreateRequest(
         userHashedId: userId!,
         origin: originController.text.trim(),
@@ -209,9 +255,13 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         destinationLatitude: destinationPosition!.latitude,
         destinationLongitude: destinationPosition!.longitude,
         deliveryDate: _formatDateForApi(dateController.text.trim()),
-        weight: _getWeightFromRange(_selectedWeightRange!),
-        category: apiCategory, // ✅ Sends API category value
-        subcategory: _selectedWeightRange!, // ✅ Use weight range as subcategory
+        deliveryTime: deliveryTime, // Required time field
+        weight: weightString, // String value: "less than 5kg", "5-10kg", "more than 10kg"
+        actualWeight: actualWeight, // Optional, required if weight is "more than 10kg"
+        category: apiCategory, // fragile, technology, documents, food, clothing, other
+        customCategory: customCategory, // Optional, required if category is "other"
+        preferenceTransport: _selectedTransportModes.isNotEmpty ? _selectedTransportModes : null, // Optional transport preferences
+        isUrgent: _isUrgent, // Urgent flag
         images: _selectedImages,
         specialInstructions: specialInstructionsController.text.trim().isEmpty
             ? null
@@ -644,6 +694,22 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     if (picked != null) {
       setState(() {
         dateController.text = '${picked.day}/${picked.month}/${picked.year}';
+      });
+    }
+  }
+
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+
+    if (picked != null) {
+      setState(() {
+        // Format time as HH:mm:ss
+        final hour = picked.hour.toString().padLeft(2, '0');
+        final minute = picked.minute.toString().padLeft(2, '0');
+        timeController.text = '$hour:$minute:00';
       });
     }
   }
@@ -1120,7 +1186,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   Widget _buildStep3() {
     return _buildStepPage(
       emoji: '📅',
-      title: 'Delivery Date',
+      title: 'Delivery Date & Time',
       subtitle: 'When do you need this delivered?',
       child: Column(
         children: [
@@ -1133,6 +1199,71 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             readOnly: true,
             onTap: () => _selectDate(context),
           ),
+          const SizedBox(height: 16),
+          _buildStepInputField(
+            controller: timeController,
+            icon: Icons.access_time,
+            label: 'Delivery Time',
+            hint: 'Select delivery time',
+            helperText: 'Choose your preferred delivery time',
+            readOnly: true,
+            onTap: () => _selectTime(context),
+          ),
+          const SizedBox(height: 20),
+
+          // Urgent delivery checkbox
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _isUrgent ? Colors.red[50] : Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _isUrgent ? Colors.red[200]! : Colors.grey[300]!),
+            ),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: _isUrgent,
+                  onChanged: (value) {
+                    setState(() {
+                      _isUrgent = value ?? false;
+                    });
+                  },
+                  activeColor: Colors.red,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.local_fire_department, color: _isUrgent ? Colors.red[700] : Colors.grey[600], size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Urgent Delivery',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: _isUrgent ? Colors.red[700] : Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Mark this order as urgent for priority handling',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _isUrgent ? Colors.red[600] : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(16),
@@ -1270,11 +1401,99 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   Widget _buildStep4() {
     return _buildStepPage(
       emoji: '⚖️',
-      title: 'Package Weight',
-      subtitle: 'Select the weight range of your package',
+      title: 'Package Weight & Transport',
+      subtitle: 'Select the weight range and preferred transport modes',
       child: Column(
         children: [
           _buildWeightRangeSelector(),
+          const SizedBox(height: 30),
+
+          // Transport Preference Section
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.directions_car, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Preferred Transport Modes (Optional)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Select one or more transport modes you prefer',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Transport chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _transportModes.map((mode) {
+              final isSelected = _selectedTransportModes.contains(mode);
+              IconData icon;
+              switch (mode) {
+                case 'Car': icon = Icons.directions_car; break;
+                case 'Bike': icon = Icons.two_wheeler; break;
+                case 'Pickup Truck': icon = Icons.local_shipping; break;
+                case 'Truck': icon = Icons.local_shipping; break;
+                case 'Bus': icon = Icons.directions_bus; break;
+                case 'Train': icon = Icons.train; break;
+                case 'Plane': icon = Icons.flight; break;
+                default: icon = Icons.directions; break;
+              }
+
+              return FilterChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 16, color: isSelected ? Colors.white : AppColors.primary),
+                    const SizedBox(width: 6),
+                    Text(mode),
+                  ],
+                ),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedTransportModes.add(mode);
+                    } else {
+                      _selectedTransportModes.remove(mode);
+                    }
+                  });
+                },
+                selectedColor: AppColors.primary,
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : Colors.black87,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+                backgroundColor: Colors.grey[100],
+                side: BorderSide(
+                  color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                  width: isSelected ? 2 : 1,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              );
+            }).toList(),
+          ),
+
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(16),
@@ -1289,7 +1508,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Select the weight range that best matches your package',
+                    'Select the weight range that best matches your package. Transport preferences help match you with suitable travelers.',
                     style: TextStyle(
                       color: Colors.purple[700],
                       fontSize: 13,
@@ -1364,6 +1583,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               onChanged: (OrderMainCategory? newValue) {
                 setState(() {
                   _selectedMainCategory = newValue;
+                  // Clear custom category if not selecting "other"
+                  if (newValue?.apiValue != 'other') {
+                    customCategoryController.clear();
+                  }
                 });
               },
             ),
@@ -1437,6 +1660,45 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               ),
             ),
           const SizedBox(height: 20),
+          // Custom category input field (shown only when category is "other")
+          if (_selectedMainCategory != null && _selectedMainCategory!.apiValue == 'other')
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Please specify the category of your item',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange[900],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildStepInputField(
+                  controller: customCategoryController,
+                  icon: Icons.label,
+                  label: 'Custom Category (Required)',
+                  hint: 'e.g., Books, Toys, Plants, etc.',
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(

@@ -16,6 +16,7 @@ class RouteMapViewScreen extends StatefulWidget {
   final double? destinationLatitude;
   final double? destinationLongitude;
   final RouteInfo routeInfo;
+  final List<dynamic>? initialStopovers; // Accept initial stopovers from previous navigation
 
   const RouteMapViewScreen({
     Key? key,
@@ -26,10 +27,23 @@ class RouteMapViewScreen extends StatefulWidget {
     this.destinationLatitude,
     this.destinationLongitude,
     required this.routeInfo,
+    this.initialStopovers, // Optional initial stopovers
   }) : super(key: key);
 
   @override
   State<RouteMapViewScreen> createState() => _RouteMapViewScreenState();
+}
+
+class Stopover {
+  final String name;
+  final double latitude;
+  final double longitude;
+
+  Stopover({
+    required this.name,
+    required this.latitude,
+    required this.longitude,
+  });
 }
 
 class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
@@ -39,10 +53,28 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   bool _isCardMinimized = true;
+  List<Stopover> _stopovers = [];
+
+  // Updated route info when stopovers are added
+  String? _updatedDistance;
+  String? _updatedDuration;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize stopovers from previous navigation if provided
+    if (widget.initialStopovers != null && widget.initialStopovers!.isNotEmpty) {
+      _stopovers = widget.initialStopovers!.map((data) {
+        return Stopover(
+          name: data['name'],
+          latitude: data['latitude'],
+          longitude: data['longitude'],
+        );
+      }).toList();
+      print('✅ Loaded ${_stopovers.length} existing stopovers');
+    }
+
     _initializeMap();
   }
 
@@ -64,7 +96,12 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
       }
 
       // Fetch and decode the polyline from the route
-      await _fetchAndDrawRoute();
+      // If stopovers exist, fetch route with stopovers; otherwise fetch normal route
+      if (_stopovers.isNotEmpty) {
+        await _updateRouteWithStopovers();
+      } else {
+        await _fetchAndDrawRoute();
+      }
 
       // Create markers for all waypoints
       _createMarkers();
@@ -235,32 +272,27 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
       ),
     );
 
-    // Waypoint markers for cities along route
-    int waypointIndex = 0;
-    for (var cityWaypoint in widget.routeInfo.cities) {
+    // Add stopover markers
+    for (int i = 0; i < _stopovers.length; i++) {
+      final stopover = _stopovers[i];
       markers.add(
         Marker(
-          markerId: MarkerId('waypoint_$waypointIndex'),
-          position: LatLng(cityWaypoint.latitude, cityWaypoint.longitude),
-          icon: cityWaypoint.type == 'nearby'
-              ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange)
-              : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          markerId: MarkerId('stopover_$i'),
+          position: LatLng(stopover.latitude, stopover.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
           infoWindow: InfoWindow(
-            title: cityWaypoint.name,
-            snippet: cityWaypoint.type == 'nearby'
-                ? 'Nearby (${cityWaypoint.category})'
-                : 'Passing Through (${cityWaypoint.category})',
+            title: stopover.name,
+            snippet: 'Stopover ${i + 1}',
           ),
         ),
       );
-      waypointIndex++;
     }
 
     setState(() {
       _markers = markers;
     });
 
-    print('✅ Created ${_markers.length} markers');
+    print('✅ Created ${_markers.length} markers (${_stopovers.length} stopovers)');
   }
 
   void _fitMapToRoute() {
@@ -303,6 +335,173 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
     return LatLngBounds(
       southwest: LatLng(minLat!, minLng!),
       northeast: LatLng(maxLat!, maxLng!),
+    );
+  }
+
+  void _showAddStopoverDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _AddStopoverSheet(
+        onStopoverAdded: (stopover) {
+          print('📍 Adding stopover: ${stopover.name} at (${stopover.latitude}, ${stopover.longitude})');
+          setState(() {
+            _stopovers.add(stopover);
+            _createMarkers();
+          });
+          print('📍 Total stopovers now: ${_stopovers.length}');
+          print('📍 Stopovers list: ${_stopovers.map((s) => s.name).toList()}');
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Stopover added: ${stopover.name}'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green[700],
+              duration: Duration(seconds: 2),
+            ),
+          );
+
+          // Update route with new stopover
+          _updateRouteWithStopovers();
+        },
+        existingStopovers: _stopovers,
+      ),
+    );
+  }
+
+  Future<void> _updateRouteWithStopovers() async {
+    if (_stopovers.isEmpty) {
+      // If no stopovers, just use original route
+      await _fetchAndDrawRoute();
+      return;
+    }
+
+    // Build waypoints string for Google Directions API
+    final waypointsString = _stopovers
+        .map((s) => '${s.latitude},${s.longitude}')
+        .join('|');
+
+    try {
+      print('🗺️  Fetching route with ${_stopovers.length} stopovers...');
+      print('📍 Waypoints: $waypointsString');
+
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/directions/json?'
+        'origin=${widget.originLatitude},${widget.originLongitude}&'
+        'destination=${widget.destinationLatitude},${widget.destinationLongitude}&'
+        'waypoints=$waypointsString&'
+        'key=${ApiConstants.googleMapsApiKey}',
+      );
+
+      final response = await http.get(url);
+      print('📡 Stopover route response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('📦 Stopover route API status: ${data['status']}');
+
+        if (data['status'] == 'OK' && data['routes'] != null && data['routes'].isNotEmpty) {
+          final route = data['routes'][0];
+          final polylinePoints = _decodePolyline(route['overview_polyline']['points']);
+
+          // Extract updated distance and duration
+          String totalDistance = '0 km';
+          String totalDuration = '0 min';
+
+          if (route['legs'] != null && route['legs'].isNotEmpty) {
+            // Calculate total distance and duration from all legs
+            int totalDistanceMeters = 0;
+            int totalDurationSeconds = 0;
+
+            for (var leg in route['legs']) {
+              if (leg['distance'] != null && leg['distance']['value'] != null) {
+                totalDistanceMeters += (leg['distance']['value'] as num).toInt();
+              }
+              if (leg['duration'] != null && leg['duration']['value'] != null) {
+                totalDurationSeconds += (leg['duration']['value'] as num).toInt();
+              }
+            }
+
+            // Format distance
+            if (totalDistanceMeters >= 1000) {
+              totalDistance = '${(totalDistanceMeters / 1000).toStringAsFixed(1)} km';
+            } else {
+              totalDistance = '$totalDistanceMeters m';
+            }
+
+            // Format duration
+            int hours = totalDurationSeconds ~/ 3600;
+            int minutes = (totalDurationSeconds % 3600) ~/ 60;
+            if (hours > 0) {
+              totalDuration = '${hours}h ${minutes}min';
+            } else {
+              totalDuration = '${minutes}min';
+            }
+
+            print('📏 New distance: $totalDistance');
+            print('⏱️ New duration: $totalDuration');
+          }
+
+          print('📍 Decoded ${polylinePoints.length} polyline points for route with stopovers');
+
+          setState(() {
+            _polylines.clear();
+            _polylines.add(
+              Polyline(
+                polylineId: PolylineId('main_route_with_stopovers'),
+                points: polylinePoints,
+                color: Colors.blue,
+                width: 8,
+                geodesic: true,
+                visible: true,
+                startCap: Cap.roundCap,
+                endCap: Cap.roundCap,
+              ),
+            );
+
+            // Update distance and duration
+            _updatedDistance = totalDistance;
+            _updatedDuration = totalDuration;
+          });
+
+          print('✅ Route updated with ${_stopovers.length} stopovers');
+          print('🗺️ Polyline now has ${polylinePoints.length} points');
+
+          // Fit map to show all points including stopovers
+          _fitMapToRoute();
+        } else if (data['status'] == 'REQUEST_DENIED') {
+          print('⚠️ API Request denied for stopover route: ${data['error_message']}');
+          _showErrorSnackbar('Unable to fetch route with stopovers. Please check API configuration.');
+        } else {
+          print('⚠️ No route found with stopovers, keeping original route');
+          _showErrorSnackbar('Could not find route with stopovers');
+        }
+      } else {
+        print('⚠️ HTTP error fetching stopover route: ${response.statusCode}');
+        _showErrorSnackbar('Error fetching route with stopovers');
+      }
+    } catch (e) {
+      print('❌ Error updating route with stopovers: $e');
+      _showErrorSnackbar('Error: $e');
+    }
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red[700],
+        duration: Duration(seconds: 3),
+      ),
     );
   }
 
@@ -355,6 +554,19 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
                 right: 0,
                 child: _buildRouteInfoCard(),
               ),
+
+            // Add Stopover Button
+            if (!_isLoading && _errorMessage == null)
+              Positioned(
+                right: 16,
+                bottom: 280,
+                child: FloatingActionButton(
+                  onPressed: _showAddStopoverDialog,
+                  backgroundColor: AppColors.primary,
+                  child: Icon(Icons.add_location_alt, color: Colors.white),
+                  tooltip: 'Add Stopover',
+                ),
+              ),
           ],
         ),
       ),
@@ -383,7 +595,15 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
         child: Row(
           children: [
             GestureDetector(
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                // Return stopovers when navigating back
+                final stopoversData = _stopovers.map((s) => {
+                  'name': s.name,
+                  'latitude': s.latitude,
+                  'longitude': s.longitude,
+                }).toList();
+                Navigator.pop(context, stopoversData);
+              },
               child: Container(
                 width: 44,
                 height: 44,
@@ -468,15 +688,18 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           // Minimize/Maximize Handle
           GestureDetector(
             onTap: () {
               setState(() {
                 _isCardMinimized = !_isCardMinimized;
               });
+              print('🎴 Card ${_isCardMinimized ? "minimized" : "expanded"}');
+              print('🎴 Stopovers count: ${_stopovers.length}');
             },
             child: Container(
               width: double.infinity,
@@ -543,7 +766,7 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
                       ),
                       SizedBox(height: 6),
                       Text(
-                        widget.routeInfo.distance,
+                        _updatedDistance ?? widget.routeInfo.distance,
                         style: TextStyle(
                           color: Colors.black87,
                           fontSize: 18,
@@ -582,7 +805,7 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
                       Padding(
                         padding: EdgeInsets.only(left: 16),
                         child: Text(
-                          widget.routeInfo.duration,
+                          _updatedDuration ?? widget.routeInfo.duration,
                           style: TextStyle(
                             color: Colors.black87,
                             fontSize: 18,
@@ -599,50 +822,83 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
 
           // Expandable content
           if (!_isCardMinimized) ...[
-            // Cities Along Route
-            if (widget.routeInfo.cities.isNotEmpty)
+            // Stopovers List
+            if (_stopovers.isNotEmpty) ...[
+              // Divider before stopovers
+              Divider(color: Colors.grey[300], thickness: 1, height: 1),
+
               Container(
-                padding: EdgeInsets.all(20),
-                constraints: BoxConstraints(maxHeight: 300),
+                padding: EdgeInsets.fromLTRB(20, 20, 20, 20),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50], // Light orange background to make it visible
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(
-                          Icons.location_city,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
+                        Icon(Icons.add_location_alt, color: Colors.orange, size: 18),
                         SizedBox(width: 8),
                         Text(
-                          'Waypoints (${widget.routeInfo.cities.length})',
+                          'Stopovers (${_stopovers.length}):',
                           style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 16,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
+                            color: Colors.grey[800],
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 16),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: widget.routeInfo.cities.length,
-                        itemBuilder: (context, index) {
-                          final city = widget.routeInfo.cities[index];
-                          return _buildWaypointItem(city, index);
-                        },
-                      ),
-                    ),
+                    SizedBox(height: 12),
+                    ..._stopovers.asMap().entries.map((entry) {
+                      int index = entry.key;
+                      Stopover stopover = entry.value;
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: Colors.orange[100],
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    color: Colors.orange[800],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                stopover.name,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ],
                 ),
               ),
+            ],
 
             // Route Summary
             if (widget.routeInfo.summary.isNotEmpty)
               Container(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+                padding: EdgeInsets.fromLTRB(20, _stopovers.isEmpty ? 20 : 0, 20, 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -673,78 +929,11 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
               ),
           ],
         ],
+        ),
       ),
     );
   }
 
-  Widget _buildWaypointItem(CityWaypoint waypoint, int index) {
-    final isNearby = waypoint.type == 'nearby';
-    final color = isNearby ? Colors.orange : Colors.blue;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          // Icon
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              isNearby ? Icons.near_me : Icons.circle,
-              color: color[700],
-              size: isNearby ? 18 : 12,
-            ),
-          ),
-          SizedBox(width: 12),
-          // City info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  waypoint.name,
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  isNearby
-                      ? 'Nearby • ${_getCategoryLabel(waypoint.category)}'
-                      : 'Passing Through • ${_getCategoryLabel(waypoint.category)}',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getCategoryLabel(String category) {
-    switch (category) {
-      case 'city':
-        return 'City';
-      case 'district':
-        return 'District';
-      case 'town':
-        return 'Town';
-      case 'area':
-        return 'Area';
-      default:
-        return 'Location';
-    }
-  }
 
   Widget _buildLoadingState() {
     return Container(
@@ -853,6 +1042,324 @@ class _RouteMapViewScreenState extends State<RouteMapViewScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Add Stopover Bottom Sheet Widget
+class _AddStopoverSheet extends StatefulWidget {
+  final Function(Stopover) onStopoverAdded;
+  final List<Stopover> existingStopovers;
+
+  const _AddStopoverSheet({
+    required this.onStopoverAdded,
+    required this.existingStopovers,
+  });
+
+  @override
+  State<_AddStopoverSheet> createState() => _AddStopoverSheetState();
+}
+
+class _AddStopoverSheetState extends State<_AddStopoverSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  List<dynamic> _searchResults = [];
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _searchPlaces(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?'
+        'input=$query&'
+        'key=${ApiConstants.googleMapsApiKey}',
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK') {
+          setState(() {
+            _searchResults = data['predictions'];
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error searching places: $e');
+    } finally {
+      setState(() {
+        _isSearching = false;
+      });
+    }
+  }
+
+  Future<void> _selectPlace(String placeId, String description) async {
+    try {
+      // Get place details to get coordinates
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/details/json?'
+        'place_id=$placeId&'
+        'fields=geometry&'
+        'key=${ApiConstants.googleMapsApiKey}',
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK') {
+          final location = data['result']['geometry']['location'];
+          final stopover = Stopover(
+            name: description,
+            latitude: location['lat'],
+            longitude: location['lng'],
+          );
+
+          widget.onStopoverAdded(stopover);
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      print('❌ Error getting place details: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Header
+          Padding(
+            padding: EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Icon(Icons.add_location_alt, color: AppColors.primary, size: 28),
+                SizedBox(width: 12),
+                Text(
+                  'Add Stopover',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+
+          // Search bar
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search for a place...',
+                prefixIcon: Icon(Icons.search),
+                suffixIcon: _isSearching
+                    ? Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                ),
+              ),
+              onChanged: (value) {
+                _searchPlaces(value);
+              },
+            ),
+          ),
+
+          SizedBox(height: 16),
+
+          // Existing stopovers
+          if (widget.existingStopovers.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Current Stopovers (${widget.existingStopovers.length})',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 8),
+            Container(
+              height: 80,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                itemCount: widget.existingStopovers.length,
+                itemBuilder: (context, index) {
+                  final stopover = widget.existingStopovers[index];
+                  return Container(
+                    margin: EdgeInsets.only(right: 12),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange[200]!),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.location_on, color: Colors.orange, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              'Stop ${index + 1}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        SizedBox(
+                          width: 150,
+                          child: Text(
+                            stopover.name,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 16),
+          ],
+
+          // Search results
+          Expanded(
+            child: _searchResults.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search, size: 64, color: Colors.grey[300]),
+                        SizedBox(height: 16),
+                        Text(
+                          'Search for a place to add as stopover',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final result = _searchResults[index];
+                      return ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.place,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          result['structured_formatting']['main_text'],
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          result['structured_formatting']['secondary_text'] ?? '',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        onTap: () {
+                          _selectPlace(
+                            result['place_id'],
+                            result['description'],
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

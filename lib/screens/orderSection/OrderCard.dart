@@ -162,7 +162,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                     children: [
                       _buildCompactChip(Icons.calendar_today, _formatDate(order.date)),
                       const SizedBox(width: 8),
-                      _buildCompactChip(Icons.scale, '${order.weight} kg'),
+                      _buildCompactChip(Icons.scale, order.weight),
                       const SizedBox(width: 8),
                       if (order.expectedPrice != null)
                         _buildCompactChip(
@@ -258,6 +258,87 @@ class ModernSenderOrderCard extends StatelessWidget {
       return '${parsedDate.day}/${parsedDate.month}/${parsedDate.year}';
     } catch (e) {
       return date.split('T').first;
+    }
+  }
+
+  String _formatTime(String time) {
+    try {
+      // Time is in HH:mm:ss format
+      final parts = time.split(':');
+      if (parts.length >= 2) {
+        final hour = int.parse(parts[0]);
+        final minute = parts[1];
+        final period = hour >= 12 ? 'PM' : 'AM';
+        final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+        return '$displayHour:$minute $period';
+      }
+      return time;
+    } catch (e) {
+      return time;
+    }
+  }
+
+  String _formatDateTime(String dateTime) {
+    try {
+      final DateTime parsedDateTime = DateTime.parse(dateTime);
+      final date = '${parsedDateTime.day}/${parsedDateTime.month}/${parsedDateTime.year}';
+      final hour = parsedDateTime.hour > 12 ? parsedDateTime.hour - 12 : (parsedDateTime.hour == 0 ? 12 : parsedDateTime.hour);
+      final minute = parsedDateTime.minute.toString().padLeft(2, '0');
+      final period = parsedDateTime.hour >= 12 ? 'PM' : 'AM';
+      return '$date at $hour:$minute $period';
+    } catch (e) {
+      return dateTime;
+    }
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'technology':
+        return Icons.devices;
+      case 'fragile':
+        return Icons.warning_amber_rounded;
+      case 'documents':
+        return Icons.description;
+      case 'food':
+        return Icons.restaurant;
+      case 'clothing':
+        return Icons.checkroom;
+      default:
+        return Icons.category;
+    }
+  }
+
+  String _getCategoryDisplayName(String category) {
+    switch (category.toLowerCase()) {
+      case 'technology':
+        return 'Technology';
+      case 'fragile':
+        return 'Fragile Items';
+      case 'documents':
+        return 'Documents';
+      case 'food':
+        return 'Food Items';
+      case 'clothing':
+        return 'Clothing';
+      default:
+        return category.toUpperCase();
+    }
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'technology':
+        return Colors.blue[700]!;
+      case 'fragile':
+        return Colors.orange[700]!;
+      case 'documents':
+        return Colors.green[700]!;
+      case 'food':
+        return Colors.amber[700]!;
+      case 'clothing':
+        return Colors.purple[700]!;
+      default:
+        return Colors.grey[700]!;
     }
   }
 
@@ -688,7 +769,9 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 itemDescription: itemDescController.text.trim().isNotEmpty
                                     ? itemDescController.text.trim()
                                     : 'Package', // Default value
-                                weight: double.parse(weightController.text),
+                                weight: weightController.text.trim().isNotEmpty
+                                    ? '${weightController.text.trim()} kg'
+                                    : '0kg',
                                 status: order.status,
                                 expectedPrice: priceController.text.isNotEmpty
                                     ? int.tryParse(priceController.text)
@@ -875,12 +958,48 @@ class ModernSenderOrderCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Date
+                      // Date and Time
                       _buildDetailRow(
                         Icons.calendar_today,
                         'Delivery Date',
                         _formatDate(order.date),
                       ),
+                      if (order.deliveryTime != null) ...[
+                        const SizedBox(height: 12),
+                        _buildDetailRow(
+                          Icons.access_time,
+                          'Delivery Time',
+                          _formatTime(order.deliveryTime!),
+                        ),
+                      ],
+
+                      // Urgent Badge
+                      if (order.isUrgent == true) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red[200]!),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.local_fire_department, color: Colors.red[700], size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'URGENT DELIVERY',
+                                style: TextStyle(
+                                  color: Colors.red[700],
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
 
                       // Route Section
@@ -981,19 +1100,64 @@ class ModernSenderOrderCard extends StatelessWidget {
                               'Item Description',
                               order.itemDescription,
                             ),
+                            if (order.category != null) ...[
+                              const Divider(height: 24),
+                              _buildDetailRow(
+                                _getCategoryIcon(order.category!),
+                                'Category',
+                                _getCategoryDisplayName(order.category!),
+                                valueColor: _getCategoryColor(order.category!),
+                              ),
+                            ],
                             const Divider(height: 24),
                             _buildDetailRow(
                               Icons.scale_outlined,
                               'Weight',
-                              '${order.weight} kg',
+                              order.weight,
                             ),
-                            if (order.expectedPrice != null) ...[
+                            if (order.preferenceTransport != null && order.preferenceTransport!.isNotEmpty) ...[
                               const Divider(height: 24),
-                              _buildDetailRow(
-                                Icons.currency_rupee,
-                                'Expected Price',
-                                '₹${order.expectedPrice}',
-                                valueColor: Colors.green[700],
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.local_shipping_outlined, size: 18, color: Colors.grey[700]),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Preferred Transport',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey[700],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: order.preferenceTransport!.map((transport) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue[50],
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.blue[200]!),
+                                        ),
+                                        child: Text(
+                                          transport,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.blue[700],
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
                               ),
                             ],
                             if (order.notes != null && order.notes!.isNotEmpty) ...[
@@ -1002,6 +1166,15 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 Icons.note_outlined,
                                 'Special Instructions',
                                 order.notes!,
+                              ),
+                            ],
+                            if (order.createdAt != null) ...[
+                              const Divider(height: 24),
+                              _buildDetailRow(
+                                Icons.schedule,
+                                'Created At',
+                                _formatDateTime(order.createdAt!),
+                                valueColor: Colors.grey[600],
                               ),
                             ],
                           ],
