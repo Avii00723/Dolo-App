@@ -9,7 +9,7 @@ import '../Controllers/OrderService.dart';
 import '../Controllers/TripRequestService.dart';
 import '../Controllers/AuthService.dart';
 import 'LocationinputField.dart';
-import 'CustomRouteMapScreen.dart';
+import 'CustomRoutePreviewScreen.dart';
 import 'orderSection/SearchResultPage.dart';
 import 'orderSection/YourOrders.dart';
 
@@ -24,7 +24,8 @@ class _SendPageState extends State<SendPage> {
   final TextEditingController fromController = TextEditingController();
   final TextEditingController toController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
-  final TextEditingController timeController = TextEditingController(); // Time for delivery_time API param
+  final TextEditingController timeController =
+      TextEditingController(); // Time for delivery_time API param
   final TextEditingController hoursController = TextEditingController();
 
   String? selectedVehicle;
@@ -101,7 +102,7 @@ class _SendPageState extends State<SendPage> {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // ✨ NEW METHOD: Show Route Map
+  // ✨ NEW METHOD: Show Route Preview
   // ═══════════════════════════════════════════════════════════════════
   Future<void> _showRouteMap() async {
     if (originPosition == null || destinationPosition == null) {
@@ -109,40 +110,27 @@ class _SendPageState extends State<SendPage> {
       return;
     }
 
-    // Pass stopovers to CustomRouteMapScreen
-    final selectedRoute = await Navigator.push(
+    if (selectedVehicle == null) {
+      _showSnackBar('Please select a vehicle type', Colors.orange);
+      return;
+    }
+
+    // Show custom route preview with Google Maps and app theme colors
+    Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CustomRouteMapScreen(
-          originCity: fromController.text,
-          destinationCity: toController.text,
-          originLatitude: originPosition!.latitude,
-          originLongitude: originPosition!.longitude,
-          destinationLatitude: destinationPosition!.latitude,
-          destinationLongitude: destinationPosition!.longitude,
-          stopovers: stopovers, // Pass stopovers list
+        builder: (context) => CustomRoutePreviewScreen(
+          origin: fromController.text,
+          destination: toController.text,
+          originLat: originPosition!.latitude,
+          originLng: originPosition!.longitude,
+          destLat: destinationPosition!.latitude,
+          destLng: destinationPosition!.longitude,
+          stopovers: stopovers,
+          vehicle: selectedVehicle!,
         ),
       ),
     );
-
-    // If user selected a route, show confirmation
-    if (selectedRoute != null) {
-      _showSnackBar('Route selected: ${selectedRoute.distance}, ${selectedRoute.duration}', Colors.green);
-      print('✅ User selected route: ${selectedRoute.distance}, ${selectedRoute.duration}');
-      print('   Route summary: ${selectedRoute.summary}');
-      print('   Cities along route (${selectedRoute.cities.length}):');
-      for (var city in selectedRoute.cities) {
-        print('     - ${city.name} (${city.category} - ${city.type})');
-      }
-
-      // Show stopovers if any
-      if (stopovers.isNotEmpty) {
-        print('📍 Stopovers (${stopovers.length}):');
-        for (var stopover in stopovers) {
-          print('     - ${stopover['city']}');
-        }
-      }
-    }
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -193,7 +181,8 @@ class _SendPageState extends State<SendPage> {
 
     if (picked != null) {
       setState(() {
-        dateController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        dateController.text =
+            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
     }
   }
@@ -231,7 +220,8 @@ class _SendPageState extends State<SendPage> {
     }
 
     if (originPosition == null) {
-      _showSnackBar('Please select origin location from suggestions', Colors.orange);
+      _showSnackBar(
+          'Please select origin location from suggestions', Colors.orange);
       return;
     }
 
@@ -320,9 +310,12 @@ class _SendPageState extends State<SendPage> {
 
     // Validate that the order has an ID
     if (order.id.isEmpty) {
-      _showSnackBar('Invalid order: Missing order ID. Please refresh and try again.', Colors.red);
+      _showSnackBar(
+          'Invalid order: Missing order ID. Please refresh and try again.',
+          Colors.red);
       print('❌ ERROR: Order ID is empty');
-      print('DEBUG: Order details - Origin: ${order.origin}, Destination: ${order.destination}');
+      print(
+          'DEBUG: Order details - Origin: ${order.origin}, Destination: ${order.destination}');
       return;
     }
 
@@ -330,14 +323,16 @@ class _SendPageState extends State<SendPage> {
     final startTimeController = TextEditingController();
     final endTimeController = TextEditingController();
 
-    Future<void> selectTime(BuildContext context, TextEditingController controller) async {
+    Future<void> selectTime(
+        BuildContext context, TextEditingController controller) async {
       TimeOfDay? pickedTime = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.now(),
       );
 
       if (pickedTime != null) {
-        final formattedTime = '${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}:00';
+        final formattedTime =
+            '${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}:00';
         controller.text = formattedTime;
       }
     }
@@ -357,7 +352,10 @@ class _SendPageState extends State<SendPage> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primary.withOpacity(0.8)
+                    ],
                   ),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
@@ -372,7 +370,8 @@ class _SendPageState extends State<SendPage> {
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.send, color: Colors.white, size: 24),
+                      child:
+                          const Icon(Icons.send, color: Colors.white, size: 24),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -419,7 +418,8 @@ class _SendPageState extends State<SendPage> {
                       ),
                       const SizedBox(height: 15),
                       GestureDetector(
-                        onTap: () => selectTime(dialogContext, startTimeController),
+                        onTap: () =>
+                            selectTime(dialogContext, startTimeController),
                         child: AbsorbPointer(
                           child: _buildEnhancedTextField(
                             controller: startTimeController,
@@ -432,7 +432,8 @@ class _SendPageState extends State<SendPage> {
                       ),
                       const SizedBox(height: 15),
                       GestureDetector(
-                        onTap: () => selectTime(dialogContext, endTimeController),
+                        onTap: () =>
+                            selectTime(dialogContext, endTimeController),
                         child: AbsorbPointer(
                           child: _buildEnhancedTextField(
                             controller: endTimeController,
@@ -488,7 +489,8 @@ class _SendPageState extends State<SendPage> {
                           if (vehicleInfoController.text.trim().isEmpty ||
                               startTimeController.text.trim().isEmpty ||
                               endTimeController.text.trim().isEmpty) {
-                            _showSnackBar('Please fill all required fields', Colors.red);
+                            _showSnackBar(
+                                'Please fill all required fields', Colors.red);
                             return;
                           }
 
@@ -547,7 +549,8 @@ class _SendPageState extends State<SendPage> {
                             print('DEBUG: Traveler ID: $currentUserId');
                             print('DEBUG: Order ID: ${order.id}');
 
-                            final response = await _tripRequestService.sendTripRequest(tripRequest);
+                            final response = await _tripRequestService
+                                .sendTripRequest(tripRequest);
 
                             if (context.mounted) {
                               Navigator.of(context).pop();
@@ -570,7 +573,8 @@ class _SendPageState extends State<SendPage> {
                             }
                             print('ERROR: Failed to send trip request: $e');
                             if (context.mounted) {
-                              _showSnackBar('Failed to send request: $e', Colors.red);
+                              _showSnackBar(
+                                  'Failed to send request: $e', Colors.red);
                             }
                           }
                         },
@@ -694,7 +698,8 @@ class _SendPageState extends State<SendPage> {
               hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
               prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
             ),
           ),
         ),
@@ -904,7 +909,8 @@ class _SendPageState extends State<SendPage> {
                       child: GestureDetector(
                         onTap: _showAddStopoverDialog,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
@@ -1023,7 +1029,8 @@ class _SendPageState extends State<SendPage> {
                     // ═══════════════════════════════════════════════════════════════
                     // ✨ NEW: View Route Button (Shows when both locations selected)
                     // ═══════════════════════════════════════════════════════════════
-                    if (originPosition != null && destinationPosition != null) ...[
+                    if (originPosition != null &&
+                        destinationPosition != null) ...[
                       const SizedBox(height: 15),
                       Container(
                         width: double.infinity,
@@ -1046,7 +1053,8 @@ class _SendPageState extends State<SendPage> {
                             onTap: _showRouteMap,
                             borderRadius: BorderRadius.circular(12),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16, horizontal: 12),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
@@ -1100,20 +1108,23 @@ class _SendPageState extends State<SendPage> {
                     GestureDetector(
                       onTap: () => _selectDate(context),
                       child: AbsorbPointer(
-                        child: buildInputBox('Date (YYYY-MM-DD)', dateController, Icons.calendar_today),
+                        child: buildInputBox('Date (YYYY-MM-DD)',
+                            dateController, Icons.calendar_today),
                       ),
                     ),
                     const SizedBox(height: 15),
                     GestureDetector(
                       onTap: () => _selectTime(context),
                       child: AbsorbPointer(
-                        child: buildInputBox('Delivery Time', timeController, Icons.access_time),
+                        child: buildInputBox(
+                            'Delivery Time', timeController, Icons.access_time),
                       ),
                     ),
                     const SizedBox(height: 15),
                     _buildVehicleDropdown(),
                     const SizedBox(height: 15),
-                    buildInputBox('Travel Hours', hoursController, Icons.access_time,
+                    buildInputBox(
+                        'Travel Hours', hoursController, Icons.access_time,
                         keyboardType: TextInputType.number),
                     const SizedBox(height: 20),
                     SizedBox(
@@ -1129,21 +1140,22 @@ class _SendPageState extends State<SendPage> {
                         ),
                         child: isSearching
                             ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
                             : const Text(
-                          'Search Orders',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                                'Search Orders',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -1192,7 +1204,8 @@ class _SendPageState extends State<SendPage> {
                   ),
                 ),
                 isExpanded: true,
-                icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                icon:
+                    const Icon(Icons.arrow_drop_down, color: AppColors.primary),
                 style: const TextStyle(
                   fontSize: 16,
                   color: Colors.black,
@@ -1290,7 +1303,8 @@ class _SendPageState extends State<SendPage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(20),
@@ -1407,11 +1421,11 @@ class _SendPageState extends State<SendPage> {
   }
 
   Widget buildInputBox(
-      String label,
-      TextEditingController controller,
-      IconData icon, {
-        TextInputType keyboardType = TextInputType.text,
-      }) {
+    String label,
+    TextEditingController controller,
+    IconData icon, {
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return Container(
       height: 55,
       padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -1457,8 +1471,8 @@ class _SendPageState extends State<SendPage> {
               color == Colors.green
                   ? Icons.check_circle
                   : color == Colors.red
-                  ? Icons.error_outline
-                  : Icons.info_outline,
+                      ? Icons.error_outline
+                      : Icons.info_outline,
               color: Colors.white,
               size: 20,
             ),
@@ -1490,7 +1504,8 @@ class _AddStopoverBottomSheet extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<_AddStopoverBottomSheet> createState() => _AddStopoverBottomSheetState();
+  State<_AddStopoverBottomSheet> createState() =>
+      _AddStopoverBottomSheetState();
 }
 
 class _AddStopoverBottomSheetState extends State<_AddStopoverBottomSheet> {
@@ -1558,7 +1573,8 @@ class _AddStopoverBottomSheetState extends State<_AddStopoverBottomSheet> {
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.add_location_alt, color: Colors.white, size: 24),
+                  child: const Icon(Icons.add_location_alt,
+                      color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
@@ -1644,27 +1660,30 @@ class _AddStopoverBottomSheetState extends State<_AddStopoverBottomSheet> {
                     ),
                     suffixIcon: widget.controller.text.isNotEmpty
                         ? IconButton(
-                      icon: Icon(Icons.clear, color: Colors.grey[600]),
-                      onPressed: () {
-                        setState(() {
-                          widget.controller.clear();
-                          selectedPosition = null;
-                          selectedCityName = null;
-                        });
-                      },
-                    )
+                            icon: Icon(Icons.clear, color: Colors.grey[600]),
+                            onPressed: () {
+                              setState(() {
+                                widget.controller.clear();
+                                selectedPosition = null;
+                                selectedCityName = null;
+                              });
+                            },
+                          )
                         : null,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                      borderSide:
+                          BorderSide(color: Colors.grey[300]!, width: 1.5),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                      borderSide:
+                          BorderSide(color: Colors.grey[300]!, width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                      borderSide:
+                          BorderSide(color: AppColors.primary, width: 2),
                     ),
                     filled: true,
                     fillColor: Colors.grey[50],
@@ -1691,7 +1710,8 @@ class _AddStopoverBottomSheetState extends State<_AddStopoverBottomSheet> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                        Icon(Icons.check_circle,
+                            color: Colors.green[700], size: 20),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -1731,12 +1751,12 @@ class _AddStopoverBottomSheetState extends State<_AddStopoverBottomSheet> {
                   child: ElevatedButton.icon(
                     onPressed: selectedPosition != null
                         ? () {
-                      widget.onAdd(
-                        selectedCityName ?? widget.controller.text,
-                        selectedPosition!.latitude,
-                        selectedPosition!.longitude,
-                      );
-                    }
+                            widget.onAdd(
+                              selectedCityName ?? widget.controller.text,
+                              selectedPosition!.latitude,
+                              selectedPosition!.longitude,
+                            );
+                          }
                         : null,
                     icon: const Icon(Icons.add_location_alt, size: 20),
                     label: const Text(

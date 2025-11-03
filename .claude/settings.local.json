@@ -12,7 +12,9 @@
       "Bash(tail:*)",
       "Bash(flutter clean:*)",
       "Bash(dart format:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(dart analyze:*)",
+      "Bash(dart compile kernel:*)"
     ],
     "deny": [],
     "ask": []
