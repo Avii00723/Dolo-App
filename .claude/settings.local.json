@@ -10,7 +10,9 @@
       "Bash(wc:*)",
       "Bash(flutter run:*)",
       "Bash(tail:*)",
-      "Bash(flutter clean:*)"
+      "Bash(flutter clean:*)",
+      "Bash(dart format:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

@@ -23,7 +23,8 @@ class ApiConstants {
   // Trip Requests
   static const String sendTripRequest = '$baseUrl/trip-requests/send';
   static const String acceptTripRequest = '$baseUrl/trip-requests/accept';
-  static const String getMyTripRequests = '$baseUrl/trip-requests/mytrip';
+  static const String getMyTripRequests = '$baseUrl/trip-requests/mytrip'; // Trip requests sent BY user (as traveler)
+  static const String getOrderTripRequests = '$baseUrl/trip-requests/for-orders'; // Trip requests FOR user's orders (as sender)
   static const String deleteTripRequest = '$baseUrl/trip-requests'; // ✅ NEW - Base path for delete
 
   // Chat

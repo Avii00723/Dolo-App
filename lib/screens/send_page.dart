@@ -836,6 +836,7 @@ class _SendPageState extends State<SendPage> {
       backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           child: Column(
             children: [
               const SizedBox(height: 20),
@@ -986,6 +987,8 @@ class _SendPageState extends State<SendPage> {
                                         fontWeight: FontWeight.w600,
                                         color: Colors.black87,
                                       ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
@@ -1043,40 +1046,45 @@ class _SendPageState extends State<SendPage> {
                             onTap: _showRouteMap,
                             borderRadius: BorderRadius.circular(12),
                             child: Padding(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const Icon(
                                     Icons.map,
                                     color: Colors.white,
-                                    size: 24,
+                                    size: 22,
                                   ),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'View Route on Map',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                                  const SizedBox(width: 10),
+                                  const Flexible(
+                                    child: Text(
+                                      'View Route on Map',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
-                                      vertical: 4,
+                                      vertical: 3,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(12),
+                                      color: Colors.white.withOpacity(0.25),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: const Text(
                                       'NEW',
                                       style: TextStyle(
                                         color: Colors.white,
-                                        fontSize: 10,
+                                        fontSize: 9,
                                         fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
                                       ),
                                     ),
                                   ),

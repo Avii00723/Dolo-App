@@ -301,12 +301,15 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
     try {
       print('🔍 Loading trip requests for orders: $orderIds');
-      final allRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
-      print('📦 Got ${allRequests.length} total trip requests');
+      // Use getTripRequestsForMyOrders instead of getMyTripRequests
+      // This fetches trip requests FOR the user's orders (as sender), not BY the user (as traveler)
+      final allRequests = await _tripRequestService.getTripRequestsForMyOrders(currentUserId!);
+      print('📦 Got ${allRequests.length} trip requests for my orders');
 
       Map<String, List<TripRequestDisplay>> requestsByOrder = {};
 
       for (var request in allRequests) {
+        print('  Processing request: order=${request.orderId}, status=${request.status}, traveler=${request.travelerId}');
         if (request.status == 'pending' && orderIds.contains(request.orderId)) {
           final displayRequest = TripRequestDisplay(
             id: request.id,
@@ -324,10 +327,15 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           } else {
             requestsByOrder[request.orderId] = [displayRequest];
           }
+          print('  ✅ Added request to order ${request.orderId}');
         }
       }
 
       print('📊 Total pending requests by order: ${requestsByOrder.length}');
+      requestsByOrder.forEach((orderId, requests) {
+        print('  Order $orderId: ${requests.length} pending requests');
+      });
+
       if (mounted) {
         setState(() {
           tripRequestsByOrder = requestsByOrder;
@@ -351,17 +359,20 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     try {
       print('🔍 Loading trip requests sent by user: $currentUserId');
       final tripRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
-      print('📦 Found ${tripRequests.length} trip requests');
+      print('📦 Found ${tripRequests.length} trip requests from API');
 
       final List<OrderDisplay> displayOrders = [];
       final Set<String> processedOrderIds = {};
 
       for (var request in tripRequests) {
-        if (request.travelerId != currentUserId) {
-          continue;
-        }
+        print('  Examining request: id=${request.id}, orderId=${request.orderId}, travelerId=${request.travelerId}');
+
+        // NOTE: The API /trip-requests/mytrip should only return requests where user is the TRAVELER
+        // If it's returning requests where user is the ORDER CREATOR, that's a backend issue
+        // For now, we trust that the API filters correctly
 
         if (processedOrderIds.contains(request.orderId)) {
+          print('  ⏭️ Skipping duplicate order ${request.orderId}');
           continue;
         }
 
@@ -380,10 +391,10 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           orderType: 'receive',
           requestStatus: request.status,
           notes: '${request.vehicleInfo} • Pickup: ${request.pickupTime} • Dropoff: ${request.dropoffTime}',
-          tripRequestId: request.id, // ✅ ADD THIS LINE - Store the trip request ID
+          tripRequestId: request.id,
         ));
 
-        print('✅ Added order ${request.orderId} with Trip Request ID: ${request.id}');
+        print('  ✅ Added trip request for order ${request.orderId}');
       }
 
       if (mounted) {

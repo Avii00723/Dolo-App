@@ -224,6 +224,7 @@ class OrderService {
     required String vehicle,
     required double timeHours,
     required String userId,
+    String? stopovers, // Optional: Comma-separated list of stopover cities
   }) async {
     print('=== SEARCH ORDERS API CALL ===');
     print('Endpoint: ${ApiConstants.searchOrders}');
@@ -237,6 +238,9 @@ class OrderService {
     print(' - vehicle: $vehicle');
     print(' - time_hours: $timeHours');
     print(' - userId: $userId');
+    if (stopovers != null && stopovers.isNotEmpty) {
+      print(' - stopovers: $stopovers');
+    }
 
     try {
       // Build query parameters
@@ -251,6 +255,11 @@ class OrderService {
         'time_hours': timeHours.toString(),
         'userId': userId,
       };
+
+      // Add stopovers if provided
+      if (stopovers != null && stopovers.isNotEmpty) {
+        queryParams['stopovers'] = stopovers;
+      }
 
       final response = await _api.get(
         ApiConstants.searchOrders,

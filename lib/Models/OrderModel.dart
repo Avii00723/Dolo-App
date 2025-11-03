@@ -76,10 +76,14 @@ class Order {
     }
 
     // Parse ID with fallback and logging
-    final parsedId = json['hashed_id']?.toString() ?? json['id']?.toString() ?? '';
+    // API returns different field names: 'orderId' (search), 'hashed_id' (getMyOrders), or 'id'
+    final parsedId = json['orderId']?.toString() ??
+                     json['hashed_id']?.toString() ??
+                     json['id']?.toString() ?? '';
     if (parsedId.isEmpty) {
       print('⚠️ WARNING: Order parsed with empty ID');
       print('  Available keys in JSON: ${json.keys.toList()}');
+      print('  orderId: ${json['orderId']}');
       print('  hashed_id: ${json['hashed_id']}');
       print('  id: ${json['id']}');
       print('  origin: ${json['origin']}');
