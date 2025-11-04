@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'OTPScreen.dart';
 import '../../Controllers/LoginService.dart';
+import '../../Widgets/ModernInputField.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,7 +28,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (phoneNumber.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter valid 10-digit phone number')),
+        const SnackBar(
+            content: Text('Please enter valid 10-digit phone number')),
       );
       return;
     }
@@ -139,69 +142,39 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 60),
 
-              // Phone Number Input
-              TextField(
+              // Phone Number Input with Modern Design
+              ModernInputField(
                 controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: "Phone Number",
-                  prefixText: "+91 ",
-                  labelStyle: TextStyle(color: Colors.black),
-                  border: OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF001127), width: 2),
-                  ),
-                ),
+                label: "Phone Number",
+                hint: "Enter your phone number",
+                prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
                 maxLength: 10,
                 enabled: !isLoading,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
               ),
 
               const SizedBox(height: 40),
 
               // Continue Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF001127),
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: isLoading ? null : sendOTP,
-                  child: isLoading
-                      ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                      : const Text(
-                    "Send OTP",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+              ModernButton(
+                text: "Send OTP",
+                onPressed: isLoading ? null : sendOTP,
+                isLoading: isLoading,
               ),
 
               const SizedBox(height: 280),
 
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8.0),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
                 child: Text(
                   'By continuing, you agree to our Terms\nof Service and Privacy Policy',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey,
+                    color: Colors.grey[700],
                   ),
                 ),
               ),

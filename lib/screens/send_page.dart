@@ -1181,94 +1181,107 @@ class _SendPageState extends State<SendPage> {
 
   Widget _buildVehicleDropdown() {
     return Container(
-      height: 55,
-      padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border.all(color: Colors.grey.shade300, width: 1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.directions_car, color: AppColors.primary, size: 20),
-          const SizedBox(width: 15),
-          Expanded(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: selectedVehicle,
-                hint: Text(
-                  'Select Transportation Mode',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 13,
-                  ),
-                ),
-                isExpanded: true,
-                icon:
-                    const Icon(Icons.arrow_drop_down, color: AppColors.primary),
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.black,
-                ),
-                items: vehicleOptions.map((String vehicle) {
-                  return DropdownMenuItem<String>(
-                    value: vehicle,
-                    child: Row(
-                      children: [
-                        _getVehicleIcon(vehicle),
-                        const SizedBox(width: 12),
-                        Text(vehicle),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    selectedVehicle = newValue;
-                  });
-                },
-              ),
-            ),
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[300]!, width: 2),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      child: DropdownButtonFormField<String>(
+        value: selectedVehicle,
+        hint: Row(
+          children: [
+            Icon(Icons.directions_car, color: Colors.grey[400], size: 20),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Select Transportation Mode',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+        ),
+        icon: Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
+        ),
+        isExpanded: true,
+        menuMaxHeight: 400,
+        items: vehicleOptions.map((String vehicle) {
+          IconData icon;
+          switch (vehicle) {
+            case 'Car':
+              icon = Icons.directions_car;
+              break;
+            case 'Bike':
+              icon = Icons.two_wheeler;
+              break;
+            case 'Pickup Truck':
+              icon = Icons.local_shipping;
+              break;
+            case 'Truck':
+              icon = Icons.local_shipping;
+              break;
+            case 'Bus':
+              icon = Icons.directions_bus;
+              break;
+            case 'Train':
+              icon = Icons.train;
+              break;
+            case 'Plane':
+              icon = Icons.flight;
+              break;
+            default:
+              icon = Icons.directions;
+              break;
+          }
+
+          return DropdownMenuItem<String>(
+            value: vehicle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 45,
+                    height: 45,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: AppColors.primary, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      vehicle,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+        onChanged: (String? newValue) {
+          setState(() {
+            selectedVehicle = newValue;
+          });
+        },
+      ),
     );
-  }
-
-  Widget _getVehicleIcon(String vehicle) {
-    IconData icon;
-    Color color = AppColors.primary;
-
-    switch (vehicle) {
-      case 'Car':
-        icon = Icons.directions_car;
-        break;
-      case 'Bike':
-        icon = Icons.two_wheeler;
-        break;
-      case 'Pickup Truck':
-        icon = Icons.local_shipping;
-        break;
-      case 'Truck':
-        icon = Icons.local_shipping;
-        color = Colors.orange;
-        break;
-      case 'Bus':
-        icon = Icons.directions_bus;
-        break;
-      case 'Train':
-        icon = Icons.train;
-        color = Colors.blue;
-        break;
-      case 'Plane':
-        icon = Icons.flight;
-        color = Colors.purple;
-        break;
-      default:
-        icon = Icons.directions_car;
-    }
-
-    return Icon(icon, size: 18, color: color);
   }
 
   Widget _buildAvailableOrdersList() {
@@ -1427,36 +1440,46 @@ class _SendPageState extends State<SendPage> {
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Container(
-      height: 55,
-      padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border.all(color: Colors.grey.shade300, width: 1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 20),
-          const SizedBox(width: 15),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: keyboardType,
-              decoration: InputDecoration(
-                hintText: label,
-                hintStyle: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 13,
-                ),
-                border: InputBorder.none,
-              ),
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.black,
-              ),
-            ),
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[300]!, width: 2),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        style: const TextStyle(
+          fontSize: 16,
+          color: Colors.black87,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          hintText: label,
+          hintStyle: const TextStyle(
+            color: Colors.grey,
+            fontSize: 16,
+          ),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 16, right: 12),
+            child: Icon(
+              icon,
+              color: Colors.grey[400],
+              size: 22,
+            ),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 17,
+          ),
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../Models/LoginModel.dart';
 import '../../Controllers/ProfileService.dart';
+import '../../Widgets/ModernInputField.dart';
 
 class ProfileDetailsPage extends StatefulWidget {
   final UserProfile userProfile;
@@ -183,6 +184,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
       ),
     );
   }
+
 // ✅ NEW: Build gradient avatar with initials
   Widget _buildGradientAvatar(String name, double radius) {
     // Generate initials
@@ -239,18 +241,18 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        elevation: 0,
         backgroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF001127)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Profile Details',
           style: TextStyle(
-            color: Colors.black,
+            color: Color(0xFF001127),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -261,291 +263,260 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
             IconButton(
               icon: Icon(
                 _isEditMode ? Icons.close : Icons.edit,
-                color: _isEditMode ? Colors.red : Colors.indigo[800],
+                color: _isEditMode ? Colors.red[700] : const Color(0xFF001127),
               ),
               onPressed: _toggleEditMode,
               tooltip: _isEditMode ? 'Cancel' : 'Edit Profile',
             ),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ✅ Show edit mode banner
-                if (_isEditMode)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, color: Colors.blue[800], size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Edit Mode: Make changes to your profile',
-                            style: TextStyle(
-                              color: Colors.blue[800],
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ✅ Show edit mode banner
+              if (_isEditMode)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, color: Colors.blue[800], size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Edit Mode: Make changes to your profile',
+                          style: TextStyle(
+                            color: Colors.blue[800],
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                ),
 
-                // Profile Header Card with editable image
-                Card(
-                  shape: RoundedRectangleBorder(
+              // Profile Header Card with editable image
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.indigo[600]!, Colors.indigo[800]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  elevation: 0,
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.indigo[600]!, Colors.indigo[800]!],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      children: [
-                        // Profile Image with edit button
-                        // Profile Image with edit button - REPLACE the existing Stack widget
-                        Stack(
-                          alignment: Alignment.bottomRight,
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 4),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: CircleAvatar(
-                                radius: 55,
-                                backgroundColor: Colors.white,
-                                child: _newProfileImage != null
-                                    ? ClipOval(
-                                  child: Image.file(
-                                    _newProfileImage!,
-                                    width: 110,
-                                    height: 110,
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                                    : (widget.userProfile.photoURL.isNotEmpty
-                                    ? ClipOval(
-                                  child: Image.network(
-                                    widget.userProfile.photoURL,
-                                    width: 110,
-                                    height: 110,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      // Fallback to gradient avatar if network image fails
-                                      return _buildGradientAvatar(widget.userProfile.name, 55);
-                                    },
-                                  ),
-                                )
-                                    : _buildGradientAvatar(widget.userProfile.name, 55)),
-                              ),
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    children: [
+                      // Profile Image with edit button
+                      // Profile Image with edit button - REPLACE the existing Stack widget
+                      Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
-                            // ✅ Edit button only visible in edit mode
-                            if (_isEditMode)
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.indigo[800]!, width: 2),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
+                            child: CircleAvatar(
+                              radius: 55,
+                              backgroundColor: Colors.white,
+                              child: _newProfileImage != null
+                                  ? ClipOval(
+                                      child: Image.file(
+                                        _newProfileImage!,
+                                        width: 110,
+                                        height: 110,
+                                        fit: BoxFit.cover,
                                       ),
-                                    ],
-                                  ),
-                                  child: IconButton(
-                                    icon: Icon(Icons.camera_alt, size: 20, color: Colors.indigo[800]),
-                                    onPressed: _pickProfileImage,
-                                    padding: const EdgeInsets.all(8),
-                                  ),
+                                    )
+                                  : (widget.userProfile.photoURL.isNotEmpty
+                                      ? ClipOval(
+                                          child: Image.network(
+                                            widget.userProfile.photoURL,
+                                            width: 110,
+                                            height: 110,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              // Fallback to gradient avatar if network image fails
+                                              return _buildGradientAvatar(
+                                                  widget.userProfile.name, 55);
+                                            },
+                                          ),
+                                        )
+                                      : _buildGradientAvatar(
+                                          widget.userProfile.name, 55)),
+                            ),
+                          ),
+                          // ✅ Edit button only visible in edit mode
+                          if (_isEditMode)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: Colors.indigo[800]!, width: 2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: IconButton(
+                                  icon: Icon(Icons.camera_alt,
+                                      size: 20, color: Colors.indigo[800]),
+                                  onPressed: _pickProfileImage,
+                                  padding: const EdgeInsets.all(8),
                                 ),
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          widget.userProfile.name,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'USER ID: ${widget.userProfile.id}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Editable Personal Information
-                _buildEditableInfoCard(
-                  title: 'Personal Information',
-                  icon: Icons.person_outline,
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      enabled: _isEditMode, // ✅ Only editable in edit mode
-                      decoration: InputDecoration(
-                        labelText: 'Full Name',
-                        prefixIcon: const Icon(Icons.person),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: !_isEditMode,
-                        fillColor: !_isEditMode ? Colors.grey[100] : null,
+                        ],
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your name';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _emailController,
-                      enabled: _isEditMode, // ✅ Only editable in edit mode
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: const Icon(Icons.email),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: !_isEditMode,
-                        fillColor: !_isEditMode ? Colors.grey[100] : null,
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                            .hasMatch(value)) {
-                          return 'Please enter a valid email';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildStaticInfoRow('Phone', widget.userProfile.phone),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Account Information (Read-only)
-                _buildInfoCard(
-                  title: 'Account Information',
-                  icon: Icons.account_circle_outlined,
-                  children: [
-                    _buildInfoRow('User ID', widget.userProfile.id.toString()),
-                    _buildInfoRow(
-                        'Last Login', _formatDate(widget.userProfile.lastLogin)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // KYC Information (Read-only)
-                _buildInfoCard(
-                  title: 'KYC Information',
-                  icon: Icons.security_outlined,
-                  children: [
-                    _buildInfoRowWithStatus(
-                      'KYC Status',
-                      widget.userProfile.kycStatus,
-                      _getKycStatusColor(widget.userProfile.kycStatus),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // ✅ Save button only visible in edit mode
-                if (_isEditMode)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isUpdating ? null : _updateProfile,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF001127),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        disabledBackgroundColor: Colors.grey[300],
-                      ),
-                      child: _isUpdating
-                          ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                          AlwaysStoppedAnimation(Colors.white),
-                        ),
-                      )
-                          : const Text(
-                        'Save Changes',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                      const SizedBox(height: 16),
+                      Text(
+                        widget.userProfile.name,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'USER ID: ${widget.userProfile.id}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-              ],
-            ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Editable Personal Information
+              _buildEditableInfoCard(
+                title: 'Personal Information',
+                icon: Icons.person_outline,
+                children: [
+                  ModernInputField(
+                    controller: _nameController,
+                    enabled: _isEditMode, // ✅ Only editable in edit mode
+                    label: 'Full Name',
+                    hint: 'Enter your full name',
+                    prefixIcon: Icons.person_outlined,
+                    showLabel: true,
+                    showClearButton: _isEditMode,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ModernInputField(
+                    controller: _emailController,
+                    enabled: _isEditMode, // ✅ Only editable in edit mode
+                    keyboardType: TextInputType.emailAddress,
+                    label: 'Email',
+                    hint: 'Enter your email address',
+                    prefixIcon: Icons.email_outlined,
+                    showLabel: true,
+                    showClearButton: _isEditMode,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your email';
+                      }
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                          .hasMatch(value)) {
+                        return 'Please enter a valid email';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildStaticInfoRow('Phone', widget.userProfile.phone),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Account Information (Read-only)
+              _buildInfoCard(
+                title: 'Account Information',
+                icon: Icons.account_circle_outlined,
+                children: [
+                  _buildInfoRow('User ID', widget.userProfile.id.toString()),
+                  _buildInfoRow(
+                      'Last Login', _formatDate(widget.userProfile.lastLogin)),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // KYC Information (Read-only)
+              _buildInfoCard(
+                title: 'KYC Information',
+                icon: Icons.security_outlined,
+                children: [
+                  _buildInfoRowWithStatus(
+                    'KYC Status',
+                    widget.userProfile.kycStatus,
+                    _getKycStatusColor(widget.userProfile.kycStatus),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // ✅ Save button only visible in edit mode
+              if (_isEditMode)
+                ModernButton(
+                  text: 'Save Changes',
+                  onPressed: _isUpdating ? null : _updateProfile,
+                  isLoading: _isUpdating,
+                  icon: Icons.save_outlined,
+                ),
+            ],
           ),
         ),
       ),
@@ -702,7 +673,8 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     );
   }
 
-  Widget _buildInfoRowWithStatus(String label, String value, Color statusColor) {
+  Widget _buildInfoRowWithStatus(
+      String label, String value, Color statusColor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(

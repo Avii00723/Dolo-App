@@ -11,6 +11,7 @@ import '../LocationinputField.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Models/OrderModel.dart';
 import '../LoginScreens/kyc_screen.dart';
+import '../../Widgets/ModernInputField.dart';
 
 class CreateOrderPage extends StatefulWidget {
   final VoidCallback? onOrderCreated;
@@ -30,11 +31,15 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   final TextEditingController originController = TextEditingController();
   final TextEditingController destinationController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
-  final TextEditingController timeController = TextEditingController(); // New time controller
+  final TextEditingController timeController =
+      TextEditingController(); // New time controller
   final TextEditingController weightController = TextEditingController();
-  final TextEditingController actualWeightController = TextEditingController(); // For "more than 10kg"
-  final TextEditingController specialInstructionsController = TextEditingController();
-  final TextEditingController customCategoryController = TextEditingController(); // For "other" category
+  final TextEditingController actualWeightController =
+      TextEditingController(); // For "more than 10kg"
+  final TextEditingController specialInstructionsController =
+      TextEditingController();
+  final TextEditingController customCategoryController =
+      TextEditingController(); // For "other" category
 
   Position? originPosition;
   Position? destinationPosition;
@@ -160,7 +165,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           return false;
         }
         if (originPosition == null) {
-          _showSnackBar('Please get coordinates for origin location', Colors.orange);
+          _showSnackBar(
+              'Please get coordinates for origin location', Colors.orange);
           return false;
         }
         return true;
@@ -170,7 +176,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           return false;
         }
         if (destinationPosition == null) {
-          _showSnackBar('Please get coordinates for destination location', Colors.orange);
+          _showSnackBar(
+              'Please get coordinates for destination location', Colors.orange);
           return false;
         }
         return true;
@@ -192,7 +199,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           return false;
         }
         // Check if custom category is required and provided
-        if (_selectedMainCategory!.apiValue == 'other' && customCategoryController.text.trim().isEmpty) {
+        if (_selectedMainCategory!.apiValue == 'other' &&
+            customCategoryController.text.trim().isEmpty) {
           _showSnackBar('Please enter a custom category', Colors.orange);
           return false;
         }
@@ -218,7 +226,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       });
 
       // ✅ NEW: Use API value for category only
-      String apiCategory = _selectedMainCategory!.apiValue; // e.g., 'technology', 'documents', 'fragile'
+      String apiCategory = _selectedMainCategory!
+          .apiValue; // e.g., 'technology', 'documents', 'fragile'
 
       print('DEBUG: Starting order creation process');
       print('DEBUG: Category (API): $apiCategory');
@@ -231,13 +240,15 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
       // Get actual weight if "more than 10kg"
       double? actualWeight;
-      if (weightString == 'more than 10kg' && actualWeightController.text.trim().isNotEmpty) {
+      if (weightString == 'more than 10kg' &&
+          actualWeightController.text.trim().isNotEmpty) {
         actualWeight = double.tryParse(actualWeightController.text.trim());
       }
 
       // Get custom category if category is "other"
       String? customCategory;
-      if (apiCategory == 'other' && customCategoryController.text.trim().isNotEmpty) {
+      if (apiCategory == 'other' &&
+          customCategoryController.text.trim().isNotEmpty) {
         customCategory = customCategoryController.text.trim();
       }
 
@@ -256,11 +267,17 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         destinationLongitude: destinationPosition!.longitude,
         deliveryDate: _formatDateForApi(dateController.text.trim()),
         deliveryTime: deliveryTime, // Required time field
-        weight: weightString, // String value: "less than 5kg", "5-10kg", "more than 10kg"
-        actualWeight: actualWeight, // Optional, required if weight is "more than 10kg"
-        category: apiCategory, // fragile, technology, documents, food, clothing, other
-        customCategory: customCategory, // Optional, required if category is "other"
-        preferenceTransport: _selectedTransportModes.isNotEmpty ? _selectedTransportModes : null, // Optional transport preferences
+        weight:
+            weightString, // String value: "less than 5kg", "5-10kg", "more than 10kg"
+        actualWeight:
+            actualWeight, // Optional, required if weight is "more than 10kg"
+        category:
+            apiCategory, // fragile, technology, documents, food, clothing, other
+        customCategory:
+            customCategory, // Optional, required if category is "other"
+        preferenceTransport: _selectedTransportModes.isNotEmpty
+            ? _selectedTransportModes
+            : null, // Optional transport preferences
         isUrgent: _isUrgent, // Urgent flag
         images: _selectedImages,
         specialInstructions: specialInstructionsController.text.trim().isEmpty
@@ -280,7 +297,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         print('DEBUG: Order ID: ${response.orderId}');
 
         if (response.imageUrls != null && response.imageUrls!.isNotEmpty) {
-          print('DEBUG: ✅ ${response.imageUrls!.length} image(s) uploaded successfully');
+          print(
+              'DEBUG: ✅ ${response.imageUrls!.length} image(s) uploaded successfully');
         }
 
         _clearAllFields();
@@ -297,7 +315,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
         String successMessage = 'Order ID: #${response.orderId}';
         if (response.imageUrls != null && response.imageUrls!.isNotEmpty) {
-          successMessage += '\n📸 ${response.imageUrls!.length} image(s) uploaded';
+          successMessage +=
+              '\n📸 ${response.imageUrls!.length} image(s) uploaded';
         }
 
         _showSuccessToast(successMessage);
@@ -319,7 +338,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       if (e.toString().contains('KYC') || e.toString().contains('403')) {
         _showKycRequiredDialog();
       } else {
-        _showSnackBar('Failed to create order: ${e.toString().replaceAll('Exception: ', '')}', Colors.red);
+        _showSnackBar(
+            'Failed to create order: ${e.toString().replaceAll('Exception: ', '')}',
+            Colors.red);
       }
     }
   }
@@ -373,7 +394,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                    Icon(Icons.info_outline,
+                        color: Colors.orange[700], size: 20),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
@@ -406,7 +428,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF001127),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -466,7 +489,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                   color: Colors.white24,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_circle, color: Colors.white, size: 24),
+                child: const Icon(Icons.check_circle,
+                    color: Colors.white, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -602,7 +626,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         setState(() {
           _selectedImages.add(File(image.path));
         });
-        _showSnackBar('Image added (${_selectedImages.length} total)', Colors.green);
+        _showSnackBar(
+            'Image added (${_selectedImages.length} total)', Colors.green);
       }
     } catch (e) {
       _showSnackBar('Error picking image: $e', Colors.red);
@@ -622,7 +647,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           setState(() {
             _selectedImages.addAll(images.map((img) => File(img.path)));
           });
-          _showSnackBar('${images.length} images added (${_selectedImages.length} total)', Colors.green);
+          _showSnackBar(
+              '${images.length} images added (${_selectedImages.length} total)',
+              Colors.green);
         }
       } else {
         await _getImage(source);
@@ -650,7 +677,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
 
     if (originPosition == null || destinationPosition == null) {
-      _showSnackBar('Please ensure both origin and destination coordinates are set', Colors.red);
+      _showSnackBar(
+          'Please ensure both origin and destination coordinates are set',
+          Colors.red);
       return false;
     }
 
@@ -769,7 +798,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
               ),
             ],
@@ -973,10 +1003,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               onPressed: _currentStep == _totalSteps - 1
                   ? _createOrder
                   : () {
-                if (_validateCurrentStep()) {
-                  _nextStep();
-                }
-              },
+                      if (_validateCurrentStep()) {
+                        _nextStep();
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -987,32 +1017,34 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               ),
               child: _isCreatingOrder
                   ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
                   : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _currentStep == _totalSteps - 1 ? 'Create Order' : 'Continue',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _currentStep == _totalSteps - 1
+                              ? 'Create Order'
+                              : 'Continue',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.arrow_forward,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(
-                    Icons.arrow_forward,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ],
-              ),
             ),
           ),
         ],
@@ -1217,7 +1249,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             decoration: BoxDecoration(
               color: _isUrgent ? Colors.red[50] : Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _isUrgent ? Colors.red[200]! : Colors.grey[300]!),
+              border: Border.all(
+                  color: _isUrgent ? Colors.red[200]! : Colors.grey[300]!),
             ),
             child: Row(
               children: [
@@ -1237,14 +1270,19 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.local_fire_department, color: _isUrgent ? Colors.red[700] : Colors.grey[600], size: 20),
+                          Icon(Icons.local_fire_department,
+                              color: _isUrgent
+                                  ? Colors.red[700]
+                                  : Colors.grey[600],
+                              size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'Urgent Delivery',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: _isUrgent ? Colors.red[700] : Colors.black87,
+                              color:
+                                  _isUrgent ? Colors.red[700] : Colors.black87,
                             ),
                           ),
                         ],
@@ -1293,108 +1331,103 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Build innovative weight range selector
+  // Build weight range dropdown selector
   Widget _buildWeightRangeSelector() {
     final weightRanges = [
-      {'label': 'Below 2 kg', 'icon': '📦', 'color': Colors.green, 'description': 'Light packages'},
-      {'label': '2–5 kg', 'icon': '📦📦', 'color': Colors.blue, 'description': 'Medium packages'},
-      {'label': '5–10 kg', 'icon': '📦📦📦', 'color': Colors.orange, 'description': 'Heavy packages'},
-      {'label': 'More than 10 kg', 'icon': '📦📦📦📦', 'color': Colors.red, 'description': 'Very heavy packages'},
+      'Below 2 kg',
+      '2–5 kg',
+      '5–10 kg',
+      'More than 10 kg',
     ];
 
-    return Column(
-      children: weightRanges.map((range) {
-        final isSelected = _selectedWeightRange == range['label'];
-        final color = range['color'] as Color;
+    final weightIcons = {
+      'Below 2 kg': Icons.inventory_2_outlined,
+      '2–5 kg': Icons.inventory_2,
+      '5–10 kg': Icons.move_to_inbox,
+      'More than 10 kg': Icons.all_inbox,
+    };
 
-        return GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedWeightRange = range['label'] as String;
-            });
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isSelected ? color.withOpacity(0.1) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isSelected ? color : Colors.grey[300]!,
-                width: isSelected ? 2 : 1,
-              ),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: color.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : [],
-            ),
-            child: Row(
-              children: [
-                // Icon container
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: isSelected ? color : color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      range['icon'] as String,
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Label and description
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        range['label'] as String,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                          color: isSelected ? color : Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        range['description'] as String,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Check icon
-                if (isSelected)
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-              ],
-            ),
+    final weightColors = {
+      'Below 2 kg': Colors.green,
+      '2–5 kg': Colors.blue,
+      '5–10 kg': Colors.orange,
+      'More than 10 kg': Colors.red,
+    };
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[300]!, width: 2),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        );
-      }).toList(),
+        ],
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _selectedWeightRange,
+        hint: Row(
+          children: [
+            Icon(Icons.scale, color: Colors.grey[400], size: 22),
+            const SizedBox(width: 12),
+            const Text(
+              'Select package weight',
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ],
+        ),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+        ),
+        icon: Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
+        ),
+        isExpanded: true,
+        menuMaxHeight: 400,
+        items: weightRanges.map((weight) {
+          return DropdownMenuItem<String>(
+            value: weight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 45,
+                    height: 45,
+                    decoration: BoxDecoration(
+                      color: weightColors[weight]!.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      weightIcons[weight]!,
+                      color: weightColors[weight]!,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      weight,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+        onChanged: (String? newValue) {
+          setState(() {
+            _selectedWeightRange = newValue;
+          });
+        },
+      ),
     );
   }
 
@@ -1406,7 +1439,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       child: Column(
         children: [
           _buildWeightRangeSelector(),
-          const SizedBox(height: 30),
+          const SizedBox(height: 24),
 
           // Transport Preference Section
           Align(
@@ -1416,10 +1449,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.directions_car, color: AppColors.primary, size: 20),
+                    Icon(Icons.directions_car,
+                        color: AppColors.primary, size: 20),
                     const SizedBox(width: 8),
                     const Text(
-                      'Preferred Transport Modes (Optional)',
+                      'Preferred Vehicle (Optional)',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1428,9 +1462,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
-                  'Select one or more transport modes you prefer',
+                  'Select your preferred transport mode',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.grey[600],
@@ -1439,62 +1473,117 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
-          // Transport chips
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _transportModes.map((mode) {
-              final isSelected = _selectedTransportModes.contains(mode);
-              IconData icon;
-              switch (mode) {
-                case 'Car': icon = Icons.directions_car; break;
-                case 'Bike': icon = Icons.two_wheeler; break;
-                case 'Pickup Truck': icon = Icons.local_shipping; break;
-                case 'Truck': icon = Icons.local_shipping; break;
-                case 'Bus': icon = Icons.directions_bus; break;
-                case 'Train': icon = Icons.train; break;
-                case 'Plane': icon = Icons.flight; break;
-                default: icon = Icons.directions; break;
-              }
+          // Transport dropdown
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: Colors.grey[300]!, width: 2),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: DropdownButtonFormField<String>(
+              value: _selectedTransportModes.isNotEmpty
+                  ? _selectedTransportModes.first
+                  : null,
+              hint: Row(
+                children: [
+                  Icon(Icons.directions_car, color: Colors.grey[400], size: 22),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Select preferred vehicle',
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                ],
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+              ),
+              icon: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
+              ),
+              isExpanded: true,
+              menuMaxHeight: 400,
+              items: _transportModes.map((mode) {
+                IconData icon;
+                switch (mode) {
+                  case 'Car':
+                    icon = Icons.directions_car;
+                    break;
+                  case 'Bike':
+                    icon = Icons.two_wheeler;
+                    break;
+                  case 'Pickup Truck':
+                    icon = Icons.local_shipping;
+                    break;
+                  case 'Truck':
+                    icon = Icons.local_shipping;
+                    break;
+                  case 'Bus':
+                    icon = Icons.directions_bus;
+                    break;
+                  case 'Train':
+                    icon = Icons.train;
+                    break;
+                  case 'Plane':
+                    icon = Icons.flight;
+                    break;
+                  default:
+                    icon = Icons.directions;
+                    break;
+                }
 
-              return FilterChip(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(icon, size: 16, color: isSelected ? Colors.white : AppColors.primary),
-                    const SizedBox(width: 6),
-                    Text(mode),
-                  ],
-                ),
-                selected: isSelected,
-                onSelected: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedTransportModes.add(mode);
-                    } else {
-                      _selectedTransportModes.remove(mode);
-                    }
-                  });
-                },
-                selectedColor: AppColors.primary,
-                checkmarkColor: Colors.white,
-                labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black87,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                ),
-                backgroundColor: Colors.grey[100],
-                side: BorderSide(
-                  color: isSelected ? AppColors.primary : Colors.grey[300]!,
-                  width: isSelected ? 2 : 1,
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              );
-            }).toList(),
+                return DropdownMenuItem<String>(
+                  value: mode,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 45,
+                          height: 45,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(icon, color: AppColors.primary, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            mode,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  if (newValue != null) {
+                    _selectedTransportModes = [newValue];
+                  } else {
+                    _selectedTransportModes = [];
+                  }
+                });
+              },
+            ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1504,14 +1593,15 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.purple[700]),
+                Icon(Icons.info_outline, color: Colors.purple[700], size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Select the weight range that best matches your package. Transport preferences help match you with suitable travelers.',
+                    'Select the weight range that best matches your package. Transport preference helps match you with suitable travelers.',
                     style: TextStyle(
                       color: Colors.purple[700],
                       fontSize: 13,
+                      height: 1.4,
                     ),
                   ),
                 ),
@@ -1532,16 +1622,24 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         children: [
           Container(
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+              border: Border.all(color: Colors.grey[300]!, width: 2),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: DropdownButtonFormField<OrderMainCategory>(
               value: _selectedMainCategory,
               hint: Row(
-                children: const [
-                  Icon(Icons.category, color: Colors.grey),
-                  SizedBox(width: 12),
-                  Text(
+                children: [
+                  Icon(Icons.category, color: Colors.grey[400], size: 22),
+                  const SizedBox(width: 12),
+                  const Text(
                     'Select category',
                     style: TextStyle(color: Colors.grey, fontSize: 16),
                   ),
@@ -1549,34 +1647,62 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               ),
               decoration: const InputDecoration(
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 20, vertical: 17),
               ),
-              icon: const Icon(Icons.keyboard_arrow_down),
+              icon: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
+              ),
               isExpanded: true,
               menuMaxHeight: 400,
               itemHeight: null,
+              selectedItemBuilder: (BuildContext context) {
+                return orderCategories.map<Widget>((category) {
+                  return Row(
+                    children: [
+                      const SizedBox(width: 4),
+                      Text(
+                        category.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList();
+              },
               items: orderCategories.map((category) {
                 return DropdownMenuItem<OrderMainCategory>(
                   value: category,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: category.color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 45,
+                          height: 45,
+                          decoration: BoxDecoration(
+                            color: category.color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(category.icon,
+                                style: const TextStyle(fontSize: 20)),
+                          ),
                         ),
-                        child: Center(
-                          child: Text(category.icon, style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            category.name,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        category.name,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               }).toList(),
@@ -1591,10 +1717,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               },
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           if (_selectedMainCategory != null)
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: _selectedMainCategory!.color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(16),
@@ -1659,9 +1785,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 ],
               ),
             ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           // Custom category input field (shown only when category is "other")
-          if (_selectedMainCategory != null && _selectedMainCategory!.apiValue == 'other')
+          if (_selectedMainCategory != null &&
+              _selectedMainCategory!.apiValue == 'other')
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1674,7 +1801,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                      Icon(Icons.info_outline,
+                          color: Colors.orange[700], size: 20),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -1683,45 +1811,49 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                             fontSize: 13,
                             color: Colors.orange[900],
                             fontWeight: FontWeight.w500,
+                            height: 1.4,
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 _buildStepInputField(
                   controller: customCategoryController,
                   icon: Icons.label,
-                  label: 'Custom Category (Required)',
-                  hint: 'e.g., Books, Toys, Plants, etc.',
+                  label: 'Custom Category',
+                  hint: 'Enter category name (e.g., Books, Toys, etc.)',
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
               ],
             ),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.blue[700]),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Select the category that best describes the type of package you\'re sending.',
-                    style: TextStyle(
-                      color: Colors.blue[700],
-                      fontSize: 13,
+          if (_selectedMainCategory == null ||
+              _selectedMainCategory!.apiValue != 'other')
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Select the category that best describes the type of package you\'re sending.',
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -1741,7 +1873,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 width: double.infinity,
                 height: 200,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!, width: 2, style: BorderStyle.solid),
+                  border: Border.all(
+                      color: Colors.grey[300]!,
+                      width: 2,
+                      style: BorderStyle.solid),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -1801,13 +1936,17 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                         onTap: _pickImage,
                         child: Container(
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!, width: 2, style: BorderStyle.solid),
+                            border: Border.all(
+                                color: Colors.grey[300]!,
+                                width: 2,
+                                style: BorderStyle.solid),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.add, color: Colors.grey[400], size: 32),
+                              Icon(Icons.add,
+                                  color: Colors.grey[400], size: 32),
                               const SizedBox(height: 4),
                               Text(
                                 'Add More',
@@ -1885,34 +2024,27 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            readOnly: readOnly,
-            onTap: onTap,
-            maxLines: maxLines,
-            decoration: InputDecoration(
-              labelText: label,
-              hintText: hint,
-              prefixIcon: Icon(icon, color: AppColors.primary),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(16),
-              labelStyle: TextStyle(color: AppColors.primary),
-            ),
-          ),
+        ModernInputField(
+          controller: controller,
+          label: label,
+          hint: hint,
+          prefixIcon: icon,
+          keyboardType: keyboardType,
+          readOnly: readOnly,
+          onTap: onTap,
+          maxLines: maxLines,
+          showClearButton: !readOnly,
         ),
         if (helperText != null) ...[
           const SizedBox(height: 8),
-          Text(
-            helperText,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Text(
+              helperText,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
             ),
           ),
         ],

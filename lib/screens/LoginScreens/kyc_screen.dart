@@ -142,7 +142,8 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(true); // Return to previous screen with success
+              Navigator.of(context)
+                  .pop(true); // Return to previous screen with success
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF001127),
@@ -174,8 +175,8 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF001127),
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF001127),
         title: const Text('Upload KYC Document'),
         elevation: 0,
       ),
@@ -184,6 +185,7 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 20),
             // Header Section
             Container(
               padding: const EdgeInsets.all(16),
@@ -276,7 +278,9 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
                   color: Colors.grey[50],
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _selectedFile != null ? Colors.green : Colors.grey[300]!,
+                    color: _selectedFile != null
+                        ? Colors.green
+                        : Colors.grey[300]!,
                     width: 2,
                     style: BorderStyle.solid,
                   ),
@@ -285,18 +289,26 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      _selectedFile != null ? Icons.check_circle : Icons.cloud_upload,
+                      _selectedFile != null
+                          ? Icons.check_circle
+                          : Icons.cloud_upload,
                       size: 64,
-                      color: _selectedFile != null ? Colors.green : Colors.grey[400],
+                      color: _selectedFile != null
+                          ? Colors.green
+                          : Colors.grey[400],
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      _selectedFile != null ? _fileName! : 'Tap to select document',
+                      _selectedFile != null
+                          ? _fileName!
+                          : 'Tap to select document',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: _selectedFile != null ? Colors.green : Colors.grey[600],
+                        color: _selectedFile != null
+                            ? Colors.green
+                            : Colors.grey[600],
                       ),
                     ),
                     if (_selectedFile != null) ...[
@@ -340,17 +352,19 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
                 onPressed: _isUploading ? null : _uploadKyc,
                 icon: _isUploading
                     ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
                     : const Icon(Icons.upload_file),
                 label: Text(
                   _isUploading ? 'Uploading...' : 'Upload Document',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF001127),

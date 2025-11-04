@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_places_autocomplete_text_field/google_places_autocomplete_text_field.dart';
 import '../Services/LocationService.dart';
 import '../../Constants/colorconstant.dart';
+import '../../Widgets/ModernInputField.dart';
 
 class EnhancedLocationInputField extends StatefulWidget {
   final TextEditingController controller;
@@ -24,10 +25,12 @@ class EnhancedLocationInputField extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<EnhancedLocationInputField> createState() => _EnhancedLocationInputFieldState();
+  State<EnhancedLocationInputField> createState() =>
+      _EnhancedLocationInputFieldState();
 }
 
-class _EnhancedLocationInputFieldState extends State<EnhancedLocationInputField> {
+class _EnhancedLocationInputFieldState
+    extends State<EnhancedLocationInputField> {
   Position? selectedPosition;
 
   @override
@@ -38,26 +41,16 @@ class _EnhancedLocationInputFieldState extends State<EnhancedLocationInputField>
         GestureDetector(
           onTap: () => _showLocationSearchScreen(context),
           child: AbsorbPointer(
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(12),
-                color: Colors.white,
-              ),
-              child: TextField(
-                controller: widget.controller,
-                decoration: InputDecoration(
-                  labelText: widget.label,
-                  hintText: widget.hint,
-                  prefixIcon: Icon(widget.icon, color: AppColors.primary),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.all(16),
-                  suffixIcon: Icon(
-                    Icons.arrow_drop_down,
-                    color: AppColors.primary,
-                  ),
-                  labelStyle: TextStyle(color: AppColors.primary),
-                ),
+            child: ModernInputField(
+              controller: widget.controller,
+              label: widget.label,
+              hint: widget.hint,
+              prefixIcon: widget.icon,
+              readOnly: true,
+              showClearButton: false,
+              suffixIcon: Icon(
+                Icons.arrow_drop_down,
+                color: AppColors.primary,
               ),
             ),
           ),
@@ -65,15 +58,16 @@ class _EnhancedLocationInputFieldState extends State<EnhancedLocationInputField>
         if (selectedPosition != null) ...[
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.all(8),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.green[50],
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.green[200]!),
             ),
             child: Row(
               children: [
-                Icon(Icons.location_on, color: Colors.green[700], size: 16),
+                Icon(Icons.location_on, color: Colors.green[700], size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -81,6 +75,7 @@ class _EnhancedLocationInputFieldState extends State<EnhancedLocationInputField>
                     style: TextStyle(
                       color: Colors.green[700],
                       fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -92,10 +87,17 @@ class _EnhancedLocationInputFieldState extends State<EnhancedLocationInputField>
                     });
                     widget.onLocationSelected?.call(null);
                   },
-                  child: Icon(
-                    Icons.close,
-                    color: Colors.green[700],
-                    size: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.green[100],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.close,
+                      color: Colors.green[700],
+                      size: 16,
+                    ),
                   ),
                 ),
               ],
@@ -234,7 +236,9 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
-                            onTap: isLoadingCurrentLocation ? null : _getCurrentLocation,
+                            onTap: isLoadingCurrentLocation
+                                ? null
+                                : _getCurrentLocation,
                             child: Padding(
                               padding: const EdgeInsets.all(20),
                               child: Row(
@@ -247,23 +251,26 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                     ),
                                     child: isLoadingCurrentLocation
                                         ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
-                                    )
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                      Colors.white),
+                                            ),
+                                          )
                                         : const Icon(
-                                      Icons.gps_fixed,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
+                                            Icons.gps_fixed,
+                                            color: Colors.white,
+                                            size: 24,
+                                          ),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           isLoadingCurrentLocation
@@ -279,7 +286,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                         Text(
                                           'Auto-detect your current position',
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(0.9),
+                                            color:
+                                                Colors.white.withOpacity(0.9),
                                             fontSize: 13,
                                           ),
                                         ),
@@ -301,7 +309,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
 
                     // Divider with text
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       child: Row(
                         children: [
                           Expanded(
@@ -337,91 +346,118 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
-                          GooglePlacesAutoCompleteTextFormField(
-                            textEditingController: _searchController,
-                            focusNode: _searchFocusNode,
-                            config: const GoogleApiConfig(
-                              apiKey: 'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
-                              countries: ['in'],
-                              fetchPlaceDetailsWithCoordinates: true,
-                              debounceTime: 400,
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            onPredictionWithCoordinatesReceived: (prediction) {
-                              if (prediction.lat != null && prediction.lng != null) {
-                                final position = Position(
-                                  latitude: double.parse(prediction.lat.toString()),
-                                  longitude: double.parse(prediction.lng.toString()),
-                                  timestamp: DateTime.now(),
-                                  accuracy: 0.0,
-                                  altitude: 0.0,
-                                  altitudeAccuracy: 0.0,
-                                  heading: 0.0,
-                                  headingAccuracy: 0.0,
-                                  speed: 0.0,
-                                  speedAccuracy: 0.0,
-                                );
+                            child: GooglePlacesAutoCompleteTextFormField(
+                              textEditingController: _searchController,
+                              focusNode: _searchFocusNode,
+                              config: const GoogleApiConfig(
+                                apiKey:
+                                    'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
+                                countries: ['in'],
+                                fetchPlaceDetailsWithCoordinates: true,
+                                debounceTime: 400,
+                              ),
+                              onPredictionWithCoordinatesReceived:
+                                  (prediction) {
+                                if (prediction.lat != null &&
+                                    prediction.lng != null) {
+                                  final position = Position(
+                                    latitude:
+                                        double.parse(prediction.lat.toString()),
+                                    longitude:
+                                        double.parse(prediction.lng.toString()),
+                                    timestamp: DateTime.now(),
+                                    accuracy: 0.0,
+                                    altitude: 0.0,
+                                    altitudeAccuracy: 0.0,
+                                    heading: 0.0,
+                                    headingAccuracy: 0.0,
+                                    speed: 0.0,
+                                    speedAccuracy: 0.0,
+                                  );
 
-                                final address = prediction.description ?? '';
-                                widget.onLocationSelected(position, address);
+                                  final address = prediction.description ?? '';
+                                  widget.onLocationSelected(position, address);
 
-                                _showSuccessSnackBar(
-                                    context,
-                                    widget.isOrigin
-                                        ? '✅ Origin location selected'
-                                        : '✅ Destination location selected'
+                                  _showSuccessSnackBar(
+                                      context,
+                                      widget.isOrigin
+                                          ? '✅ Origin location selected'
+                                          : '✅ Destination location selected');
+                                }
+                              },
+                              onSuggestionClicked: (prediction) {
+                                final description =
+                                    prediction.description ?? '';
+                                _searchController.text = description;
+                                _searchController.selection =
+                                    TextSelection.fromPosition(
+                                  TextPosition(offset: description.length),
                                 );
-                              }
-                            },
-                            onSuggestionClicked: (prediction) {
-                              final description = prediction.description ?? '';
-                              _searchController.text = description;
-                              _searchController.selection = TextSelection.fromPosition(
-                                TextPosition(offset: description.length),
-                              );
-                            },
-                            decoration: InputDecoration(
-                              hintText: 'Search for a location...',
-                              hintStyle: TextStyle(
-                                color: Colors.grey[400],
+                              },
+                              decoration: InputDecoration(
+                                hintText: 'Search for a location...',
+                                hintStyle: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 16,
+                                ),
+                                prefixIcon: Padding(
+                                  padding: const EdgeInsets.only(
+                                      left: 16, right: 12),
+                                  child: Icon(
+                                    Icons.search,
+                                    color: Colors.grey[400],
+                                    size: 22,
+                                  ),
+                                ),
+                                suffixIcon: _searchController.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: Icon(Icons.clear,
+                                            color: Colors.grey[600]),
+                                        onPressed: () {
+                                          setState(() {
+                                            _searchController.clear();
+                                          });
+                                        },
+                                      )
+                                    : null,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: BorderSide(
+                                      color: Colors.grey[300]!, width: 2),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: BorderSide(
+                                      color: Colors.grey[300]!, width: 2),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: BorderSide(
+                                      color: AppColors.primary, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 17,
+                                ),
+                              ),
+                              style: const TextStyle(
                                 fontSize: 16,
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w500,
                               ),
-                              prefixIcon: Icon(
-                                Icons.search,
-                                color: AppColors.primary,
-                                size: 28,
-                              ),
-                              suffixIcon: _searchController.text.isNotEmpty
-                                  ? IconButton(
-                                icon: Icon(Icons.clear, color: Colors.grey[600]),
-                                onPressed: () {
-                                  setState(() {
-                                    _searchController.clear();
-                                  });
-                                },
-                              )
-                                  : null,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: AppColors.primary, width: 2),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 18,
-                              ),
-                            ),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.black87,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -621,8 +657,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               color == Colors.green
                   ? Icons.check_circle
                   : color == Colors.red
-                  ? Icons.error_outline
-                  : Icons.info_outline,
+                      ? Icons.error_outline
+                      : Icons.info_outline,
               color: Colors.white,
               size: 20,
             ),
