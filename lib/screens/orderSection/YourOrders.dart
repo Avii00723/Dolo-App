@@ -264,7 +264,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           destinationLongitude: order.destinationLongitude,
           orderType: 'send',
           estimatedDistance: order.distanceKm,
-          expectedPrice: order.expectedPrice,
+          expectedPrice: order.expectedPrice ?? (order.calculatedPrice != null ? order.calculatedPrice!.toInt() : null),
           notes: order.specialInstructions,
           imageUrl: "${ApiConstants.imagebaseUrl}${order.imageUrl}",
           category: order.category,

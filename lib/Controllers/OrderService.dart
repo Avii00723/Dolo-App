@@ -26,12 +26,20 @@ class OrderService {
       request.fields['origin_latitude'] = order.originLatitude.toString();
       request.fields['origin_longitude'] = order.originLongitude.toString();
       request.fields['destination'] = order.destination;
-      request.fields['destination_latitude'] = order.destinationLatitude.toString();
-      request.fields['destination_longitude'] = order.destinationLongitude.toString();
-      request.fields['delivery_date'] = order.deliveryDate;
-      request.fields['delivery_time'] = order.deliveryTime; // Required time field
+      request.fields['destination_latitude'] =
+          order.destinationLatitude.toString();
+      request.fields['destination_longitude'] =
+          order.destinationLongitude.toString();
+
+      // Combine date and time into delivery_datetime in ISO 8601 format
+      // Format: YYYY-MM-DDTHH:MM:SS (as per API documentation)
+      String deliveryDatetime = '${order.deliveryDate}T${order.deliveryTime}';
+      request.fields['delivery_datetime'] = deliveryDatetime;
+      print('📅 delivery_datetime: $deliveryDatetime');
+
       request.fields['weight'] = order.weight; // String value now
-      request.fields['category'] = order.category; // fragile, technology, documents, food, clothing, other
+      request.fields['category'] = order
+          .category; // fragile, technology, documents, food, clothing, other
       request.fields['is_urgent'] = order.isUrgent.toString(); // Urgent flag
 
       // Add actual_weight if weight is "more than 10kg"
@@ -45,14 +53,18 @@ class OrderService {
       }
 
       // Add preference_transport if provided (array of strings)
-      if (order.preferenceTransport != null && order.preferenceTransport!.isNotEmpty) {
+      if (order.preferenceTransport != null &&
+          order.preferenceTransport!.isNotEmpty) {
         for (int i = 0; i < order.preferenceTransport!.length; i++) {
-          request.fields['preference_transport[$i]'] = order.preferenceTransport![i];
+          request.fields['preference_transport[$i]'] =
+              order.preferenceTransport![i];
         }
-        print('✅ Added ${order.preferenceTransport!.length} preferred transport modes');
+        print(
+            '✅ Added ${order.preferenceTransport!.length} preferred transport modes');
       }
 
-      if (order.specialInstructions != null && order.specialInstructions!.isNotEmpty) {
+      if (order.specialInstructions != null &&
+          order.specialInstructions!.isNotEmpty) {
         request.fields['special_instructions'] = order.specialInstructions!;
       }
 
@@ -142,7 +154,8 @@ class OrderService {
         print('Error: ${response.error}');
         print('Status Code: ${response.statusCode}');
 
-        if (response.statusCode == 403 && response.error?.contains('KYC') == true) {
+        if (response.statusCode == 403 &&
+            response.error?.contains('KYC') == true) {
           throw Exception('KYC_NOT_APPROVED');
         }
 
@@ -188,7 +201,8 @@ class OrderService {
         print('Error: ${response.error}');
         print('Status Code: ${response.statusCode}');
 
-        if (response.statusCode == 403 && response.error?.contains('KYC') == true) {
+        if (response.statusCode == 403 &&
+            response.error?.contains('KYC') == true) {
           throw Exception('KYC_NOT_APPROVED');
         }
 
@@ -213,7 +227,7 @@ class OrderService {
     }
   }
 
-  // Search orders with vehicle and time_hours parameters
+  // Search orders with vehicle parameter
   Future<List<Order>> searchOrders({
     required String origin,
     required String destination,
@@ -222,21 +236,23 @@ class OrderService {
     required double originLatitude,
     required double originLongitude,
     required String vehicle,
-    required double timeHours,
     required String userId,
     String? stopovers, // Optional: Comma-separated list of stopover cities
   }) async {
     print('=== SEARCH ORDERS API CALL ===');
     print('Endpoint: ${ApiConstants.searchOrders}');
+
+    // Combine date and time into delivery_datetime in ISO 8601 format
+    // Format: YYYY-MM-DDTHH:MM:SS (as per API documentation)
+    String deliveryDatetime = '${deliveryDate}T$deliveryTime';
+
     print('Query Parameters:');
     print(' - origin: $origin');
     print(' - destination: $destination');
-    print(' - delivery_date: $deliveryDate');
-    print(' - delivery_time: $deliveryTime');
+    print(' - delivery_datetime: $deliveryDatetime');
     print(' - origin_latitude: $originLatitude');
     print(' - origin_longitude: $originLongitude');
     print(' - vehicle: $vehicle');
-    print(' - time_hours: $timeHours');
     print(' - userId: $userId');
     if (stopovers != null && stopovers.isNotEmpty) {
       print(' - stopovers: $stopovers');
@@ -247,12 +263,10 @@ class OrderService {
       final queryParams = {
         'origin': origin,
         'destination': destination,
-        'delivery_date': deliveryDate,
-        'delivery_time': deliveryTime,
+        'delivery_datetime': deliveryDatetime,
         'origin_latitude': originLatitude.toString(),
         'origin_longitude': originLongitude.toString(),
         'vehicle': vehicle,
-        'time_hours': timeHours.toString(),
         'userId': userId,
       };
 
@@ -267,9 +281,8 @@ class OrderService {
         parser: (json) {
           print('Raw JSON Response: $json');
           if (json['orders'] is List) {
-            final orders = (json['orders'] as List)
-                .map((e) => Order.fromJson(e))
-                .toList();
+            final orders =
+                (json['orders'] as List).map((e) => Order.fromJson(e)).toList();
             print('Parsed Orders Count: ${orders.length}');
             return orders;
           }
@@ -295,7 +308,8 @@ class OrderService {
   }
 
   // Update order
-  Future<OrderUpdateResponse?> updateOrder(String orderId, OrderUpdateRequest order) async {
+  Future<OrderUpdateResponse?> updateOrder(
+      String orderId, OrderUpdateRequest order) async {
     final endpoint = '${ApiConstants.updateOrder}/$orderId';
     print('=== UPDATE ORDER API CALL ===');
     print('Endpoint: $endpoint');
@@ -339,9 +353,8 @@ class OrderService {
         parser: (json) {
           print('Raw JSON Response: $json');
           if (json['orders'] is List) {
-            final orders = (json['orders'] as List)
-                .map((e) => Order.fromJson(e))
-                .toList();
+            final orders =
+                (json['orders'] as List).map((e) => Order.fromJson(e)).toList();
             print('Parsed Orders Count: ${orders.length}');
             return orders;
           }

@@ -9,6 +9,7 @@ class SearchResultsPage extends StatelessWidget {
   final String fromLocation;
   final String toLocation;
   final String date;
+  final String searchedVehicle; // The vehicle type used in search
   final Function(Order) onSendRequest;
 
   const SearchResultsPage({
@@ -17,14 +18,23 @@ class SearchResultsPage extends StatelessWidget {
     required this.fromLocation,
     required this.toLocation,
     required this.date,
+    required this.searchedVehicle,
     required this.onSendRequest,
   }) : super(key: key);
 
   String _formatDateForDisplay(String isoDate) {
+    print('📅 DEBUG formatDate: Input = "$isoDate"');
+    if (isoDate.isEmpty || isoDate == 'N/A') {
+      print('📅 DEBUG formatDate: Empty or N/A received!');
+      return 'N/A';
+    }
     try {
       DateTime dateTime = DateTime.parse(isoDate);
-      return DateFormat('dd MMM yyyy').format(dateTime);
+      String formatted = DateFormat('dd MMM yyyy').format(dateTime);
+      print('📅 DEBUG formatDate: Formatted = "$formatted"');
+      return formatted;
     } catch (e) {
+      print('📅 DEBUG formatDate: Parse error = $e, returning original: "$isoDate"');
       return isoDate;
     }
   }
@@ -175,6 +185,7 @@ class SearchResultsPage extends StatelessWidget {
                   order: order,
                   onSendRequest: () => onSendRequest(order),
                   formatDate: _formatDateForDisplay,
+                  searchedVehicle: searchedVehicle,
                 );
               },
             ),
@@ -193,13 +204,29 @@ class CompactOrderCard extends StatelessWidget {
   final Order order;
   final VoidCallback onSendRequest;
   final String Function(String) formatDate;
+  final String searchedVehicle;
 
   const CompactOrderCard({
     Key? key,
     required this.order,
     required this.onSendRequest,
     required this.formatDate,
+    required this.searchedVehicle,
   }) : super(key: key);
+
+  // ═══════════════════════════════════════════════════════════════════
+  // METHOD: Check if searched vehicle matches order's preferred vehicles
+  // ═══════════════════════════════════════════════════════════════════
+  bool _isVehiclePreferred() {
+    if (order.preferenceTransport == null || order.preferenceTransport!.isEmpty) {
+      return false;
+    }
+
+    // Check if the searched vehicle matches any of the preferred vehicles (case-insensitive)
+    return order.preferenceTransport!.any(
+      (vehicle) => vehicle.toLowerCase() == searchedVehicle.toLowerCase()
+    );
+  }
 
   // ═══════════════════════════════════════════════════════════════════
   // NEW METHOD: Show Route Map for this order
@@ -254,49 +281,57 @@ class CompactOrderCard extends StatelessWidget {
               ),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.local_shipping,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: AppColors.primary,
+                  child: Text(
+                    order.userName.isNotEmpty
+                        ? order.userName[0].toUpperCase()
+                        : 'U',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Order #${order.id}',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'By ${order.userName}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        order.userName.isNotEmpty
+                            ? order.userName
+                            : 'Unknown User',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      // const SizedBox(height: 2),
+                      // Text(
+                      //   'Order #${order.id}',
+                      //   style: TextStyle(
+                      //     fontSize: 10,
+                      //     color: Colors.grey[600],
+                      //     fontWeight: FontWeight.w500,
+                      //   ),
+                      //   overflow: TextOverflow.ellipsis,
+                      //   maxLines: 1,
+                      // ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Container(
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -310,14 +345,14 @@ class CompactOrderCard extends StatelessWidget {
                       Icon(
                         Icons.check_circle,
                         color: Colors.green[700],
-                        size: 14,
+                        size: 12,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         'Available',
                         style: TextStyle(
                           color: Colors.green[700],
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -474,12 +509,68 @@ class CompactOrderCard extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildInfoItem(
-                        icon: Icons.directions_car,
-                        label: 'Vehicle',
-                        value: order.transportMode,
-                        color: Colors.teal,
+                        icon: Icons.access_time,
+                        label: 'Time',
+                        value: order.deliveryTime != null
+                            ? order.deliveryTime!.substring(0, 5)
+                            : 'N/A',
+                        color: Colors.indigo,
                       ),
                     ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // Preferred Transport & Urgent Status
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInfoItem(
+                        icon: Icons.local_shipping,
+                        label: 'Preferred Vehicle',
+                        value: order.preferenceTransport != null && order.preferenceTransport!.isNotEmpty
+                            ? order.preferenceTransport!.join(', ')
+                            : 'Any',
+                        color: Colors.teal,
+                        showPreferredBadge: _isVehiclePreferred(),
+                      ),
+                    ),
+                    if (order.isUrgent == true) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.red[200]!,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.local_fire_department,
+                                color: Colors.red[700],
+                                size: 18,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'URGENT',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
 
@@ -538,7 +629,7 @@ class CompactOrderCard extends StatelessWidget {
                           ],
                         ),
                         Icon(
-                          Icons.monetization_on,
+                          Icons.currency_rupee,
                           color: Colors.green.shade400,
                           size: 40,
                         ),
@@ -617,6 +708,7 @@ class CompactOrderCard extends StatelessWidget {
     required String label,
     required String value,
     required Color color,
+    bool showPreferredBadge = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -629,19 +721,44 @@ class CompactOrderCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Icon(icon, size: 16, color: color),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
+              // Show "Preferred" badge if vehicle matches
+              if (showPreferredBadge) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green[600],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'PREFERRED',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 6),
@@ -652,7 +769,7 @@ class CompactOrderCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
               color: Colors.black87,
             ),
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],

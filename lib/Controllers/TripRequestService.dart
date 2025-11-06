@@ -6,7 +6,8 @@ class TripRequestService {
   final ApiService _api = ApiService();
 
   // Send a trip request
-  Future<TripRequestSendResponse?> sendTripRequest(TripRequestSendRequest request) async {
+  Future<TripRequestSendResponse?> sendTripRequest(
+      TripRequestSendRequest request) async {
     final response = await _api.post(
       ApiConstants.sendTripRequest,
       body: request.toJson(),
@@ -16,7 +17,8 @@ class TripRequestService {
   }
 
   // Accept a trip request
-  Future<TripRequestAcceptResponse?> acceptTripRequest(TripRequestAcceptRequest request) async {
+  Future<TripRequestAcceptResponse?> acceptTripRequest(
+      TripRequestAcceptRequest request) async {
     final response = await _api.post(
       ApiConstants.acceptTripRequest,
       body: request.toJson(),
@@ -29,7 +31,9 @@ class TripRequestService {
   Future<List<TripRequest>> getMyTripRequests(String userHashedId) async {
     final response = await _api.get(
       ApiConstants.getMyTripRequests,
-      queryParameters: {'userHashedId': userHashedId},
+      queryParameters: {
+        'userHashedId': userHashedId
+      }, // Backend expects userHashedId parameter
       parser: (json) {
         if (json['tripRequests'] is List) {
           return (json['tripRequests'] as List)
@@ -43,15 +47,20 @@ class TripRequestService {
   }
 
   // Get all trip requests FOR a user's orders (as order creator/sender)
-  Future<List<TripRequest>> getTripRequestsForMyOrders(String userHashedId) async {
+  // Note: This uses the same mytrip endpoint since the backend doesn't have a separate for-orders endpoint
+  Future<List<TripRequest>> getTripRequestsForMyOrders(
+      String userHashedId) async {
     try {
-      print('🔍 Fetching trip requests for user orders: $userHashedId');
+      print(
+          '🔍 Fetching trip requests for user orders using mytrip endpoint: $userHashedId');
 
       final response = await _api.get(
-        ApiConstants.getOrderTripRequests,
-        queryParameters: {'userHashedId': userHashedId},
+        ApiConstants.getOrderTripRequests, // Now points to mytrip endpoint
+        queryParameters: {
+          'userHashedId': userHashedId
+        }, // Backend expects userHashedId parameter
         parser: (json) {
-          print('📦 Trip requests for orders response: $json');
+          print('📦 Trip requests response: $json');
           if (json['tripRequests'] is List) {
             return (json['tripRequests'] as List)
                 .map((e) => TripRequest.fromJson(e))
@@ -62,18 +71,23 @@ class TripRequestService {
       );
 
       if (response.success) {
-        print('✅ Successfully fetched ${(response.data as List).length} trip requests for orders');
+        print(
+            '✅ Successfully fetched ${(response.data as List).length} trip requests');
         return response.data as List<TripRequest>;
       } else {
-        print('⚠️ Failed to fetch trip requests for orders: ${response.error}');
-        print('⚠️ The endpoint ${ApiConstants.getOrderTripRequests} may not be implemented yet');
-        print('⚠️ Please ensure the backend has this endpoint or use the mytrip endpoint with proper filtering');
+        print('! Failed to fetch trip requests for orders: ${response.error}');
+        print(
+            '! The endpoint http://51.20.193.95:3000/api/trip-requests/for-orders may not be implemented yet');
+        print(
+            '! Please ensure the backend has this endpoint or use the mytrip endpoint with proper filtering');
         return [];
       }
     } catch (e) {
-      print('❌ Exception fetching trip requests for orders: $e');
-      print('⚠️ If you see 404 error, the backend endpoint may not exist yet');
-      print('⚠️ Backend needs to implement: GET /api/trip-requests/for-orders?userHashedId=XXX');
+      print('! Failed to fetch trip requests for orders: $e');
+      print(
+          '! The endpoint http://51.20.193.95:3000/api/trip-requests/for-orders may not be implemented yet');
+      print(
+          '! Please ensure the backend has this endpoint or use the mytrip endpoint with proper filtering');
       return [];
     }
   }

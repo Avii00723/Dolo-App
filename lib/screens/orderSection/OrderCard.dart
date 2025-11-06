@@ -58,30 +58,62 @@ class ModernSenderOrderCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  // Order ID Badge
-                  Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[600],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '#${order.id}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                  // User Name with Icon
+                  Expanded(
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: Colors.blue[600],
+                          child: Text(
+                            order.userName.isNotEmpty
+                                ? order.userName[0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                order.userName.isNotEmpty
+                                    ? order.userName
+                                    : 'Unknown User',
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              Text(
+                                '#${order.id}',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
                   // Status Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: _getStatusColor(order.status),
                       borderRadius: BorderRadius.circular(12),
@@ -109,7 +141,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Route - Compact
                   Row(
                     children: [
-                      Icon(Icons.radio_button_checked, color: Colors.green[600], size: 14),
+                      Icon(Icons.radio_button_checked,
+                          color: Colors.green[600], size: 14),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -160,7 +193,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Quick Info Row
                   Row(
                     children: [
-                      _buildCompactChip(Icons.calendar_today, _formatDate(order.date)),
+                      _buildCompactChip(
+                          Icons.calendar_today, _formatDate(order.date)),
                       const SizedBox(width: 8),
                       _buildCompactChip(Icons.scale, order.weight),
                       const SizedBox(width: 8),
@@ -177,7 +211,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Trip Requests Indicator
                   if (tripRequests != null && tripRequests!.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.orange[50],
                         borderRadius: BorderRadius.circular(8),
@@ -186,7 +221,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.people_outline, color: Colors.orange[700], size: 14),
+                          Icon(Icons.people_outline,
+                              color: Colors.orange[700], size: 14),
                           const SizedBox(width: 6),
                           Text(
                             '${tripRequests!.length} Request${tripRequests!.length > 1 ? 's' : ''}',
@@ -214,7 +250,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_ios, size: 10, color: Colors.grey[400]),
+                      Icon(Icons.arrow_forward_ios,
+                          size: 10, color: Colors.grey[400]),
                     ],
                   ),
                 ],
@@ -281,8 +318,11 @@ class ModernSenderOrderCard extends StatelessWidget {
   String _formatDateTime(String dateTime) {
     try {
       final DateTime parsedDateTime = DateTime.parse(dateTime);
-      final date = '${parsedDateTime.day}/${parsedDateTime.month}/${parsedDateTime.year}';
-      final hour = parsedDateTime.hour > 12 ? parsedDateTime.hour - 12 : (parsedDateTime.hour == 0 ? 12 : parsedDateTime.hour);
+      final date =
+          '${parsedDateTime.day}/${parsedDateTime.month}/${parsedDateTime.year}';
+      final hour = parsedDateTime.hour > 12
+          ? parsedDateTime.hour - 12
+          : (parsedDateTime.hour == 0 ? 12 : parsedDateTime.hour);
       final minute = parsedDateTime.minute.toString().padLeft(2, '0');
       final period = parsedDateTime.hour >= 12 ? 'PM' : 'AM';
       return '$date at $hour:$minute $period';
@@ -370,7 +410,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_rounded, color: Colors.white, size: 28),
+                    const Icon(Icons.warning_rounded,
+                        color: Colors.white, size: 28),
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Column(
@@ -415,7 +456,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.info_outline, color: Colors.red[700], size: 20),
+                              Icon(Icons.info_outline,
+                                  color: Colors.red[700], size: 20),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
@@ -471,9 +513,11 @@ class ModernSenderOrderCard extends StatelessWidget {
                             onPressed: () {
                               print('🔴 DELETE BUTTON PRESSED');
                               print('Order ID to delete: ${order.id}');
-                              print('onDeleteOrder callback is ${onDeleteOrder == null ? 'NULL' : 'NOT NULL'}');
+                              print(
+                                  'onDeleteOrder callback is ${onDeleteOrder == null ? 'NULL' : 'NOT NULL'}');
 
-                              Navigator.pop(context); // Close confirmation dialog
+                              Navigator.pop(
+                                  context); // Close confirmation dialog
                               Navigator.pop(context); // Close details modal
 
                               if (onDeleteOrder != null) {
@@ -520,12 +564,14 @@ class ModernSenderOrderCard extends StatelessWidget {
 
     // Pre-populate with current order data
     final originController = TextEditingController(text: order.origin);
-    final destinationController = TextEditingController(text: order.destination);
-    final itemDescController = TextEditingController(text: order.itemDescription);
-    final weightController = TextEditingController(text: order.weight.toString());
-    final priceController = TextEditingController(
-        text: order.expectedPrice?.toString() ?? ''
-    );
+    final destinationController =
+        TextEditingController(text: order.destination);
+    final itemDescController =
+        TextEditingController(text: order.itemDescription);
+    final weightController =
+        TextEditingController(text: order.weight.toString());
+    final priceController =
+        TextEditingController(text: order.expectedPrice?.toString() ?? '');
     final notesController = TextEditingController(text: order.notes ?? '');
     DateTime selectedDate = DateTime.parse(order.date);
 
@@ -534,7 +580,8 @@ class ModernSenderOrderCard extends StatelessWidget {
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: EdgeInsets.zero,
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
@@ -604,7 +651,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                             controller: originController,
                             label: 'Origin *',
                             icon: Icons.radio_button_checked,
-                            validator: (val) => val?.isEmpty ?? true ? 'Origin required' : null,
+                            validator: (val) =>
+                                val?.isEmpty ?? true ? 'Origin required' : null,
                           ),
                           const SizedBox(height: 16),
 
@@ -613,7 +661,9 @@ class ModernSenderOrderCard extends StatelessWidget {
                             controller: destinationController,
                             label: 'Destination *',
                             icon: Icons.location_on,
-                            validator: (val) => val?.isEmpty ?? true ? 'Destination required' : null,
+                            validator: (val) => val?.isEmpty ?? true
+                                ? 'Destination required'
+                                : null,
                           ),
                           const SizedBox(height: 16),
 
@@ -624,7 +674,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 context: context,
                                 initialDate: selectedDate,
                                 firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                                lastDate: DateTime.now()
+                                    .add(const Duration(days: 365)),
                               );
                               if (picked != null) {
                                 setState(() {
@@ -640,11 +691,13 @@ class ModernSenderOrderCard extends StatelessWidget {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.calendar_today, size: 18, color: Colors.grey[600]),
+                                  Icon(Icons.calendar_today,
+                                      size: 18, color: Colors.grey[600]),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Delivery Date *',
@@ -664,7 +717,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  Icon(Icons.edit, size: 16, color: Colors.blue[600]),
+                                  Icon(Icons.edit,
+                                      size: 16, color: Colors.blue[600]),
                                 ],
                               ),
                             ),
@@ -766,9 +820,10 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 origin: originController.text.trim(),
                                 destination: destinationController.text.trim(),
                                 date: selectedDate.toIso8601String(),
-                                itemDescription: itemDescController.text.trim().isNotEmpty
-                                    ? itemDescController.text.trim()
-                                    : 'Package', // Default value
+                                itemDescription:
+                                    itemDescController.text.trim().isNotEmpty
+                                        ? itemDescController.text.trim()
+                                        : 'Package', // Default value
                                 weight: weightController.text.trim().isNotEmpty
                                     ? '${weightController.text.trim()} kg'
                                     : '0kg',
@@ -782,17 +837,22 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 originLatitude: order.originLatitude,
                                 originLongitude: order.originLongitude,
                                 destinationLatitude: order.destinationLatitude,
-                                destinationLongitude: order.destinationLongitude,
+                                destinationLongitude:
+                                    order.destinationLongitude,
                                 orderType: order.orderType,
                                 estimatedDistance: order.estimatedDistance,
                                 requestStatus: order.requestStatus,
-                                imageUrl:"${ApiConstants.imagebaseUrl}${order.imageUrl}" ?? 'https://example.com/default.jpg',
+                                imageUrl: (order.imageUrl != null &&
+                                        order.imageUrl!.isNotEmpty)
+                                    ? "${ApiConstants.imagebaseUrl}${order.imageUrl}"
+                                    : 'https://example.com/default.jpg',
                                 profileImageUrl: order.profileImageUrl,
                                 matchedTravellerId: order.matchedTravellerId,
                               );
 
                               Navigator.pop(context);
-                              print('✅ Calling onUpdateOrder with order ID: ${updatedOrder.id}');
+                              print(
+                                  '✅ Calling onUpdateOrder with order ID: ${updatedOrder.id}');
                               onUpdateOrder?.call(updatedOrder);
                             }
                           },
@@ -888,44 +948,68 @@ class ModernSenderOrderCard extends StatelessWidget {
 
               // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
                   border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
                 ),
                 child: Row(
                   children: [
-                    Flexible(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[600],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.send_outlined, color: Colors.white, size: 16),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                'Order #${order.id}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.blue[600],
+                            child: Text(
+                              order.userName.isNotEmpty
+                                  ? order.userName[0].toUpperCase()
+                                  : 'U',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  order.userName.isNotEmpty
+                                      ? order.userName
+                                      : 'Unknown User',
+                                  style: const TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                Text(
+                                  'Order #${order.id}',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: _getStatusColor(order.status),
                         borderRadius: BorderRadius.circular(12),
@@ -977,7 +1061,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                       if (order.isUrgent == true) ...[
                         const SizedBox(height: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.red[50],
                             borderRadius: BorderRadius.circular(8),
@@ -986,7 +1071,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.local_fire_department, color: Colors.red[700], size: 18),
+                              Icon(Icons.local_fire_department,
+                                  color: Colors.red[700], size: 18),
                               const SizedBox(width: 8),
                               Text(
                                 'URGENT DELIVERY',
@@ -1028,7 +1114,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                             ),
                             if (order.estimatedDistance != null) ...[
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
                                 child: Row(
                                   children: [
                                     const SizedBox(width: 12),
@@ -1039,7 +1126,10 @@ class ModernSenderOrderCard extends StatelessWidget {
                                         gradient: LinearGradient(
                                           begin: Alignment.topCenter,
                                           end: Alignment.bottomCenter,
-                                          colors: [Colors.green[400]!, Colors.red[400]!],
+                                          colors: [
+                                            Colors.green[400]!,
+                                            Colors.red[400]!
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -1115,14 +1205,16 @@ class ModernSenderOrderCard extends StatelessWidget {
                               'Weight',
                               order.weight,
                             ),
-                            if (order.preferenceTransport != null && order.preferenceTransport!.isNotEmpty) ...[
+                            if (order.preferenceTransport != null &&
+                                order.preferenceTransport!.isNotEmpty) ...[
                               const Divider(height: 24),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.local_shipping_outlined, size: 18, color: Colors.grey[700]),
+                                      Icon(Icons.local_shipping_outlined,
+                                          size: 18, color: Colors.grey[700]),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Preferred Transport',
@@ -1138,13 +1230,17 @@ class ModernSenderOrderCard extends StatelessWidget {
                                   Wrap(
                                     spacing: 6,
                                     runSpacing: 6,
-                                    children: order.preferenceTransport!.map((transport) {
+                                    children: order.preferenceTransport!
+                                        .map((transport) {
                                       return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: Colors.blue[50],
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: Colors.blue[200]!),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: Colors.blue[200]!),
                                         ),
                                         child: Text(
                                           transport,
@@ -1160,7 +1256,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 ],
                               ),
                             ],
-                            if (order.notes != null && order.notes!.isNotEmpty) ...[
+                            if (order.notes != null &&
+                                order.notes!.isNotEmpty) ...[
                               const Divider(height: 24),
                               _buildDetailRow(
                                 Icons.note_outlined,
@@ -1183,7 +1280,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                       const SizedBox(height: 20),
 
                       // Image if available
-                      if (order.imageUrl != null && order.imageUrl!.isNotEmpty) ...[
+                      if (order.imageUrl != null &&
+                          order.imageUrl!.isNotEmpty) ...[
                         const Text(
                           'Package Image',
                           style: TextStyle(
@@ -1195,11 +1293,12 @@ class ModernSenderOrderCard extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: Image.network(
-                            "${order.imageUrl}"!,
+                            order.imageUrl ?? '',
                             height: 180,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
                               height: 180,
                               decoration: BoxDecoration(
                                 color: Colors.grey[200],
@@ -1257,9 +1356,9 @@ class ModernSenderOrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         ...tripRequests!.map((request) => _buildTripRequestCard(
-                          context,
-                          request,
-                        )),
+                              context,
+                              request,
+                            )),
                         const SizedBox(height: 20),
                       ],
 
@@ -1311,7 +1410,8 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildRoutePoint(IconData icon, String label, String location, Color color) {
+  Widget _buildRoutePoint(
+      IconData icon, String label, String location, Color color) {
     return Row(
       children: [
         Icon(icon, color: color, size: 18),
@@ -1343,7 +1443,8 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTripRequestCard(BuildContext context, TripRequestDisplay request) {
+  Widget _buildTripRequestCard(
+      BuildContext context, TripRequestDisplay request) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -1409,7 +1510,8 @@ class ModernSenderOrderCard extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildInfoRowCompact(Icons.directions_car, 'Vehicle', request.vehicleInfo),
+                _buildInfoRowCompact(
+                    Icons.directions_car, 'Vehicle', request.vehicleInfo),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -1698,7 +1800,7 @@ class ModernSenderOrderCard extends StatelessWidget {
         return Colors.deepPurple[600]!;
       case 'delivered':
         return Colors.green[600]!;
-        case 'booked':
+      case 'booked':
         return Colors.yellow[600]!;
       default:
         return Colors.grey[600]!;

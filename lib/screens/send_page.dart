@@ -24,9 +24,6 @@ class _SendPageState extends State<SendPage> {
   final TextEditingController fromController = TextEditingController();
   final TextEditingController toController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
-  final TextEditingController timeController =
-      TextEditingController(); // Time for delivery_time API param
-  final TextEditingController hoursController = TextEditingController();
 
   String? selectedVehicle;
   final List<String> vehicleOptions = [
@@ -50,6 +47,10 @@ class _SendPageState extends State<SendPage> {
   Position? destinationPosition;
   String? currentUserId;
 
+  // Store actual date and time values for API
+  String? _selectedDate; // YYYY-MM-DD format
+  String? _selectedTime; // HH:mm:ss format
+
   // Stopover management
   List<Map<String, dynamic>> stopovers = [];
 
@@ -64,8 +65,6 @@ class _SendPageState extends State<SendPage> {
     fromController.dispose();
     toController.dispose();
     dateController.dispose();
-    timeController.dispose();
-    hoursController.dispose();
     super.dispose();
   }
 
@@ -171,35 +170,52 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    DateTime? picked = await showDatePicker(
+  Future<void> _selectDateTime(BuildContext context) async {
+    // First, pick the date
+    DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(2101),
     );
 
-    if (picked != null) {
-      setState(() {
-        dateController.text =
-            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
-      });
-    }
-  }
+    if (pickedDate != null) {
+      // Then, pick the time
+      if (context.mounted) {
+        TimeOfDay? pickedTime = await showTimePicker(
+          context: context,
+          initialTime: TimeOfDay.now(),
+        );
 
-  Future<void> _selectTime(BuildContext context) async {
-    TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
+        if (pickedTime != null) {
+          // Combine date and time
+          final combinedDateTime = DateTime(
+            pickedDate.year,
+            pickedDate.month,
+            pickedDate.day,
+            pickedTime.hour,
+            pickedTime.minute,
+          );
 
-    if (picked != null) {
-      setState(() {
-        // Format time as HH:mm:ss for API
-        final hour = picked.hour.toString().padLeft(2, '0');
-        final minute = picked.minute.toString().padLeft(2, '0');
-        timeController.text = '$hour:$minute:00';
-      });
+          // Store date and time separately for API
+          final dateStr = "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+          final hour = pickedTime.hour.toString().padLeft(2, '0');
+          final minute = pickedTime.minute.toString().padLeft(2, '0');
+          final timeStr = '$hour:$minute:00';
+
+          setState(() {
+            _selectedDate = dateStr;
+            _selectedTime = timeStr;
+
+            // Display formatted datetime in the text field (for user visibility)
+            dateController.text = DateFormat('dd MMM yyyy, hh:mm a').format(combinedDateTime);
+          });
+
+          print('📅 Selected DateTime Display: ${dateController.text}');
+          print('📅 Date for API: $_selectedDate');
+          print('⏰ Time for API: $_selectedTime');
+        }
+      }
     }
   }
 
@@ -211,10 +227,9 @@ class _SendPageState extends State<SendPage> {
 
     if (fromController.text.trim().isEmpty ||
         toController.text.trim().isEmpty ||
-        dateController.text.trim().isEmpty ||
-        timeController.text.trim().isEmpty ||
-        selectedVehicle == null ||
-        hoursController.text.trim().isEmpty) {
+        _selectedDate == null ||
+        _selectedTime == null ||
+        selectedVehicle == null) {
       _showSnackBar('Please fill all required fields', Colors.red);
       return;
     }
@@ -222,12 +237,6 @@ class _SendPageState extends State<SendPage> {
     if (originPosition == null) {
       _showSnackBar(
           'Please select origin location from suggestions', Colors.orange);
-      return;
-    }
-
-    final hours = double.tryParse(hoursController.text.trim());
-    if (hours == null || hours <= 0) {
-      _showSnackBar('Please enter valid hours', Colors.red);
       return;
     }
 
@@ -240,22 +249,29 @@ class _SendPageState extends State<SendPage> {
       print('DEBUG: User ID: $currentUserId');
       print('DEBUG: From: "${fromController.text.trim()}"');
       print('DEBUG: To: "${toController.text.trim()}"');
-      print('DEBUG: Date: "${dateController.text.trim()}"');
+      print('DEBUG: Date: "$_selectedDate"');
+      print('DEBUG: Time: "$_selectedTime"');
       print('DEBUG: Origin Lat: ${originPosition!.latitude}');
       print('DEBUG: Origin Lng: ${originPosition!.longitude}');
       print('DEBUG: Vehicle: $selectedVehicle');
-      print('DEBUG: Hours: $hours');
+
+      // Format stopovers as comma-separated city names
+      String? stopoversParam;
+      if (stopovers.isNotEmpty) {
+        stopoversParam = stopovers.map((s) => s['city'] as String).join(',');
+        print('DEBUG: Stopovers: $stopoversParam');
+      }
 
       final orders = await _orderService.searchOrders(
         origin: fromController.text.trim(),
         destination: toController.text.trim(),
-        deliveryDate: dateController.text.trim(),
-        deliveryTime: timeController.text.trim(), // Required delivery_time
+        deliveryDate: _selectedDate!,
+        deliveryTime: _selectedTime!,
         originLatitude: originPosition!.latitude,
         originLongitude: originPosition!.longitude,
         vehicle: selectedVehicle!,
-        timeHours: hours,
         userId: currentUserId!,
+        stopovers: stopoversParam,
       );
 
       print('DEBUG: API returned ${orders.length} orders');
@@ -273,6 +289,7 @@ class _SendPageState extends State<SendPage> {
               fromLocation: fromController.text.trim(),
               toLocation: toController.text.trim(),
               date: dateController.text.trim(),
+              searchedVehicle: selectedVehicle!, // Pass the searched vehicle
               onSendRequest: (order) => _sendRequestToSender(order),
             ),
           ),
@@ -796,11 +813,12 @@ class _SendPageState extends State<SendPage> {
                   fromController.clear();
                   toController.clear();
                   dateController.clear();
-                  hoursController.clear();
                   setState(() {
                     selectedVehicle = null;
                     originPosition = null;
                     destinationPosition = null;
+                    _selectedDate = null;
+                    _selectedTime = null;
                   });
                 });
               },
@@ -1106,26 +1124,17 @@ class _SendPageState extends State<SendPage> {
 
                     const SizedBox(height: 15),
                     GestureDetector(
-                      onTap: () => _selectDate(context),
-                      child: AbsorbPointer(
-                        child: buildInputBox('Date (YYYY-MM-DD)',
-                            dateController, Icons.calendar_today),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    GestureDetector(
-                      onTap: () => _selectTime(context),
+                      onTap: () => _selectDateTime(context),
                       child: AbsorbPointer(
                         child: buildInputBox(
-                            'Delivery Time', timeController, Icons.access_time),
+                          'Delivery Date & Time',
+                          dateController,
+                          Icons.calendar_today,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 15),
                     _buildVehicleDropdown(),
-                    const SizedBox(height: 15),
-                    buildInputBox(
-                        'Travel Hours', hoursController, Icons.access_time,
-                        keyboardType: TextInputType.number),
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
@@ -1218,6 +1227,55 @@ class _SendPageState extends State<SendPage> {
         ),
         isExpanded: true,
         menuMaxHeight: 400,
+        selectedItemBuilder: (BuildContext context) {
+          return vehicleOptions.map<Widget>((vehicle) {
+            IconData icon;
+            switch (vehicle) {
+              case 'Car':
+                icon = Icons.directions_car;
+                break;
+              case 'Bike':
+                icon = Icons.two_wheeler;
+                break;
+              case 'Pickup Truck':
+                icon = Icons.local_shipping;
+                break;
+              case 'Truck':
+                icon = Icons.local_shipping;
+                break;
+              case 'Bus':
+                icon = Icons.directions_bus;
+                break;
+              case 'Train':
+                icon = Icons.train;
+                break;
+              case 'Plane':
+                icon = Icons.flight;
+                break;
+              default:
+                icon = Icons.directions;
+                break;
+            }
+
+            return Row(
+              children: [
+                Icon(icon, color: AppColors.primary, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    vehicle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            );
+          }).toList();
+        },
         items: vehicleOptions.map((String vehicle) {
           IconData icon;
           switch (vehicle) {

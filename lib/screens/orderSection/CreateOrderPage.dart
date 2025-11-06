@@ -1373,9 +1373,12 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           children: [
             Icon(Icons.scale, color: Colors.grey[400], size: 22),
             const SizedBox(width: 12),
-            const Text(
-              'Select package weight',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
+            const Expanded(
+              child: Text(
+                'Select package weight',
+                style: TextStyle(color: Colors.grey, fontSize: 16),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -1389,6 +1392,27 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         ),
         isExpanded: true,
         menuMaxHeight: 400,
+        selectedItemBuilder: (BuildContext context) {
+          return weightRanges.map<Widget>((weight) {
+            return Row(
+              children: [
+                Icon(weightIcons[weight]!, color: weightColors[weight]!, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    weight,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            );
+          }).toList();
+        },
         items: weightRanges.map((weight) {
           return DropdownMenuItem<String>(
             value: weight,
@@ -1497,9 +1521,12 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 children: [
                   Icon(Icons.directions_car, color: Colors.grey[400], size: 22),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Select preferred vehicle',
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  const Expanded(
+                    child: Text(
+                      'Select preferred vehicle',
+                      style: TextStyle(color: Colors.grey, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -1514,6 +1541,55 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               ),
               isExpanded: true,
               menuMaxHeight: 400,
+              selectedItemBuilder: (BuildContext context) {
+                return _transportModes.map<Widget>((mode) {
+                  IconData icon;
+                  switch (mode) {
+                    case 'Car':
+                      icon = Icons.directions_car;
+                      break;
+                    case 'Bike':
+                      icon = Icons.two_wheeler;
+                      break;
+                    case 'Pickup Truck':
+                      icon = Icons.local_shipping;
+                      break;
+                    case 'Truck':
+                      icon = Icons.local_shipping;
+                      break;
+                    case 'Bus':
+                      icon = Icons.directions_bus;
+                      break;
+                    case 'Train':
+                      icon = Icons.train;
+                      break;
+                    case 'Plane':
+                      icon = Icons.flight;
+                      break;
+                    default:
+                      icon = Icons.directions;
+                      break;
+                  }
+
+                  return Row(
+                    children: [
+                      Icon(icon, color: AppColors.primary, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          mode,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList();
+              },
               items: _transportModes.map((mode) {
                 IconData icon;
                 switch (mode) {

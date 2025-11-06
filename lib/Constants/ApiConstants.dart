@@ -1,5 +1,4 @@
 class ApiConstants {
-
   static const String baseUrl = 'http://51.20.193.95:3000/api';
   static const String imagebaseUrl = 'http://51.20.193.95:3000';
 
@@ -23,9 +22,12 @@ class ApiConstants {
   // Trip Requests
   static const String sendTripRequest = '$baseUrl/trip-requests/send';
   static const String acceptTripRequest = '$baseUrl/trip-requests/accept';
-  static const String getMyTripRequests = '$baseUrl/trip-requests/mytrip'; // Trip requests sent BY user (as traveler)
-  static const String getOrderTripRequests = '$baseUrl/trip-requests/for-orders'; // Trip requests FOR user's orders (as sender)
-  static const String deleteTripRequest = '$baseUrl/trip-requests'; // ✅ NEW - Base path for delete
+  static const String getMyTripRequests =
+      '$baseUrl/trip-requests/mytrip'; // Trip requests sent BY user (as traveler)
+  static const String getOrderTripRequests =
+      '$baseUrl/trip-requests/mytrip'; // Use mytrip endpoint for all trip requests (filter on client side)
+  static const String deleteTripRequest =
+      '$baseUrl/trip-requests'; // ✅ NEW - Base path for delete
 
   // Chat
   static const String getChatInbox = '$baseUrl/chat/inbox';
@@ -39,5 +41,6 @@ class ApiConstants {
   // ⚠️ IMPORTANT: Replace this with your actual Google Maps API Key
   // Get it from: https://console.cloud.google.com/
   // Required APIs: Directions API, Geocoding API, Maps SDK for Android/iOS
-  static const String googleMapsApiKey = 'AIzaSyDQtNoIW22hko1eCS4ItjsO2JvtwDHJwkY';
+  static const String googleMapsApiKey =
+      'AIzaSyDQtNoIW22hko1eCS4ItjsO2JvtwDHJwkY';
 }
