@@ -11,6 +11,7 @@ class TripRequestSendRequest {
   final String destination;
   final String pickupTime;  // ✅ Changed from startTripTime
   final String dropoffTime; // ✅ Changed from endTripTime
+  final String? comments; // ✅ Optional comments field
 
   TripRequestSendRequest({
     required this.travelerId,
@@ -21,6 +22,7 @@ class TripRequestSendRequest {
     required this.destination,
     required this.pickupTime,
     required this.dropoffTime,
+    this.comments, // ✅ Optional parameter
   });
 
   Map<String, dynamic> toJson() {
@@ -40,6 +42,11 @@ class TripRequestSendRequest {
       'pickup_time': pickupTime,   // ✅ API field name
       'dropoff_time': dropoffTime, // ✅ API field name
     };
+
+    // ✅ Add comments if provided
+    if (comments != null && comments!.isNotEmpty) {
+      json['comments'] = comments!;
+    }
 
     print('📤 Trip Request JSON: $json');
     return json;

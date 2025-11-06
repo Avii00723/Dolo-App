@@ -339,6 +339,7 @@ class _SendPageState extends State<SendPage> {
     final vehicleInfoController = TextEditingController();
     final startTimeController = TextEditingController();
     final endTimeController = TextEditingController();
+    final commentsController = TextEditingController(); // ✅ Comments controller
 
     Future<void> selectTime(
         BuildContext context, TextEditingController controller) async {
@@ -461,6 +462,15 @@ class _SendPageState extends State<SendPage> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 15),
+                      _buildEnhancedTextField(
+                        controller: commentsController,
+                        label: 'Comments (Optional)',
+                        hint: 'e.g., Can carry your item securely',
+                        icon: Icons.comment_outlined,
+                        isRequired: false,
+                        maxLines: 3,
+                      ),
                     ],
                   ),
                 ),
@@ -560,6 +570,9 @@ class _SendPageState extends State<SendPage> {
                               destination: order.destination,
                               pickupTime: startTimeController.text.trim(),
                               dropoffTime: endTimeController.text.trim(),
+                              comments: commentsController.text.trim().isNotEmpty
+                                  ? commentsController.text.trim()
+                                  : null, // ✅ Add comments if provided
                             );
 
                             print('DEBUG: Sending trip request...');
