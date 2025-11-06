@@ -23,11 +23,9 @@ class ApiConstants {
   static const String sendTripRequest = '$baseUrl/trip-requests/send';
   static const String acceptTripRequest = '$baseUrl/trip-requests/accept';
   static const String getMyTripRequests =
-      '$baseUrl/trip-requests/mytrip'; // Trip requests sent BY user (as traveler)
-  static const String getOrderTripRequests =
-      '$baseUrl/trip-requests/mytrip'; // Use mytrip endpoint for all trip requests (filter on client side)
+      '$baseUrl/trip-requests/mytrip'; // Returns all trip requests related to user (filters on backend)
   static const String deleteTripRequest =
-      '$baseUrl/trip-requests'; // ✅ NEW - Base path for delete
+      '$baseUrl/trip-requests'; // Base path for delete
 
   // Chat
   static const String getChatInbox = '$baseUrl/chat/inbox';

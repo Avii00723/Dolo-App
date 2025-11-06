@@ -87,7 +87,7 @@ class TripRequestAcceptRequest {
 
   Map<String, dynamic> toJson() {
     return {
-      'order_creator_id': orderCreatorId,
+      'order_creator_hashed_id': orderCreatorId, // ✅ FIXED: API expects order_creator_hashed_id
       'trip_request_id': tripRequestId,
       'negotiatedPrice': negotiatedPrice,
     };
@@ -154,8 +154,8 @@ class TripRequest {
   factory TripRequest.fromJson(Map<String, dynamic> json) {
     return TripRequest(
       id: json['hashed_id']?.toString() ?? '', // Updated from 'id'
-      travelerId: json['traveler_hashed_id']?.toString() ?? '', // Updated from 'traveler_id'
-      orderId: json['order_hashed_id']?.toString() ?? '', // Updated from 'order_id'
+      travelerId: json['traveler_id']?.toString() ?? '', // ✅ FIXED: Use traveler_id not traveler_hashed_id
+      orderId: json['order_id']?.toString() ?? '', // ✅ FIXED: Use order_id not order_hashed_id
       travelDate: json['travel_date'] as String,
       vehicleInfo: json['vehicle_info'] as String,
       source: json['source'] as String,

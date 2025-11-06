@@ -47,47 +47,30 @@ class TripRequestService {
   }
 
   // Get all trip requests FOR a user's orders (as order creator/sender)
-  // Note: This uses the same mytrip endpoint since the backend doesn't have a separate for-orders endpoint
+  // Uses the mytrip endpoint - returns ALL trip requests related to the user
   Future<List<TripRequest>> getTripRequestsForMyOrders(
       String userHashedId) async {
-    try {
-      print(
-          '🔍 Fetching trip requests for user orders using mytrip endpoint: $userHashedId');
+    print('🔍 Fetching trip requests for user orders: $userHashedId');
 
-      final response = await _api.get(
-        ApiConstants.getOrderTripRequests, // Now points to mytrip endpoint
-        queryParameters: {
-          'userHashedId': userHashedId
-        }, // Backend expects userHashedId parameter
-        parser: (json) {
-          print('📦 Trip requests response: $json');
-          if (json['tripRequests'] is List) {
-            return (json['tripRequests'] as List)
-                .map((e) => TripRequest.fromJson(e))
-                .toList();
-          }
-          return [];
-        },
-      );
-
-      if (response.success) {
-        print(
-            '✅ Successfully fetched ${(response.data as List).length} trip requests');
-        return response.data as List<TripRequest>;
-      } else {
-        print('! Failed to fetch trip requests for orders: ${response.error}');
-        print(
-            '! The endpoint http://51.20.193.95:3000/api/trip-requests/for-orders may not be implemented yet');
-        print(
-            '! Please ensure the backend has this endpoint or use the mytrip endpoint with proper filtering');
+    final response = await _api.get(
+      ApiConstants.getMyTripRequests, // Use mytrip endpoint
+      queryParameters: {'userHashedId': userHashedId},
+      parser: (json) {
+        print('📦 Trip requests response: $json');
+        if (json['tripRequests'] is List) {
+          return (json['tripRequests'] as List)
+              .map((e) => TripRequest.fromJson(e))
+              .toList();
+        }
         return [];
-      }
-    } catch (e) {
-      print('! Failed to fetch trip requests for orders: $e');
-      print(
-          '! The endpoint http://51.20.193.95:3000/api/trip-requests/for-orders may not be implemented yet');
-      print(
-          '! Please ensure the backend has this endpoint or use the mytrip endpoint with proper filtering');
+      },
+    );
+
+    if (response.success) {
+      print('✅ Successfully fetched ${(response.data as List).length} trip requests');
+      return response.data as List<TripRequest>;
+    } else {
+      print('❌ Failed to fetch trip requests: ${response.error}');
       return [];
     }
   }
