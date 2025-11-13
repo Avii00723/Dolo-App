@@ -218,3 +218,85 @@ class TripRequestListResponse {
     };
   }
 }
+
+// ============================================
+// Withdraw Trip Request Models
+// ============================================
+
+class TripRequestWithdrawRequest {
+  final String travelerHashedId;
+  final String tripRequestHashedId;
+
+  TripRequestWithdrawRequest({
+    required this.travelerHashedId,
+    required this.tripRequestHashedId,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'traveler_hashed_id': travelerHashedId,
+      'trip_request_hashed_id': tripRequestHashedId,
+    };
+  }
+}
+
+class TripRequestWithdrawResponse {
+  final String message;
+
+  TripRequestWithdrawResponse({required this.message});
+
+  factory TripRequestWithdrawResponse.fromJson(Map<String, dynamic> json) {
+    return TripRequestWithdrawResponse(
+      message: json['message'] as String,
+    );
+  }
+}
+
+// ============================================
+// Decline Trip Request Models
+// ============================================
+
+class TripRequestDeclineRequest {
+  final String orderCreatorHashedId;
+  final String tripRequestId;
+
+  TripRequestDeclineRequest({
+    required this.orderCreatorHashedId,
+    required this.tripRequestId,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'order_creator_hashed_id': orderCreatorHashedId,
+      'trip_request_id': tripRequestId,
+    };
+  }
+}
+
+class TripRequestDeclineResponse {
+  final String message;
+
+  TripRequestDeclineResponse({required this.message});
+
+  factory TripRequestDeclineResponse.fromJson(Map<String, dynamic> json) {
+    return TripRequestDeclineResponse(
+      message: json['message'] as String,
+    );
+  }
+}
+
+// ============================================
+// Complete Trip Request Response
+// ============================================
+
+class TripRequestCompleteResponse {
+  final String message;
+
+  TripRequestCompleteResponse({required this.message});
+
+  factory TripRequestCompleteResponse.fromJson(Map<String, dynamic> json) {
+    return TripRequestCompleteResponse(
+      message: json['message'] as String,
+    );
+  }
+}

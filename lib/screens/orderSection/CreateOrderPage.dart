@@ -47,7 +47,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   OrderMainCategory? _selectedMainCategory;
   String? _selectedWeightRange;
 
-  // New fields for API
   List<String> _selectedTransportModes = []; // preference_transport
   bool _isUrgent = false; // is_urgent flag
 
@@ -141,13 +140,12 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-  // Helper function to convert weight range to API string format
   String _getWeightStringForApi(String range) {
     switch (range) {
       case 'Below 2 kg':
-        return 'less than 5kg'; // API format
+        return 'below 2kg'; // API format
       case '2–5 kg':
-        return '5-10kg'; // API format
+        return '2-5kg'; // API format
       case '5–10 kg':
         return '5-10kg'; // API format
       case 'More than 10 kg':

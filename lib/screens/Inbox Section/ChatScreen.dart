@@ -64,6 +64,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final GlobalKey _imagePickerKey = GlobalKey();
   final GlobalKey _sendButtonKey = GlobalKey();
 
+  // Negotiation state (dummy data for now)
+  final double _basePrice = 1000.0; // Base price for negotiation
+  double _currentOfferedPrice = 1000.0; // Current offered price
+  final double _priceRangePercent = 0.10; // 10% range
+
   @override
   void initState() {
     super.initState();
@@ -277,7 +282,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (result['success'] == true) {
         final apiMessages = result['messages'] as List;
         final convertedMessages = apiMessages.map((msg) {
-          final messageId = msg['id'];
+          // Convert messageId to int, handling both String and int types
+          final messageIdRaw = msg['id'];
+          final messageId = messageIdRaw is int ? messageIdRaw : int.tryParse(messageIdRaw.toString()) ?? 0;
+
           final senderId = msg['user_id'] ?? msg['sender_id'];
           final senderName = msg['sender_name'] ?? 'Unknown';
           final messageText = msg['message'] ?? '';
@@ -470,6 +478,271 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } catch (e) {
       print('❌ Error marking messages as seen: $e');
     }
+  }
+
+  // Show negotiation dialog with plus/minus buttons
+  void _showNegotiationDialog() {
+    final minPrice = _basePrice * (1 - _priceRangePercent);
+    final maxPrice = _basePrice * (1 + _priceRangePercent);
+    double tempOfferedPrice = _currentOfferedPrice;
+    final priceStep = _basePrice * 0.01; // 1% step for each button press
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.monetization_on,
+                            color: Colors.green.shade600,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Text(
+                            'Negotiate Price',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Offered Price Card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.green.shade400, Colors.green.shade600],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Your Offered Price',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Price with Plus/Minus buttons
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Minus Button
+                              Material(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                child: InkWell(
+                                  onTap: tempOfferedPrice > minPrice
+                                      ? () {
+                                          setDialogState(() {
+                                            tempOfferedPrice = (tempOfferedPrice - priceStep).clamp(minPrice, maxPrice);
+                                          });
+                                        }
+                                      : null,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Icon(
+                                      Icons.remove,
+                                      color: tempOfferedPrice > minPrice
+                                          ? Colors.white
+                                          : Colors.white.withOpacity(0.3),
+                                      size: 15,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              // Price Display
+                              Flexible(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '₹${tempOfferedPrice.toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Plus Button
+                              Material(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                child: InkWell(
+                                  onTap: tempOfferedPrice < maxPrice
+                                      ? () {
+                                          setDialogState(() {
+                                            tempOfferedPrice = (tempOfferedPrice + priceStep).clamp(minPrice, maxPrice);
+                                          });
+                                        }
+                                      : null,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Icon(
+                                      Icons.add,
+                                      color: tempOfferedPrice < maxPrice
+                                          ? Colors.white
+                                          : Colors.white.withOpacity(0.3),
+                                      size: 15,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Price Range Info
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Min: ₹${minPrice.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          '±10%',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Max: ₹${maxPrice.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: BorderSide(color: Colors.grey.shade300),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _currentOfferedPrice = tempOfferedPrice;
+                              });
+                              Navigator.pop(context);
+                              _showSnackBar(
+                                'Price offer sent: ₹${tempOfferedPrice.toStringAsFixed(0)}',
+                                Colors.green,
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade600,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Send Offer',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _pickImages() async {
@@ -1023,6 +1296,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               icon: Icon(Icons.image, color: Colors.blue.shade600),
               onPressed: _showImagePickerOptions,
               tooltip: 'Add Images',
+            ),
+            IconButton(
+              icon: Icon(Icons.monetization_on, color: Colors.green.shade600),
+              onPressed: _showNegotiationDialog,
+              tooltip: 'Negotiate Price',
             ),
             Expanded(
               child: Container(

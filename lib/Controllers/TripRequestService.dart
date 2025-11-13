@@ -97,4 +97,63 @@ class TripRequestService {
       rethrow;
     }
   }
+
+  // ✅ NEW: Withdraw a trip request (traveler cancels their own request)
+  Future<TripRequestWithdrawResponse?> withdrawTripRequest(
+      TripRequestWithdrawRequest request) async {
+    print('🚫 Withdrawing trip request: ${request.tripRequestHashedId}');
+
+    final response = await _api.post(
+      ApiConstants.withdrawTripRequest,
+      body: request.toJson(),
+      parser: (json) => TripRequestWithdrawResponse.fromJson(json),
+    );
+
+    if (response.success) {
+      print('✅ Trip request withdrawn successfully');
+      return response.data;
+    } else {
+      print('❌ Failed to withdraw trip request: ${response.error}');
+      return null;
+    }
+  }
+
+  // ✅ NEW: Decline a trip request (order creator declines)
+  Future<TripRequestDeclineResponse?> declineTripRequest(
+      TripRequestDeclineRequest request) async {
+    print('👎 Declining trip request: ${request.tripRequestId}');
+
+    final response = await _api.post(
+      ApiConstants.declineTripRequest,
+      body: request.toJson(),
+      parser: (json) => TripRequestDeclineResponse.fromJson(json),
+    );
+
+    if (response.success) {
+      print('✅ Trip request declined successfully');
+      return response.data;
+    } else {
+      print('❌ Failed to decline trip request: ${response.error}');
+      return null;
+    }
+  }
+
+  // ✅ NEW: Complete a trip request
+  Future<TripRequestCompleteResponse?> completeTripRequest(
+      String tripId) async {
+    print('✅ Completing trip request: $tripId');
+
+    final response = await _api.put(
+      '${ApiConstants.completeTripRequest}/$tripId',
+      parser: (json) => TripRequestCompleteResponse.fromJson(json),
+    );
+
+    if (response.success) {
+      print('✅ Trip request completed successfully');
+      return response.data;
+    } else {
+      print('❌ Failed to complete trip request: ${response.error}');
+      return null;
+    }
+  }
 }

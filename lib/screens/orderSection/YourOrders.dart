@@ -130,25 +130,14 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     // ✅ ADD: Lifecycle observer to detect app state changes
     WidgetsBinding.instance.addObserver(this);
 
-    // ✅ UPDATED: Initialize with provided tab index
+    // ✅ UPDATED: Only one tab now (My Orders)
     _tabController = TabController(
-      length: 2,
+      length: 1,
       vsync: this,
-      initialIndex: widget.initialTabIndex,
+      initialIndex: 0,
     );
 
-    // ✅ Listen to tab changes and refresh data
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        if (_tabController.index == 1 && currentUserId != null) {
-          print('📍 Switched to My Requests tab - refreshing...');
-          _loadMyRequestedOrders();
-        } else if (_tabController.index == 0 && currentUserId != null) {
-          print('📍 Switched to My Orders tab - refreshing...');
-          _loadMyOrders();
-        }
-      }
-    });
+    // ✅ Removed tab listener since we only have one tab now
 
     _initializeUser();
 
@@ -1118,6 +1107,168 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
+  // ✅ NEW: Withdraw trip request (traveler cancels their request)
+  Future<void> _withdrawTripRequest(String tripRequestId) async {
+    if (currentUserId == null) return;
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Withdrawing request...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final withdrawRequest = TripRequestWithdrawRequest(
+        travelerHashedId: currentUserId!,
+        tripRequestHashedId: tripRequestId,
+      );
+
+      final response = await _tripRequestService.withdrawTripRequest(withdrawRequest);
+
+      if (response != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Text(response.message),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        await _loadAllData();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to withdraw trip request'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'Failed to withdraw request';
+        if (e.toString().contains('Cannot withdraw accepted')) {
+          errorMessage = 'Cannot withdraw an accepted or completed trip request';
+        } else if (e.toString().contains('Not authorized')) {
+          errorMessage = 'You are not authorized to withdraw this request';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(errorMessage)),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  // ✅ NEW: Decline trip request (order creator declines)
+  Future<void> _declineTripRequest(TripRequestDisplay request, String orderId) async {
+    if (currentUserId == null) return;
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Declining request...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final declineRequest = TripRequestDeclineRequest(
+        orderCreatorHashedId: currentUserId!,
+        tripRequestId: request.id,
+      );
+
+      final response = await _tripRequestService.declineTripRequest(declineRequest);
+
+      if (response != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Text(response.message),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        await _loadAllData();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to decline trip request'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'Failed to decline request';
+        if (e.toString().contains('Only pending requests')) {
+          errorMessage = 'Only pending requests can be declined';
+        } else if (e.toString().contains('not authorized')) {
+          errorMessage = 'You are not authorized to decline this request';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(errorMessage)),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
   void _openInbox() {
     Navigator.push(
       context,
@@ -1331,31 +1482,9 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             tooltip: 'Inbox',
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          tabs: const [
-            Tab(
-              icon: Icon(Icons.send),
-              text: 'My Orders',
-            ),
-            Tab(
-              icon: Icon(Icons.delivery_dining),
-              text: 'My Requests',
-            ),
-          ],
-        ),
+        // ✅ REMOVED: TabBar not needed since we only have one section now
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildMyOrdersTab(),
-          _buildMyRequestedOrdersTab(),
-        ],
-      ),
+      body: _buildMyOrdersTab(), // ✅ Direct body, no TabBarView needed
     );
   }
 
@@ -1386,6 +1515,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             order: order,
             tripRequests: requests,
             onAcceptRequest: _acceptTripRequest,
+            onDeclineRequest: _declineTripRequest, // ✅ NEW: Decline functionality
             onTrackOrder: () => _openOrderTracking(order),
             onMarkReceived: () => _markOrderReceived(order),
             onCompleteOrder: () => _completeOrder(order),
@@ -1421,7 +1551,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           return ModernTravellerOrderCard(
             order: myRequestedOrders[index],
             onTrackOrder: () => _openOrderTracking(myRequestedOrders[index]),
-            onDeleteRequest: _deleteTripRequest, // ✅ ADD THIS
+            onWithdrawRequest: _withdrawTripRequest, // ✅ NEW: Withdraw functionality
+            onDeleteRequest: _deleteTripRequest, // ✅ Legacy - kept for backward compatibility
           );
         },
       ),

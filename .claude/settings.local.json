@@ -17,7 +17,8 @@
       "Bash(dart compile kernel:*)",
       "Bash(flutter devices:*)",
       "Bash(flutter attach:*)",
-      "Bash(nc:*)"
+      "Bash(nc:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

@@ -4,6 +4,8 @@ import 'dart:async';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
 import '../../Controllers/SocketService.dart';
+import '../../Controllers/TripRequestService.dart';
+import '../../Models/TripRequestModel.dart';
 import 'ChatScreen.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -13,26 +15,40 @@ class InboxScreen extends StatefulWidget {
   State<InboxScreen> createState() => _InboxScreenState();
 }
 
-class _InboxScreenState extends State<InboxScreen> {
+class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> _conversations = [];
   bool _isLoading = true;
   String? _errorMessage;
   String? _currentUserId;
   final SocketService _socketService = SocketService();
+  final TripRequestService _tripRequestService = TripRequestService();
+  late TabController _tabController; // ✅ NEW: Tab controller
 
   // Track typing status for each chat
   Map<String, bool> _typingStatus = {};
   Map<String, Timer?> _typingTimers = {};
 
+  // Trip requests state
+  List<TripRequest> _sentRequests = [];
+  List<TripRequest> _receivedRequests = [];
+  bool _isLoadingRequests = true;
+  String? _requestsErrorMessage;
+
+  // Section expansion state
+  bool _isReceivedExpanded = true;
+  bool _isSentExpanded = true;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this); // ✅ NEW: 2 tabs - Chats and Requests
     _initializeAndLoadInbox();
     _initializeWebSocket();
   }
 
   @override
   void dispose() {
+    _tabController.dispose(); // ✅ NEW: Dispose tab controller
     // Cancel all typing timers
     _typingTimers.values.forEach((timer) => timer?.cancel());
     super.dispose();
@@ -41,6 +57,7 @@ class _InboxScreenState extends State<InboxScreen> {
   Future<void> _initializeAndLoadInbox() async {
     _currentUserId = await AuthService.getUserId();
     await _loadInbox();
+    await _loadTripRequests();
   }
 
   // ✅ UPDATED: Load only real inbox data, no dummy data
@@ -92,6 +109,57 @@ class _InboxScreenState extends State<InboxScreen> {
       });
 
       print('❌ Exception loading inbox: $e');
+    }
+  }
+
+  // Load trip requests (sent by user and received for user's orders)
+  Future<void> _loadTripRequests() async {
+    if (!mounted || _currentUserId == null) return;
+
+    setState(() {
+      _isLoadingRequests = true;
+      _requestsErrorMessage = null;
+    });
+
+    try {
+      // Fetch all trip requests related to the current user
+      final allRequests = await _tripRequestService.getMyTripRequests(_currentUserId!);
+
+      if (!mounted) return;
+
+      // Separate sent requests (where user is the traveler) and received requests (where user created the order)
+      final sent = <TripRequest>[];
+      final received = <TripRequest>[];
+
+      for (var request in allRequests) {
+        if (request.travelerId == _currentUserId) {
+          // User sent this request
+          sent.add(request);
+        } else {
+          // User received this request on their order
+          received.add(request);
+        }
+      }
+
+      setState(() {
+        _sentRequests = sent;
+        _receivedRequests = received;
+        _isLoadingRequests = false;
+        _requestsErrorMessage = null;
+      });
+
+      print('✅ Loaded ${sent.length} sent requests and ${received.length} received requests');
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _sentRequests = [];
+        _receivedRequests = [];
+        _isLoadingRequests = false;
+        _requestsErrorMessage = 'Failed to load requests: $e';
+      });
+
+      print('❌ Exception loading trip requests: $e');
     }
   }
 
@@ -160,7 +228,7 @@ class _InboxScreenState extends State<InboxScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         title: const Text(
-          'Messages',
+          'Inbox',
           style: TextStyle(
             color: Colors.black87,
             fontWeight: FontWeight.w600,
@@ -175,8 +243,24 @@ class _InboxScreenState extends State<InboxScreen> {
             tooltip: 'Refresh',
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.blue,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: Colors.blue,
+          tabs: const [
+            Tab(icon: Icon(Icons.chat), text: 'Chats'),
+            Tab(icon: Icon(Icons.request_page), text: 'Requests'),
+          ],
+        ),
       ),
-      body: _buildBody(),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildBody(), // Chats tab - existing functionality
+          _buildRequestsTab(), // ✅ NEW: Requests tab
+        ],
+      ),
     );
   }
 
@@ -374,6 +458,455 @@ class _InboxScreenState extends State<InboxScreen> {
       // Refresh inbox when returning from chat
       _loadInbox();
     });
+  }
+
+  // Requests Tab - Shows trip requests (sent and received)
+  Widget _buildRequestsTab() {
+    if (_currentUserId == null) {
+      return _buildNotLoggedInState();
+    }
+
+    if (_isLoadingRequests) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_requestsErrorMessage != null) {
+      return _buildRequestsErrorState();
+    }
+
+    if (_sentRequests.isEmpty && _receivedRequests.isEmpty) {
+      return _buildEmptyRequestsState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadTripRequests,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Received Requests Section (Requests for YOUR orders)
+            if (_receivedRequests.isNotEmpty) ...[
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _isReceivedExpanded = !_isReceivedExpanded;
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.inbox, size: 20, color: Colors.orange.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Received Requests',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${_receivedRequests.length}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        _isReceivedExpanded ? Icons.expand_less : Icons.expand_more,
+                        size: 24,
+                        color: Colors.grey.shade600,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_isReceivedExpanded) ...[
+                ..._receivedRequests.map((request) => TripRequestCard(
+                  request: request,
+                  currentUserId: _currentUserId!,
+                  isReceived: true,
+                  onAccept: () => _acceptRequest(request),
+                  onDecline: () => _declineRequest(request),
+                  onWithdraw: null,
+                )),
+              ],
+              const SizedBox(height: 24),
+            ],
+
+            // Sent Requests Section (Requests YOU sent)
+            if (_sentRequests.isNotEmpty) ...[
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _isSentExpanded = !_isSentExpanded;
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.send, size: 20, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Sent Requests',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${_sentRequests.length}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        _isSentExpanded ? Icons.expand_less : Icons.expand_more,
+                        size: 24,
+                        color: Colors.grey.shade600,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_isSentExpanded) ...[
+                ..._sentRequests.map((request) => TripRequestCard(
+                  request: request,
+                  currentUserId: _currentUserId!,
+                  isReceived: false,
+                  onAccept: null,
+                  onDecline: null,
+                  onWithdraw: () => _withdrawRequest(request),
+                )),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyRequestsState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.request_page_outlined,
+              size: 60,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No Trip Requests',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'You haven\'t sent or received any trip requests yet',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _loadTripRequests,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequestsErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to Load Requests',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _requestsErrorMessage ?? 'Unknown error occurred',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadTripRequests,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade600,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Accept a trip request (for received requests)
+  Future<void> _acceptRequest(TripRequest request) async {
+    // Show dialog to get negotiated price
+    final TextEditingController priceController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Accept Trip Request'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Accept request from ${request.source} to ${request.destination}?'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: priceController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Negotiated Price',
+                border: OutlineInputBorder(),
+                prefixText: '₹ ',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && priceController.text.isNotEmpty) {
+      try {
+        final acceptRequest = TripRequestAcceptRequest(
+          orderCreatorId: _currentUserId!,
+          tripRequestId: request.id,
+          negotiatedPrice: int.parse(priceController.text),
+        );
+
+        final response = await _tripRequestService.acceptTripRequest(acceptRequest);
+
+        if (response != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.message),
+              backgroundColor: Colors.green,
+            ),
+          );
+          await _loadTripRequests();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to accept request: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  // Decline a trip request (for received requests)
+  Future<void> _declineRequest(TripRequest request) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Decline Trip Request'),
+        content: Text('Are you sure you want to decline this request from ${request.source} to ${request.destination}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Decline'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final declineRequest = TripRequestDeclineRequest(
+          orderCreatorHashedId: _currentUserId!,
+          tripRequestId: request.id,
+        );
+
+        final response = await _tripRequestService.declineTripRequest(declineRequest);
+
+        if (response != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.message),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          await _loadTripRequests();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to decline request: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  // Withdraw a trip request (for sent requests)
+  Future<void> _withdrawRequest(TripRequest request) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Withdraw Trip Request'),
+        content: Text('Are you sure you want to withdraw your request for ${request.source} to ${request.destination}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+            ),
+            child: const Text('Withdraw'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final withdrawRequest = TripRequestWithdrawRequest(
+          travelerHashedId: _currentUserId!,
+          tripRequestHashedId: request.id,
+        );
+
+        final response = await _tripRequestService.withdrawTripRequest(withdrawRequest);
+
+        if (response != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.message),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          await _loadTripRequests();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to withdraw request: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 }
 
@@ -697,6 +1230,383 @@ class ModernChatCard extends StatelessWidget {
       }
     } catch (e) {
       return '';
+    }
+  }
+}
+
+// Trip Request Card Widget
+class TripRequestCard extends StatelessWidget {
+  final TripRequest request;
+  final String currentUserId;
+  final bool isReceived;
+  final VoidCallback? onAccept;
+  final VoidCallback? onDecline;
+  final VoidCallback? onWithdraw;
+
+  const TripRequestCard({
+    Key? key,
+    required this.request,
+    required this.currentUserId,
+    required this.isReceived,
+    this.onAccept,
+    this.onDecline,
+    this.onWithdraw,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isReceived ? Colors.orange.shade200 : Colors.blue.shade200,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with status badge
+            Row(
+              children: [
+                Icon(
+                  isReceived ? Icons.call_received : Icons.call_made,
+                  size: 18,
+                  color: isReceived ? Colors.orange.shade700 : Colors.blue.shade700,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isReceived ? 'Request Received' : 'Request Sent',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isReceived ? Colors.orange.shade700 : Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildStatusBadge(request.status),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Route Information
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 16, color: Colors.green.shade600),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          request.source,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 22),
+                        Icon(Icons.arrow_downward, size: 14, color: Colors.grey.shade600),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 16, color: Colors.red.shade600),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          request.destination,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Trip Details - Responsive Grid
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 300;
+
+                if (isNarrow) {
+                  // Stack vertically for very narrow screens
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDetailItem(
+                        Icons.calendar_today,
+                        'Date',
+                        _formatDate(request.travelDate),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildDetailItem(
+                        Icons.directions_car,
+                        'Vehicle',
+                        request.vehicleInfo,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildDetailItem(
+                        Icons.access_time,
+                        'Pickup',
+                        request.pickupTime,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildDetailItem(
+                        Icons.access_time_filled,
+                        'Dropoff',
+                        request.dropoffTime,
+                      ),
+                    ],
+                  );
+                } else {
+                  // 2-column grid for normal screens
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDetailItem(
+                              Icons.calendar_today,
+                              'Date',
+                              _formatDate(request.travelDate),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildDetailItem(
+                              Icons.access_time,
+                              'Pickup',
+                              request.pickupTime,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDetailItem(
+                              Icons.directions_car,
+                              'Vehicle',
+                              request.vehicleInfo,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildDetailItem(
+                              Icons.access_time_filled,
+                              'Dropoff',
+                              request.dropoffTime,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+              },
+            ),
+
+            // Action Buttons (only for received requests with pending status)
+            if (isReceived && request.status.toLowerCase() == 'pending') ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onDecline,
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Decline'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade600,
+                        side: BorderSide(color: Colors.red.shade300),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: onAccept,
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text('Accept'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            // Withdraw button (only for sent requests with pending status)
+            if (!isReceived && request.status.toLowerCase() == 'pending') ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onWithdraw,
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('Withdraw Request'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange.shade700,
+                    side: BorderSide(color: Colors.orange.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailItem(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, size: 14, color: Colors.grey.shade600),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    Color backgroundColor;
+    Color textColor;
+    IconData icon;
+
+    switch (status.toLowerCase()) {
+      case 'pending':
+        backgroundColor = Colors.orange.shade50;
+        textColor = Colors.orange.shade700;
+        icon = Icons.pending;
+        break;
+      case 'accepted':
+        backgroundColor = Colors.green.shade50;
+        textColor = Colors.green.shade700;
+        icon = Icons.check_circle;
+        break;
+      case 'declined':
+        backgroundColor = Colors.red.shade50;
+        textColor = Colors.red.shade700;
+        icon = Icons.cancel;
+        break;
+      case 'withdrawn':
+        backgroundColor = Colors.grey.shade50;
+        textColor = Colors.grey.shade700;
+        icon = Icons.undo;
+        break;
+      default:
+        backgroundColor = Colors.grey.shade50;
+        textColor = Colors.grey.shade700;
+        icon = Icons.info;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            status.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return DateFormat('MMM dd, yyyy').format(date);
+    } catch (e) {
+      return dateStr;
     }
   }
 }

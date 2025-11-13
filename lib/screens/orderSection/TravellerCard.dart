@@ -5,13 +5,15 @@ import 'YourOrders.dart';
 class ModernTravellerOrderCard extends StatelessWidget {
   final OrderDisplay order;
   final VoidCallback? onTrackOrder;
-  final Function(String)? onDeleteRequest; // ✅ Callback for delete
+  final Function(String)? onDeleteRequest; // ✅ Legacy - kept for backward compatibility
+  final Function(String)? onWithdrawRequest; // ✅ NEW: Withdraw callback
 
   const ModernTravellerOrderCard({
     Key? key,
     required this.order,
     this.onTrackOrder,
     this.onDeleteRequest,
+    this.onWithdrawRequest, // ✅ NEW parameter
   }) : super(key: key);
 
   @override
@@ -798,20 +800,20 @@ class ModernTravellerOrderCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            // ✅ DELETE BUTTON
+            // ✅ WITHDRAW BUTTON
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  print('🗑️ Delete button pressed - Trip Request ID: ${order.tripRequestId}');
+                  print('🚫 Withdraw button pressed - Trip Request ID: ${order.tripRequestId}');
                   Navigator.pop(context);
-                  _showDeleteConfirmation(context);
+                  _showWithdrawConfirmation(context);
                 },
-                icon: const Icon(Icons.delete_outline, size: 18),
-                label: const Text('Cancel Request'),
+                icon: const Icon(Icons.cancel_outlined, size: 18),
+                label: const Text('Withdraw Request'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red[600],
-                  side: BorderSide(color: Colors.red[300]!),
+                  foregroundColor: Colors.orange[700],
+                  side: BorderSide(color: Colors.orange[300]!),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -903,6 +905,11 @@ class ModernTravellerOrderCard extends StatelessWidget {
 
   // ✅ FIXED: Delete confirmation dialog - use tripRequestId
   void _showDeleteConfirmation(BuildContext context) {
+    _showWithdrawConfirmation(context); // ✅ Redirect to withdraw
+  }
+
+  // ✅ NEW: Withdraw confirmation dialog
+  void _showWithdrawConfirmation(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -912,13 +919,13 @@ class ModernTravellerOrderCard extends StatelessWidget {
             Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 28),
             const SizedBox(width: 12),
             const Text(
-              'Cancel Request',
+              'Withdraw Request',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ],
         ),
         content: const Text(
-          'Are you sure you want to cancel this trip request? This action cannot be undone.',
+          'Are you sure you want to withdraw this trip request? The order creator will be notified.',
           style: TextStyle(fontSize: 15),
         ),
         actions: [
@@ -929,10 +936,10 @@ class ModernTravellerOrderCard extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              // ✅ FIXED: Use tripRequestId instead of order.id
+              // ✅ Use onWithdrawRequest if available, fallback to onDeleteRequest
               if (order.tripRequestId != null) {
-                print('✅ Calling onDeleteRequest with Trip Request ID: ${order.tripRequestId}');
-                onDeleteRequest?.call(order.tripRequestId!);
+                print('✅ Calling onWithdrawRequest with Trip Request ID: ${order.tripRequestId}');
+                (onWithdrawRequest ?? onDeleteRequest)?.call(order.tripRequestId!);
               } else {
                 print('❌ Trip Request ID is null!');
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -944,13 +951,13 @@ class ModernTravellerOrderCard extends StatelessWidget {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[600],
+              backgroundColor: Colors.orange[600],
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
             child: const Text(
-              'Cancel Request',
+              'Withdraw Request',
               style: TextStyle(color: Colors.white),
             ),
           ),

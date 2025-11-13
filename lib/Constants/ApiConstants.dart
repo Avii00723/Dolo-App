@@ -22,6 +22,9 @@ class ApiConstants {
   // Trip Requests
   static const String sendTripRequest = '$baseUrl/trip-requests/send';
   static const String acceptTripRequest = '$baseUrl/trip-requests/accept';
+  static const String withdrawTripRequest = '$baseUrl/trip-requests/withdraw';
+  static const String declineTripRequest = '$baseUrl/trip-requests/decline';
+  static const String completeTripRequest = '$baseUrl/trip-requests/complete';
   static const String getMyTripRequests =
       '$baseUrl/trip-requests/mytrip'; // Returns all trip requests related to user (filters on backend)
   static const String deleteTripRequest =

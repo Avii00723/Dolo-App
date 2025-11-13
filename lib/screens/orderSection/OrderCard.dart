@@ -8,6 +8,7 @@ class ModernSenderOrderCard extends StatelessWidget {
   final OrderDisplay order;
   final List<TripRequestDisplay>? tripRequests;
   final Function(TripRequestDisplay, String)? onAcceptRequest;
+  final Function(TripRequestDisplay, String)? onDeclineRequest; // ✅ NEW: Decline callback
   final VoidCallback? onTrackOrder;
   final VoidCallback? onMarkReceived;
   final VoidCallback? onCompleteOrder;
@@ -19,6 +20,7 @@ class ModernSenderOrderCard extends StatelessWidget {
     required this.order,
     this.tripRequests,
     this.onAcceptRequest,
+    this.onDeclineRequest, // ✅ NEW parameter
     this.onTrackOrder,
     this.onMarkReceived,
     this.onCompleteOrder,
@@ -1323,47 +1325,47 @@ class ModernSenderOrderCard extends StatelessWidget {
                       ],
 
                       // Trip Requests Section
-                      if (tripRequests != null && tripRequests!.isNotEmpty) ...[
-                        Row(
-                          children: [
-                            const Text(
-                              'Trip Requests',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange[600],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                '${tripRequests!.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        ...tripRequests!.map((request) => _buildTripRequestCard(
-                              context,
-                              request,
-                            )),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // Action Buttons
-                      _buildModalActions(context),
+                      // if (tripRequests != null && tripRequests!.isNotEmpty) ...[
+                      //   Row(
+                      //     children: [
+                      //       const Text(
+                      //         'Trip Requests',
+                      //         style: TextStyle(
+                      //           fontSize: 16,
+                      //           fontWeight: FontWeight.bold,
+                      //         ),
+                      //       ),
+                      //       const SizedBox(width: 8),
+                      //       Container(
+                      //         padding: const EdgeInsets.symmetric(
+                      //           horizontal: 8,
+                      //           vertical: 2,
+                      //         ),
+                      //         decoration: BoxDecoration(
+                      //           color: Colors.orange[600],
+                      //           borderRadius: BorderRadius.circular(10),
+                      //         ),
+                      //         child: Text(
+                      //           '${tripRequests!.length}',
+                      //           style: const TextStyle(
+                      //             color: Colors.white,
+                      //             fontSize: 12,
+                      //             fontWeight: FontWeight.bold,
+                      //           ),
+                      //         ),
+                      //       ),
+                      //     ],
+                      //   ),
+                      //   const SizedBox(height: 12),
+                      //   ...tripRequests!.map((request) => _buildTripRequestCard(
+                      //         context,
+                      //         request,
+                      //       )),
+                      //   const SizedBox(height: 20),
+                      // ],
+                      //
+                      // // Action Buttons
+                      // _buildModalActions(context),
                     ],
                   ),
                 ),
@@ -1537,28 +1539,55 @@ class ModernSenderOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Accept Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                onAcceptRequest?.call(request, order.id);
-              },
-              icon: const Icon(Icons.check_circle_outline, size: 18),
-              label: const Text(
-                'Accept Request',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green[600],
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+          // ✅ Accept and Decline Buttons (side by side)
+          Row(
+            children: [
+              // Accept Button
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    onAcceptRequest?.call(request, order.id);
+                  },
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
+                  label: const Text(
+                    'Accept',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green[600],
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              // Decline Button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    onDeclineRequest?.call(request, order.id);
+                  },
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text(
+                    'Decline',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red[600],
+                    side: BorderSide(color: Colors.red[300]!),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1639,32 +1668,32 @@ class ModernSenderOrderCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange[200]!),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.schedule, color: Colors.orange[600], size: 20),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Waiting for Trip Requests',
-                    style: TextStyle(
-                      color: Colors.orange[700],
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // const SizedBox(height: 12),
+            //
+            // Container(
+            //   width: double.infinity,
+            //   padding: const EdgeInsets.all(16),
+            //   decoration: BoxDecoration(
+            //     color: Colors.orange[50],
+            //     borderRadius: BorderRadius.circular(12),
+            //     border: Border.all(color: Colors.orange[200]!),
+            //   ),
+            //   child: Row(
+            //     mainAxisAlignment: MainAxisAlignment.center,
+            //     children: [
+            //       Icon(Icons.schedule, color: Colors.orange[600], size: 20),
+            //       const SizedBox(width: 12),
+            //       Text(
+            //         'Waiting for Trip Requests',
+            //         style: TextStyle(
+            //           color: Colors.orange[700],
+            //           fontWeight: FontWeight.w600,
+            //           fontSize: 14,
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
           ],
         );
 
