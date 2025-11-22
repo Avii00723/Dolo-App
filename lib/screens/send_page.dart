@@ -12,6 +12,7 @@ import 'LocationinputField.dart';
 import 'CustomRoutePreviewScreen.dart';
 import 'orderSection/SearchResultPage.dart';
 import 'orderSection/YourOrders.dart';
+import '../widgets/NotificationBellIcon.dart';
 
 class SendPage extends StatefulWidget {
   const SendPage({Key? key}) : super(key: key);
@@ -57,6 +58,7 @@ class _SendPageState extends State<SendPage> {
   @override
   void initState() {
     super.initState();
+    print('📄 SendPage: initState() called');
     _initializeUser();
   }
 
@@ -603,10 +605,11 @@ class _SendPageState extends State<SendPage> {
                       'assets/images/doloooo.png',
                       height: 40,
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.notifications_none),
-                      iconSize: 28,
-                      onPressed: () {},
+                    NotificationBellIcon(
+                      onNotificationHandled: () {
+                        // Refresh the inbox and requests after handling a notification
+
+                      },
                     ),
                   ],
                 ),
@@ -1859,6 +1862,14 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          NotificationBellIcon(
+            iconColor: Colors.white,
+            onNotificationHandled: () {
+              print('🔔 SendPage: Notification handled callback');
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

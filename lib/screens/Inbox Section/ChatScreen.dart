@@ -16,6 +16,7 @@ import '../../Controllers/ChatService.dart';
 import '../../Controllers/SocketService.dart';
 import '../../Controllers/tutorial_service.dart';
 import '../../widgets/tutorial_helper.dart';
+import '../../widgets/NotificationBellIcon.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -974,6 +975,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ],
       ),
       actions: [
+        NotificationBellIcon(
+          onNotificationHandled: () {
+            // Refresh messages after handling a notification
+            _loadMessages(silent: true);
+          },
+        ),
         if (_isRefreshing)
           Padding(
             padding: const EdgeInsets.all(16.0),

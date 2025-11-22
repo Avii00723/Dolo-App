@@ -6,10 +6,13 @@ import '../../Controllers/ChatService.dart';
 import '../../Controllers/SocketService.dart';
 import '../../Controllers/TripRequestService.dart';
 import '../../Models/TripRequestModel.dart';
+import '../../widgets/NotificationBellIcon.dart';
 import 'ChatScreen.dart';
 
 class InboxScreen extends StatefulWidget {
-  const InboxScreen({Key? key}) : super(key: key);
+  final int initialTab;
+
+  const InboxScreen({Key? key, this.initialTab = 0}) : super(key: key);
 
   @override
   State<InboxScreen> createState() => _InboxScreenState();
@@ -41,7 +44,11 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this); // ✅ NEW: 2 tabs - Chats and Requests
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab,
+    ); // ✅ NEW: 2 tabs - Chats and Requests
     _initializeAndLoadInbox();
     _initializeWebSocket();
   }
@@ -237,9 +244,19 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         ),
         centerTitle: false,
         actions: [
+          NotificationBellIcon(
+            onNotificationHandled: () {
+              // Refresh the inbox and requests after handling a notification
+              _loadInbox();
+              _loadTripRequests();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: _loadInbox,
+            onPressed: () {
+              _loadInbox();
+              _loadTripRequests();
+            },
             tooltip: 'Refresh',
           ),
         ],

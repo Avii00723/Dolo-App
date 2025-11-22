@@ -35,6 +35,10 @@ class ApiConstants {
   static const String sendChatMessage = '$baseUrl/chat/send';
   static const String getChatMessages = '$baseUrl/chat';
 
+  // Notifications
+  static const String getNotifications = '$baseUrl/notifications';
+  static const String markNotificationAsRead = '$baseUrl/notifications';
+
   // Media - TTS
   static const String ttsStreamUrl = 'https://api.dzdx.in/v1/media/tts/stream';
 

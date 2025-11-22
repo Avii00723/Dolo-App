@@ -7,6 +7,7 @@ import '../LoginScreens/LoginSignupScreen.dart';
 import '../LoginScreens/signup_page.dart';
 import 'ProfileDetailPage.dart';
 import '../../Models/LoginModel.dart';
+import '../../widgets/NotificationBellIcon.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -781,6 +782,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ),
         centerTitle: true,
         actions: [
+          NotificationBellIcon(
+            onNotificationHandled: () {
+              // Refresh profile after handling a notification
+              _loadUserData();
+            },
+          ),
           if (isLoading)
             const Padding(
               padding: EdgeInsets.all(16.0),

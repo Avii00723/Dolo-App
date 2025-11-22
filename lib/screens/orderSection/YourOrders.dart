@@ -8,6 +8,7 @@ import '../Inbox Section/indoxscreen.dart';
 import '../../Models/OrderModel.dart' as OrderModels;
 import '../../Models/TripRequestModel.dart';
 import '../../screens/orderSection/OrderCard.dart';
+import '../../widgets/NotificationBellIcon.dart';
 import 'TravellerCard.dart';
 
 // Local models for UI display
@@ -1470,6 +1471,12 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          NotificationBellIcon(
+            onNotificationHandled: () {
+              // Refresh data after handling a notification
+              _loadAllData();
+            },
+          ),
           // ✅ ADD: Manual refresh button
           IconButton(
             icon: const Icon(Icons.refresh),
