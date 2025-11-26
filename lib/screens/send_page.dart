@@ -24,7 +24,8 @@ class SendPage extends StatefulWidget {
 class _SendPageState extends State<SendPage> {
   final TextEditingController fromController = TextEditingController();
   final TextEditingController toController = TextEditingController();
-  final TextEditingController dateController = TextEditingController();
+  final TextEditingController departureController = TextEditingController(); // NEW: For departure datetime
+  final TextEditingController deliveryController = TextEditingController(); // RENAMED: Was dateController
 
   String? selectedVehicle;
   final List<String> vehicleOptions = [
@@ -49,8 +50,12 @@ class _SendPageState extends State<SendPage> {
   String? currentUserId;
 
   // Store actual date and time values for API
-  String? _selectedDate; // YYYY-MM-DD format
-  String? _selectedTime; // HH:mm:ss format
+  String? _selectedDate; // YYYY-MM-DD format (used for delivery date)
+  String? _selectedTime; // HH:mm:ss format (used for delivery time)
+
+  // NEW: Store departure date and time separately
+  String? _departureDate; // YYYY-MM-DD format
+  String? _departureTime; // HH:mm:ss format
 
   // Stopover management
   List<Map<String, dynamic>> stopovers = [];
@@ -66,7 +71,8 @@ class _SendPageState extends State<SendPage> {
   void dispose() {
     fromController.dispose();
     toController.dispose();
-    dateController.dispose();
+    departureController.dispose();
+    deliveryController.dispose();
     super.dispose();
   }
 
@@ -172,8 +178,8 @@ class _SendPageState extends State<SendPage> {
     );
   }
 
-  Future<void> _selectDateTime(BuildContext context) async {
-    // First, pick the date
+  // NEW: Select departure datetime
+  Future<void> _selectDepartureDateTime(BuildContext context) async {
     DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -181,42 +187,77 @@ class _SendPageState extends State<SendPage> {
       lastDate: DateTime(2101),
     );
 
-    if (pickedDate != null) {
-      // Then, pick the time
-      if (context.mounted) {
-        TimeOfDay? pickedTime = await showTimePicker(
-          context: context,
-          initialTime: TimeOfDay.now(),
+    if (pickedDate != null && context.mounted) {
+      TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+      );
+
+      if (pickedTime != null) {
+        final combinedDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
         );
 
-        if (pickedTime != null) {
-          // Combine date and time
-          final combinedDateTime = DateTime(
-            pickedDate.year,
-            pickedDate.month,
-            pickedDate.day,
-            pickedTime.hour,
-            pickedTime.minute,
-          );
+        final dateStr = "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+        final hour = pickedTime.hour.toString().padLeft(2, '0');
+        final minute = pickedTime.minute.toString().padLeft(2, '0');
+        final timeStr = '$hour:$minute:00';
 
-          // Store date and time separately for API
-          final dateStr = "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
-          final hour = pickedTime.hour.toString().padLeft(2, '0');
-          final minute = pickedTime.minute.toString().padLeft(2, '0');
-          final timeStr = '$hour:$minute:00';
+        setState(() {
+          _departureDate = dateStr;
+          _departureTime = timeStr;
+          departureController.text = DateFormat('dd MMM yyyy, hh:mm a').format(combinedDateTime);
+        });
 
-          setState(() {
-            _selectedDate = dateStr;
-            _selectedTime = timeStr;
+        print('🛫 Departure DateTime Display: ${departureController.text}');
+        print('🛫 Departure Date for API: $_departureDate');
+        print('🛫 Departure Time for API: $_departureTime');
+      }
+    }
+  }
 
-            // Display formatted datetime in the text field (for user visibility)
-            dateController.text = DateFormat('dd MMM yyyy, hh:mm a').format(combinedDateTime);
-          });
+  // UPDATED: Select delivery datetime (renamed from _selectDateTime)
+  Future<void> _selectDeliveryDateTime(BuildContext context) async {
+    DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
+    );
 
-          print('📅 Selected DateTime Display: ${dateController.text}');
-          print('📅 Date for API: $_selectedDate');
-          print('⏰ Time for API: $_selectedTime');
-        }
+    if (pickedDate != null && context.mounted) {
+      TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+      );
+
+      if (pickedTime != null) {
+        final combinedDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+
+        final dateStr = "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+        final hour = pickedTime.hour.toString().padLeft(2, '0');
+        final minute = pickedTime.minute.toString().padLeft(2, '0');
+        final timeStr = '$hour:$minute:00';
+
+        setState(() {
+          _selectedDate = dateStr;
+          _selectedTime = timeStr;
+          deliveryController.text = DateFormat('dd MMM yyyy, hh:mm a').format(combinedDateTime);
+        });
+
+        print('📦 Delivery DateTime Display: ${deliveryController.text}');
+        print('📦 Delivery Date for API: $_selectedDate');
+        print('📦 Delivery Time for API: $_selectedTime');
       }
     }
   }
@@ -229,10 +270,12 @@ class _SendPageState extends State<SendPage> {
 
     if (fromController.text.trim().isEmpty ||
         toController.text.trim().isEmpty ||
+        _departureDate == null ||
+        _departureTime == null ||
         _selectedDate == null ||
         _selectedTime == null ||
         selectedVehicle == null) {
-      _showSnackBar('Please fill all required fields', Colors.red);
+      _showSnackBar('Please fill all required fields (including departure and delivery date/time)', Colors.red);
       return;
     }
 
@@ -267,6 +310,8 @@ class _SendPageState extends State<SendPage> {
       final orders = await _orderService.searchOrders(
         origin: fromController.text.trim(),
         destination: toController.text.trim(),
+        departureDate: _departureDate!, // NEW
+        departureTime: _departureTime!, // NEW
         deliveryDate: _selectedDate!,
         deliveryTime: _selectedTime!,
         originLatitude: originPosition!.latitude,
@@ -290,9 +335,14 @@ class _SendPageState extends State<SendPage> {
               orders: orders,
               fromLocation: fromController.text.trim(),
               toLocation: toController.text.trim(),
-              date: dateController.text.trim(),
+              date: deliveryController.text.trim(), // Show delivery date/time for display
               searchedVehicle: selectedVehicle!, // Pass the searched vehicle
               onSendRequest: (order) => _sendRequestToSender(order),
+              // NEW: Pass departure and delivery datetime for trip request
+              departureDate: _departureDate!,
+              departureTime: _departureTime!,
+              deliveryDate: _selectedDate!,
+              deliveryTime: _selectedTime!,
             ),
           ),
         );
@@ -300,7 +350,7 @@ class _SendPageState extends State<SendPage> {
 
       if (orders.isEmpty) {
         _showSnackBar(
-          'No orders found for this route on ${dateController.text.trim()}',
+          'No orders found for this route on ${deliveryController.text.trim()}',
           Colors.orange,
         );
       }
@@ -346,6 +396,11 @@ class _SendPageState extends State<SendPage> {
           order: order,
           currentUserId: currentUserId!,
           tripRequestService: _tripRequestService,
+          // NEW: Pass departure and delivery datetime
+          departureDate: _departureDate!,
+          departureTime: _departureTime!,
+          deliveryDate: _selectedDate!,
+          deliveryTime: _selectedTime!,
           onSuccess: (tripRequestId, orderOwner) {
             _showSuccessDialog(
               tripRequestId: tripRequestId,
@@ -545,11 +600,14 @@ class _SendPageState extends State<SendPage> {
                 ).then((_) {
                   fromController.clear();
                   toController.clear();
-                  dateController.clear();
+                  departureController.clear();
+                  deliveryController.clear();
                   setState(() {
                     selectedVehicle = null;
                     originPosition = null;
                     destinationPosition = null;
+                    _departureDate = null;
+                    _departureTime = null;
                     _selectedDate = null;
                     _selectedTime = null;
                   });
@@ -857,13 +915,26 @@ class _SendPageState extends State<SendPage> {
                     ],
 
                     const SizedBox(height: 15),
+                    // NEW: Departure Date & Time
                     GestureDetector(
-                      onTap: () => _selectDateTime(context),
+                      onTap: () => _selectDepartureDateTime(context),
                       child: AbsorbPointer(
                         child: buildInputBox(
-                          'Delivery Date & Time',
-                          dateController,
-                          Icons.calendar_today,
+                          'Departure Date & Time *',
+                          departureController,
+                          Icons.flight_takeoff,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    // Delivery Date & Time
+                    GestureDetector(
+                      onTap: () => _selectDeliveryDateTime(context),
+                      child: AbsorbPointer(
+                        child: buildInputBox(
+                          'Delivery Date & Time *',
+                          deliveryController,
+                          Icons.schedule,
                         ),
                       ),
                     ),
@@ -1611,6 +1682,11 @@ class SendTripRequestPage extends StatefulWidget {
   final String currentUserId;
   final TripRequestService tripRequestService;
   final Function(String tripRequestId, String orderOwner) onSuccess;
+  // NEW: Accept departure and delivery datetime from search
+  final String departureDate;
+  final String departureTime;
+  final String deliveryDate;
+  final String deliveryTime;
 
   const SendTripRequestPage({
     Key? key,
@@ -1618,6 +1694,10 @@ class SendTripRequestPage extends StatefulWidget {
     required this.currentUserId,
     required this.tripRequestService,
     required this.onSuccess,
+    required this.departureDate,
+    required this.departureTime,
+    required this.deliveryDate,
+    required this.deliveryTime,
   }) : super(key: key);
 
   @override
@@ -1626,18 +1706,62 @@ class SendTripRequestPage extends StatefulWidget {
 
 class _SendTripRequestPageState extends State<SendTripRequestPage> {
   final vehicleInfoController = TextEditingController();
-  final startTimeController = TextEditingController();
-  final endTimeController = TextEditingController();
+  // REMOVED: startTimeController and endTimeController (using datetime from search)
   final commentsController = TextEditingController();
   bool isSubmitting = false;
 
   @override
   void dispose() {
     vehicleInfoController.dispose();
-    startTimeController.dispose();
-    endTimeController.dispose();
+    // REMOVED: startTimeController.dispose() and endTimeController.dispose()
     commentsController.dispose();
     super.dispose();
+  }
+
+  // NEW: Build read-only field for displaying datetime from search
+  Widget _buildReadOnlyDateTimeField({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.primary, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _selectTime(TextEditingController controller) async {
@@ -1682,10 +1806,9 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
   }
 
   Future<void> _submitRequest() async {
-    if (vehicleInfoController.text.trim().isEmpty ||
-        startTimeController.text.trim().isEmpty ||
-        endTimeController.text.trim().isEmpty) {
-      _showSnackBar('Please fill all required fields', Colors.red);
+    // NEW: Only require vehicle info and comments (datetime comes from search)
+    if (vehicleInfoController.text.trim().isEmpty) {
+      _showSnackBar('Please enter vehicle information', Colors.red);
       return;
     }
 
@@ -1694,20 +1817,18 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     });
 
     try {
-      String formattedDate = widget.order.deliveryDate;
-      if (widget.order.deliveryDate.contains('T')) {
-        formattedDate = widget.order.deliveryDate.split('T')[0];
-      }
+      // Build ISO datetime strings: YYYY-MM-DDTHH:MM:SS
+      final departureDatetime = '${widget.departureDate}T${widget.departureTime}';
+      final deliveryDatetime = '${widget.deliveryDate}T${widget.deliveryTime}';
 
       final tripRequest = TripRequestSendRequest(
         travelerId: widget.currentUserId,
         orderId: widget.order.id,
-        travelDate: formattedDate,
+        travelDate: deliveryDatetime, // travel_date = delivery datetime
         vehicleInfo: vehicleInfoController.text.trim(),
         source: widget.order.origin,
         destination: widget.order.destination,
-        pickupTime: startTimeController.text.trim(),
-        dropoffTime: endTimeController.text.trim(),
+        departureDatetime: departureDatetime, // departure_datetime
         comments: commentsController.text.trim().isNotEmpty
             ? commentsController.text.trim()
             : null,
@@ -1716,6 +1837,8 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
       print('DEBUG: Sending trip request...');
       print('DEBUG: Traveler ID: ${widget.currentUserId}');
       print('DEBUG: Order ID: ${widget.order.id}');
+      print('DEBUG: Travel Date (delivery): $deliveryDatetime');
+      print('DEBUG: Departure Datetime: $departureDatetime');
 
       final response = await widget.tripRequestService.sendTripRequest(tripRequest);
 
@@ -1975,30 +2098,17 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
                     isRequired: true,
                   ),
                   const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: () => _selectTime(startTimeController),
-                    child: AbsorbPointer(
-                      child: _buildEnhancedTextField(
-                        controller: startTimeController,
-                        label: 'Start Time',
-                        hint: 'Tap to select time',
-                        icon: Icons.access_time,
-                        isRequired: true,
-                      ),
-                    ),
+                  // NEW: Show departure and delivery datetime (read-only, from search)
+                  _buildReadOnlyDateTimeField(
+                    label: 'Departure Date & Time',
+                    value: '${widget.departureDate} ${widget.departureTime}',
+                    icon: Icons.flight_takeoff,
                   ),
                   const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: () => _selectTime(endTimeController),
-                    child: AbsorbPointer(
-                      child: _buildEnhancedTextField(
-                        controller: endTimeController,
-                        label: 'Arrival Time',
-                        hint: 'Tap to select time',
-                        icon: Icons.access_time_filled,
-                        isRequired: true,
-                      ),
-                    ),
+                  _buildReadOnlyDateTimeField(
+                    label: 'Delivery Date & Time',
+                    value: '${widget.deliveryDate} ${widget.deliveryTime}',
+                    icon: Icons.schedule,
                   ),
                   const SizedBox(height: 16),
                   _buildEnhancedTextField(

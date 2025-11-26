@@ -11,6 +11,11 @@ class SearchResultsPage extends StatelessWidget {
   final String date;
   final String searchedVehicle; // The vehicle type used in search
   final Function(Order) onSendRequest;
+  // NEW: Departure and delivery datetime for trip request
+  final String departureDate;
+  final String departureTime;
+  final String deliveryDate;
+  final String deliveryTime;
 
   const SearchResultsPage({
     Key? key,
@@ -20,6 +25,10 @@ class SearchResultsPage extends StatelessWidget {
     required this.date,
     required this.searchedVehicle,
     required this.onSendRequest,
+    required this.departureDate,
+    required this.departureTime,
+    required this.deliveryDate,
+    required this.deliveryTime,
   }) : super(key: key);
 
   String _formatDateForDisplay(String isoDate) {

@@ -231,8 +231,10 @@ class OrderService {
   Future<List<Order>> searchOrders({
     required String origin,
     required String destination,
+    required String departureDate, // NEW: Departure date
+    required String departureTime, // NEW: Departure time
     required String deliveryDate,
-    required String deliveryTime, // Required delivery time parameter
+    required String deliveryTime,
     required double originLatitude,
     required double originLongitude,
     required String vehicle,
@@ -242,13 +244,14 @@ class OrderService {
     print('=== SEARCH ORDERS API CALL ===');
     print('Endpoint: ${ApiConstants.searchOrders}');
 
-    // Combine date and time into delivery_datetime in ISO 8601 format
-    // Format: YYYY-MM-DDTHH:MM:SS (as per API documentation)
+    // Combine date and time into ISO 8601 format (YYYY-MM-DDTHH:MM:SS)
+    String departureDatetime = '${departureDate}T$departureTime';
     String deliveryDatetime = '${deliveryDate}T$deliveryTime';
 
     print('Query Parameters:');
     print(' - origin: $origin');
     print(' - destination: $destination');
+    print(' - departure_datetime: $departureDatetime'); // NEW
     print(' - delivery_datetime: $deliveryDatetime');
     print(' - origin_latitude: $originLatitude');
     print(' - origin_longitude: $originLongitude');
@@ -263,6 +266,7 @@ class OrderService {
       final queryParams = {
         'origin': origin,
         'destination': destination,
+        'departure_datetime': departureDatetime, // NEW
         'delivery_datetime': deliveryDatetime,
         'origin_latitude': originLatitude.toString(),
         'origin_longitude': originLongitude.toString(),

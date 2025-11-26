@@ -5,13 +5,12 @@
 class TripRequestSendRequest {
   final String travelerId;
   final String orderId;
-  final String travelDate;
+  final String travelDate; // Format: YYYY-MM-DDTHH:MM:SSZ (delivery datetime)
   final String vehicleInfo;
   final String source;
   final String destination;
-  final String pickupTime;  // ✅ Changed from startTripTime
-  final String dropoffTime; // ✅ Changed from endTripTime
-  final String? comments; // ✅ Optional comments field
+  final String departureDatetime; // Format: YYYY-MM-DDTHH:MM:SSZ
+  final String? comments;
 
   TripRequestSendRequest({
     required this.travelerId,
@@ -20,30 +19,22 @@ class TripRequestSendRequest {
     required this.vehicleInfo,
     required this.source,
     required this.destination,
-    required this.pickupTime,
-    required this.dropoffTime,
-    this.comments, // ✅ Optional parameter
+    required this.departureDatetime,
+    this.comments,
   });
 
   Map<String, dynamic> toJson() {
-    // Format date to YYYY-MM-DD only (remove timestamp if present)
-    String formattedDate = travelDate;
-    if (travelDate.contains('T')) {
-      formattedDate = travelDate.split('T')[0];
-    }
-
     final json = {
       'traveler_id': travelerId,
       'order_id': orderId,
-      'travel_date': formattedDate,
+      'travel_date': travelDate, // ISO datetime format
       'vehicle_info': vehicleInfo,
       'source': source,
       'destination': destination,
-      'pickup_time': pickupTime,   // ✅ API field name
-      'dropoff_time': dropoffTime, // ✅ API field name
+      'departure_datetime': departureDatetime, // ISO datetime format
     };
 
-    // ✅ Add comments if provided
+    // Add comments if provided
     if (comments != null && comments!.isNotEmpty) {
       json['comments'] = comments!;
     }
