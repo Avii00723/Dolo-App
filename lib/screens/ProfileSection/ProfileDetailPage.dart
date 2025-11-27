@@ -4,6 +4,7 @@ import 'dart:io';
 import '../../Models/LoginModel.dart';
 import '../../Controllers/ProfileService.dart';
 import '../../Widgets/ModernInputField.dart';
+import '../../Constants/ApiConstants.dart';
 
 class ProfileDetailsPage extends StatefulWidget {
   final UserProfile userProfile;
@@ -356,7 +357,9 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                                   : (widget.userProfile.photoURL.isNotEmpty
                                       ? ClipOval(
                                           child: Image.network(
-                                            widget.userProfile.photoURL,
+                                            widget.userProfile.photoURL.startsWith('http')
+                                                ? widget.userProfile.photoURL
+                                                : '${ApiConstants.imagebaseUrl}${widget.userProfile.photoURL}',
                                             width: 110,
                                             height: 110,
                                             fit: BoxFit.cover,

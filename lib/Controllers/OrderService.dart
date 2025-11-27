@@ -346,7 +346,9 @@ class OrderService {
 
   // Get user's orders
   Future<List<Order>> getMyOrders(String userHashedId) async {
-    print('=== GET MY ORDERS API CALL ===');
+    print('═══════════════════════════════════════════');
+    print('📦 GET MY ORDERS API CALL');
+    print('═══════════════════════════════════════════');
     print('Endpoint: ${ApiConstants.myOrders}');
     print('User Hashed ID: $userHashedId');
 
@@ -355,29 +357,65 @@ class OrderService {
         ApiConstants.myOrders,
         queryParameters: {'userHashedId': userHashedId},
         parser: (json) {
-          print('Raw JSON Response: $json');
+          print('📥 Raw JSON Response Type: ${json.runtimeType}');
+          print('📥 Raw JSON Response: $json');
+
+          if (json == null) {
+            print('❌ JSON response is null');
+            return <Order>[];
+          }
+
+          if (json['orders'] == null) {
+            print('❌ orders key is null in response');
+            print('📥 Available keys: ${json.keys.toList()}');
+            return <Order>[];
+          }
+
           if (json['orders'] is List) {
-            final orders =
-                (json['orders'] as List).map((e) => Order.fromJson(e)).toList();
-            print('Parsed Orders Count: ${orders.length}');
+            final ordersList = json['orders'] as List;
+            print('📦 Found ${ordersList.length} orders in response');
+
+            final List<Order> orders = [];
+            for (int i = 0; i < ordersList.length; i++) {
+              try {
+                print('📦 Parsing order $i: ${ordersList[i]}');
+                final order = Order.fromJson(ordersList[i]);
+                print('✅ Order $i parsed: id=${order.id}, status=${order.status}');
+                orders.add(order);
+              } catch (e, st) {
+                print('❌ Error parsing order $i: $e');
+                print('Stack: $st');
+              }
+            }
+
+            print('✅ Parsed ${orders.length} orders successfully');
             return orders;
           }
-          print('⚠️ No orders found in response');
-          return [];
+
+          print('⚠️ orders is not a List, type: ${json['orders'].runtimeType}');
+          return <Order>[];
         },
       );
 
       print('Response Success: ${response.success}');
+      print('Response Data Type: ${response.data?.runtimeType}');
 
       if (!response.success) {
         print('❌ GET MY ORDERS FAILED');
         print('Error: ${response.error}');
+        print('Status Code: ${response.statusCode}');
       } else {
+        final orders = response.data as List<Order>?;
         print('✅ GET MY ORDERS SUCCESS');
-        print('Total Orders: ${(response.data as List<Order>).length}');
+        print('Total Orders: ${orders?.length ?? 0}');
+        if (orders != null && orders.isNotEmpty) {
+          for (var o in orders) {
+            print('  - Order: ${o.id}, Status: ${o.status}, Origin: ${o.origin}');
+          }
+        }
       }
 
-      return response.success ? (response.data as List<Order>) : [];
+      return response.success ? (response.data as List<Order>? ?? []) : [];
     } catch (e, stackTrace) {
       print('❌ GET MY ORDERS EXCEPTION: $e');
       print('Stack Trace: $stackTrace');

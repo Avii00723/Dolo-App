@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../Controllers/LoginService.dart';
 import '../../Controllers/AuthService.dart';
+import '../../Controllers/DeviceTokenService.dart';
 import 'UserProfileHelper.dart';
 
 class OTPScreen extends StatefulWidget {
@@ -59,6 +60,9 @@ class _OTPScreenState extends State<OTPScreen> {
         );
 
         debugPrint('✅ UserId saved to secure storage: ${verifyResponse.userId}');
+
+        // Initialize FCM and save device token for push notifications
+        await DeviceTokenService.initialize();
 
         if (mounted) {
           UserProfileHelper.checkUserAndNavigate(

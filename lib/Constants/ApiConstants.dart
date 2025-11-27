@@ -39,6 +39,9 @@ class ApiConstants {
   static const String getNotifications = '$baseUrl/notifications';
   static const String markNotificationAsRead = '$baseUrl/notifications';
 
+  // Device Tokens
+  static const String saveDeviceToken = '$baseUrl/device/save';
+
   // Media - TTS
   static const String ttsStreamUrl = 'https://api.dzdx.in/v1/media/tts/stream';
 

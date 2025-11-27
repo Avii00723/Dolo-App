@@ -128,11 +128,11 @@ class TripRequest {
   final String vehicleInfo;
   final String source;
   final String destination;
-  final String pickupTime;
-  final String dropoffTime;
+  final String departureDatetime; // Updated: API now uses departure_datetime
   final String status;
   final String? origin; // Additional field from API (same as source typically)
   final String? createdAt;
+  final String? comments;
 
   TripRequest({
     required this.id,
@@ -142,44 +142,44 @@ class TripRequest {
     required this.vehicleInfo,
     required this.source,
     required this.destination,
-    required this.pickupTime,
-    required this.dropoffTime,
+    required this.departureDatetime,
     required this.status,
     this.origin,
     this.createdAt,
+    this.comments,
   });
 
   factory TripRequest.fromJson(Map<String, dynamic> json) {
     return TripRequest(
-      id: json['hashed_id']?.toString() ?? '', // Updated from 'id'
-      travelerId: json['traveler_id']?.toString() ?? '', // ✅ FIXED: Use traveler_id not traveler_hashed_id
-      orderId: json['order_id']?.toString() ?? '', // ✅ FIXED: Use order_id not order_hashed_id
-      travelDate: json['travel_date'] as String,
-      vehicleInfo: json['vehicle_info'] as String,
-      source: json['source'] as String,
-      destination: json['destination'] as String,
-      pickupTime: json['pickup_time'] as String,
-      dropoffTime: json['dropoff_time'] as String,
-      status: json['status'] as String,
-      origin: json['origin'] as String?, // New field
-      createdAt: json['created_at'] as String?,
+      id: json['hashed_id']?.toString() ?? '',
+      travelerId: json['traveler_id']?.toString() ?? '',
+      orderId: json['order_id']?.toString() ?? '',
+      travelDate: json['travel_date']?.toString() ?? '',
+      vehicleInfo: json['vehicle_info']?.toString() ?? '',
+      source: json['source']?.toString() ?? '',
+      destination: json['destination']?.toString() ?? '',
+      departureDatetime: json['departure_datetime']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      origin: json['origin']?.toString(),
+      createdAt: json['created_at']?.toString(),
+      comments: json['comments']?.toString(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'hashed_id': id, // Updated from 'id'
-      'traveler_hashed_id': travelerId, // Updated from 'traveler_id'
-      'order_hashed_id': orderId, // Updated from 'order_id'
+      'hashed_id': id,
+      'traveler_hashed_id': travelerId,
+      'order_hashed_id': orderId,
       'travel_date': travelDate,
       'vehicle_info': vehicleInfo,
       'source': source,
       'destination': destination,
-      'pickup_time': pickupTime,
-      'dropoff_time': dropoffTime,
+      'departure_datetime': departureDatetime,
       'status': status,
-      'origin': origin, // New field
+      'origin': origin,
       'created_at': createdAt,
+      'comments': comments,
     };
   }
 }

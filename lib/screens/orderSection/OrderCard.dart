@@ -1520,16 +1520,16 @@ class ModernSenderOrderCard extends StatelessWidget {
                     Expanded(
                       child: _buildInfoRowCompact(
                         Icons.access_time,
-                        'Pickup',
-                        request.pickupTime,
+                        'Departure',
+                        request.departureDatetime,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _buildInfoRowCompact(
                         Icons.access_time_filled,
-                        'Dropoff',
-                        request.dropoffTime,
+                        'Delivery',
+                        request.travelDate,
                       ),
                     ),
                   ],

@@ -81,8 +81,8 @@ class TripRequestDisplay {
   final String travellerId;
   final String travellerName;
   final String vehicleInfo;
-  final String pickupTime;
-  final String dropoffTime;
+  final String departureDatetime;
+  final String travelDate;
   final String status;
   final String? profileImageUrl;
 
@@ -92,8 +92,8 @@ class TripRequestDisplay {
     required this.travellerId,
     required this.travellerName,
     required this.vehicleInfo,
-    required this.pickupTime,
-    required this.dropoffTime,
+    required this.departureDatetime,
+    required this.travelDate,
     required this.status,
     this.profileImageUrl,
   });
@@ -221,7 +221,10 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
   // ✅ UPDATED: Add silent parameter
   Future<void> _loadMyOrders({bool silent = false}) async {
-    if (currentUserId == null) return;
+    if (currentUserId == null) {
+      print('❌ _loadMyOrders: currentUserId is null, returning');
+      return;
+    }
 
     if (!silent) {
       setState(() {
@@ -230,9 +233,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
 
     try {
-      print('🔍 Loading orders for user: $currentUserId');
+      print('═══════════════════════════════════════════');
+      print('🔍 _loadMyOrders: Loading orders for user: $currentUserId');
+      print('═══════════════════════════════════════════');
       final orders = await _orderService.getMyOrders(currentUserId!);
-      print('📦 Received ${orders.length} orders');
+      print('📦 _loadMyOrders: Received ${orders.length} orders from service');
 
       final List<OrderDisplay> displayOrders = [];
       for (var order in orders) {
@@ -307,8 +312,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             travellerId: request.travelerId,
             travellerName: 'Traveler ${request.travelerId}',
             vehicleInfo: request.vehicleInfo,
-            pickupTime: request.pickupTime,
-            dropoffTime: request.dropoffTime,
+            departureDatetime: request.departureDatetime,
+            travelDate: request.travelDate,
             status: request.status,
           );
 
@@ -380,7 +385,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           status: request.status,
           orderType: 'receive',
           requestStatus: request.status,
-          notes: '${request.vehicleInfo} • Pickup: ${request.pickupTime} • Dropoff: ${request.dropoffTime}',
+          notes: '${request.vehicleInfo} • Departure: ${request.departureDatetime} • Delivery: ${request.travelDate}',
           tripRequestId: request.id,
         ));
 
@@ -1392,9 +1397,9 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                   const SizedBox(height: 8),
                   _buildInfoRow(Icons.info_outline, 'Vehicle Info', request.vehicleInfo),
                   const SizedBox(height: 4),
-                  _buildInfoRow(Icons.access_time, 'Pickup Time', request.pickupTime),
+                  _buildInfoRow(Icons.access_time, 'Departure', request.departureDatetime),
                   const SizedBox(height: 4),
-                  _buildInfoRow(Icons.access_time_filled, 'Dropoff Time', request.dropoffTime),
+                  _buildInfoRow(Icons.access_time_filled, 'Delivery', request.travelDate),
                 ],
               ),
             ),

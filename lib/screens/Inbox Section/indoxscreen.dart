@@ -7,6 +7,7 @@ import '../../Controllers/SocketService.dart';
 import '../../Controllers/TripRequestService.dart';
 import '../../Models/TripRequestModel.dart';
 import '../../widgets/NotificationBellIcon.dart';
+import '../../Constants/ApiConstants.dart';
 import 'ChatScreen.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -1137,7 +1138,9 @@ class ModernChatCard extends StatelessWidget {
           ? ClipRRect(
         borderRadius: BorderRadius.circular(26),
         child: Image.network(
-          photoUrl,
+          photoUrl.startsWith('http')
+              ? photoUrl
+              : '${ApiConstants.imagebaseUrl}$photoUrl',
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) =>
               _buildAvatarFallback(name),
@@ -2225,8 +2228,8 @@ class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
                       Expanded(
                         child: _buildDetailRow(
                           Icons.access_time,
-                          'Pickup Time',
-                          widget.request.pickupTime,
+                          'Departure',
+                          widget.request.departureDatetime,
                           Colors.green,
                         ),
                       ),
@@ -2234,8 +2237,8 @@ class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
                       Expanded(
                         child: _buildDetailRow(
                           Icons.access_time_filled,
-                          'Dropoff Time',
-                          widget.request.dropoffTime,
+                          'Delivery',
+                          widget.request.travelDate,
                           Colors.red,
                         ),
                       ),

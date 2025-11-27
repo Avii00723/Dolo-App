@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../Constants/colorconstant.dart';
+import '../../Constants/ApiConstants.dart';
 import '../../Controllers/ProfileService.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/tutorial_service.dart';
@@ -482,7 +483,9 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                             child: userProfile?.photoURL != null && userProfile!.photoURL.isNotEmpty
                                 ? ClipOval(
                               child: Image.network(
-                                userProfile!.photoURL,
+                                userProfile!.photoURL.startsWith('http')
+                                    ? userProfile!.photoURL
+                                    : '${ApiConstants.imagebaseUrl}${userProfile!.photoURL}',
                                 width: 70,
                                 height: 70,
                                 fit: BoxFit.cover,

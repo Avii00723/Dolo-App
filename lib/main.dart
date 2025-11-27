@@ -1,11 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:dolo/screens/home/homepage.dart';
 import 'package:dolo/screens/LoginScreens/LoginSignupScreen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'Controllers/AuthService.dart';
+import 'Controllers/DeviceTokenService.dart';
+import 'firebase_options.dart';
 import 'splash_screen.dart';
+
+// Background message handler (must be top-level function)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('📩 Background message received: ${message.messageId}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Set up background message handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   runApp(const MyApp());
 }
 
@@ -58,6 +76,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       if (isLoggedIn && userData != null) {
         print('✅ User is logged in: userId=${userData['userId']}, phone=${userData['phone']}');
+        // Initialize FCM and save device token for push notifications
+        await DeviceTokenService.initialize();
       } else {
         print('ℹ️ No user session found - showing login screen');
       }
