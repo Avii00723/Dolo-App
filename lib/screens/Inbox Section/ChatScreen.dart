@@ -1304,11 +1304,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               onPressed: _showImagePickerOptions,
               tooltip: 'Add Images',
             ),
-            IconButton(
-              icon: Icon(Icons.monetization_on, color: Colors.green.shade600),
-              onPressed: _showNegotiationDialog,
-              tooltip: 'Negotiate Price',
-            ),
+            // IconButton(
+            //   icon: Icon(Icons.monetization_on, color: Colors.green.shade600),
+            //   onPressed: _showNegotiationDialog,
+            //   tooltip: 'Negotiate Price',
+            // ),
             Expanded(
               child: Container(
                 key: _messageInputKey,

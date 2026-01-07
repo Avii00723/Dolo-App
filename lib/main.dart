@@ -1,3 +1,4 @@
+import 'package:dolo/screens/LoginScreens/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:dolo/screens/home/homepage.dart';
 import 'package:dolo/screens/LoginScreens/LoginSignupScreen.dart';
@@ -41,7 +42,7 @@ class MyApp extends StatelessWidget {
       home: const AuthWrapper(),
       routes: {
         '/home': (context) => const HomePageWithNav(),
-        '/login': (context) => const LoginSignupScreen(),
+        '/login': (context) => const LoginScreen(),
       },
       debugShowCheckedModeBanner: false,
     );

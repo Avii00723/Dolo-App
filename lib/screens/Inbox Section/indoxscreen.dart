@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
 import '../../Controllers/SocketService.dart';
 import '../../Controllers/TripRequestService.dart';
+import '../../Controllers/OrderTrackingService.dart'; // ✅ NEW: Import tracking service
 import '../../Models/TripRequestModel.dart';
 import '../../widgets/NotificationBellIcon.dart';
 import '../../Constants/ApiConstants.dart';
@@ -26,19 +28,17 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   String? _currentUserId;
   final SocketService _socketService = SocketService();
   final TripRequestService _tripRequestService = TripRequestService();
-  late TabController _tabController; // ✅ NEW: Tab controller
+  final OrderTrackingService _trackingService = OrderTrackingService(); // ✅ NEW: Tracking service
+  late TabController _tabController;
 
-  // Track typing status for each chat
   Map<String, bool> _typingStatus = {};
   Map<String, Timer?> _typingTimers = {};
 
-  // Trip requests state
   List<TripRequest> _sentRequests = [];
   List<TripRequest> _receivedRequests = [];
   bool _isLoadingRequests = true;
   String? _requestsErrorMessage;
 
-  // Section expansion state
   bool _isReceivedExpanded = true;
   bool _isSentExpanded = true;
 
@@ -49,15 +49,14 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       length: 2,
       vsync: this,
       initialIndex: widget.initialTab,
-    ); // ✅ NEW: 2 tabs - Chats and Requests
+    );
     _initializeAndLoadInbox();
     _initializeWebSocket();
   }
 
   @override
   void dispose() {
-    _tabController.dispose(); // ✅ NEW: Dispose tab controller
-    // Cancel all typing timers
+    _tabController.dispose();
     _typingTimers.values.forEach((timer) => timer?.cancel());
     super.dispose();
   }
@@ -68,7 +67,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     await _loadTripRequests();
   }
 
-  // ✅ UPDATED: Load only real inbox data, no dummy data
   Future<void> _loadInbox() async {
     if (!mounted) return;
 
@@ -78,15 +76,12 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     });
 
     try {
-      // ✅ Call the API to get real inbox data
       final result = await ChatService.getInbox();
 
       if (!mounted) return;
 
       if (result['success'] == true) {
         final apiInbox = result['inbox'] as List<dynamic>;
-
-        // ✅ Only use API data - no dummy data
         final conversations = apiInbox.map((item) => item as Map<String, dynamic>).toList();
 
         setState(() {
@@ -97,7 +92,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
 
         print('✅ Loaded ${conversations.length} conversations from API');
       } else {
-        // ✅ If API fails, show empty list with error message
         setState(() {
           _conversations = [];
           _isLoading = false;
@@ -107,7 +101,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         print('⚠️ API failed: ${result['error']}');
       }
     } catch (e) {
-      // ✅ On exception, show empty list with error
       if (!mounted) return;
 
       setState(() {
@@ -120,7 +113,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     }
   }
 
-  // Load trip requests (sent by user and received for user's orders)
   Future<void> _loadTripRequests() async {
     if (!mounted || _currentUserId == null) return;
 
@@ -130,21 +122,17 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     });
 
     try {
-      // Fetch all trip requests related to the current user
       final allRequests = await _tripRequestService.getMyTripRequests(_currentUserId!);
 
       if (!mounted) return;
 
-      // Separate sent requests (where user is the traveler) and received requests (where user created the order)
       final sent = <TripRequest>[];
       final received = <TripRequest>[];
 
       for (var request in allRequests) {
         if (request.travelerId == _currentUserId) {
-          // User sent this request
           sent.add(request);
         } else {
-          // User received this request on their order
           received.add(request);
         }
       }
@@ -171,18 +159,14 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     }
   }
 
-  // Initialize WebSocket for real-time typing indicators
   Future<void> _initializeWebSocket() async {
     try {
       await _socketService.connect();
 
       if (_socketService.isConnected) {
-        // Listen for typing indicators
         _socketService.onUserTyping((data) {
           final typingUserId = data['userId'] as String?;
           final roomId = data['roomId'] as String?;
-
-          print('🔍 InboxScreen - Typing event: userId=$typingUserId, roomId=$roomId, currentUserId=$_currentUserId');
 
           if (typingUserId != null && roomId != null && typingUserId != _currentUserId) {
             if (mounted) {
@@ -190,7 +174,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                 _typingStatus[roomId] = true;
               });
 
-              // Auto-hide typing indicator after 3 seconds
               _typingTimers[roomId]?.cancel();
               _typingTimers[roomId] = Timer(const Duration(seconds: 3), () {
                 if (mounted) {
@@ -199,23 +182,10 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                   });
                 }
               });
-
-              print('⌨️  User $typingUserId is typing in room $roomId');
-            }
-          } else {
-            if (roomId == null) {
-              print('⚠️ InboxScreen - roomId is null, cannot show typing indicator');
-            }
-            if (typingUserId == null) {
-              print('⚠️ InboxScreen - typingUserId is null');
-            }
-            if (typingUserId == _currentUserId) {
-              print('⚠️ InboxScreen - Ignoring own typing event');
             }
           }
         });
 
-        // Listen for new messages to refresh inbox
         _socketService.onReceiveMessage((data) {
           print('📬 New message received, refreshing inbox');
           _loadInbox();
@@ -247,7 +217,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         actions: [
           NotificationBellIcon(
             onNotificationHandled: () {
-              // Refresh the inbox and requests after handling a notification
               _loadInbox();
               _loadTripRequests();
             },
@@ -275,8 +244,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildBody(), // Chats tab - existing functionality
-          _buildRequestsTab(), // ✅ NEW: Requests tab
+          _buildBody(),
+          _buildRequestsTab(),
         ],
       ),
     );
@@ -288,14 +257,10 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     }
 
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
-    // ✅ Show empty state when conversations list is empty
     if (_conversations.isEmpty) {
-      // Show error state if there's an error, otherwise show empty state
       if (_errorMessage != null) {
         return _buildErrorState();
       }
@@ -328,25 +293,17 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.login,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
+          Icon(Icons.login, size: 64, color: Colors.grey.shade400),
           const SizedBox(height: 16),
           Text(
             'Please log in to view messages',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
           ),
         ],
       ),
     );
   }
 
-  // ✅ UPDATED: Better empty state design
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -359,35 +316,23 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               color: Colors.grey.shade100,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.chat_bubble_outline,
-              size: 60,
-              color: Colors.grey.shade400,
-            ),
+            child: Icon(Icons.chat_bubble_outline, size: 60, color: Colors.grey.shade400),
           ),
           const SizedBox(height: 24),
           Text(
             'No Chats Available',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
           ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Start chatting by accepting trip requests or sending messages',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
           ),
           const SizedBox(height: 24),
-          // ✅ ADD: Refresh button in empty state
           ElevatedButton.icon(
             onPressed: _loadInbox,
             icon: const Icon(Icons.refresh),
@@ -395,13 +340,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue.shade600,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ],
@@ -416,27 +356,16 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red.shade300,
-            ),
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
               'Failed to Load Messages',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
             ),
             const SizedBox(height: 8),
             Text(
               _errorMessage ?? 'Unknown error occurred',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -447,13 +376,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade600,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
           ],
@@ -473,12 +397,10 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         ),
       ),
     ).then((_) {
-      // Refresh inbox when returning from chat
       _loadInbox();
     });
   }
 
-  // Requests Tab - Shows trip requests (sent and received)
   Widget _buildRequestsTab() {
     if (_currentUserId == null) {
       return _buildNotLoggedInState();
@@ -504,7 +426,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Received Requests Section (Requests for YOUR orders)
             if (_receivedRequests.isNotEmpty) ...[
               InkWell(
                 onTap: () {
@@ -521,11 +442,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                       Expanded(
                         child: Text(
                           'Received Requests',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey.shade800,
-                          ),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -537,11 +454,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                         ),
                         child: Text(
                           '${_receivedRequests.length}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade700,
-                          ),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange.shade700),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -563,12 +476,11 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                   onDecline: () => _declineRequest(request),
                   onWithdraw: null,
                   onRefresh: _loadTripRequests,
+                  trackingService: _trackingService, // ✅ NEW: Pass tracking service
                 )),
               ],
               const SizedBox(height: 24),
             ],
-
-            // Sent Requests Section (Requests YOU sent)
             if (_sentRequests.isNotEmpty) ...[
               InkWell(
                 onTap: () {
@@ -585,11 +497,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                       Expanded(
                         child: Text(
                           'Sent Requests',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey.shade800,
-                          ),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -601,11 +509,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                         ),
                         child: Text(
                           '${_sentRequests.length}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
-                          ),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -627,6 +531,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                   onDecline: null,
                   onWithdraw: () => _withdrawRequest(request),
                   onRefresh: _loadTripRequests,
+                  trackingService: _trackingService, // ✅ NEW: Pass tracking service
                 )),
               ],
             ],
@@ -648,30 +553,19 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               color: Colors.grey.shade100,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.request_page_outlined,
-              size: 60,
-              color: Colors.grey.shade400,
-            ),
+            child: Icon(Icons.request_page_outlined, size: 60, color: Colors.grey.shade400),
           ),
           const SizedBox(height: 24),
           Text(
             'No Trip Requests',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
           ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'You haven\'t sent or received any trip requests yet',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
           ),
@@ -683,13 +577,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue.shade600,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ],
@@ -704,27 +593,16 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red.shade300,
-            ),
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
               'Failed to Load Requests',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
             ),
             const SizedBox(height: 8),
             Text(
               _requestsErrorMessage ?? 'Unknown error occurred',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -735,13 +613,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade600,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
           ],
@@ -750,9 +623,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     );
   }
 
-  // Accept a trip request (for received requests)
   Future<void> _acceptRequest(TripRequest request) async {
-    // Show dialog to get negotiated price
     final TextEditingController priceController = TextEditingController();
 
     final confirmed = await showDialog<bool>(
@@ -821,7 +692,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     }
   }
 
-  // Decline a trip request (for received requests)
   Future<void> _declineRequest(TripRequest request) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -835,9 +705,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Decline'),
           ),
         ],
@@ -875,7 +743,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     }
   }
 
-  // Withdraw a trip request (for sent requests)
   Future<void> _withdrawRequest(TripRequest request) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -889,9 +756,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             child: const Text('Withdraw'),
           ),
         ],
@@ -930,7 +795,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   }
 }
 
-// ModernChatCard widget remains the same
+// ModernChatCard remains the same as in your original code
 class ModernChatCard extends StatelessWidget {
   final Map<String, dynamic> conversation;
   final String currentUserId;
@@ -978,15 +843,12 @@ class ModernChatCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Profile Avatar
                 _buildAvatar(otherUserPhoto, otherUserName),
                 const SizedBox(width: 16),
-                // Chat Content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Name and Time Row
                       Row(
                         children: [
                           Expanded(
@@ -1012,10 +874,8 @@ class ModernChatCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      // Order Info Chip
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(6),
@@ -1023,11 +883,7 @@ class ModernChatCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.local_shipping,
-                              size: 12,
-                              color: Colors.blue.shade700,
-                            ),
+                            Icon(Icons.local_shipping, size: 12, color: Colors.blue.shade700),
                             const SizedBox(width: 4),
                             Flexible(
                               flex: 2,
@@ -1060,62 +916,52 @@ class ModernChatCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      // Last Message or Typing Indicator
                       isOtherUserTyping
                           ? Row(
-                              children: [
-                                Text(
-                                  'typing',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.green.shade600,
-                                    fontStyle: FontStyle.italic,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                SizedBox(
-                                  width: 20,
-                                  height: 10,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      _buildTypingDot(0),
-                                      _buildTypingDot(200),
-                                      _buildTypingDot(400),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Text(
-                              lastMessage,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade600,
-                                height: 1.3,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                        children: [
+                          Text(
+                            'typing',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.green.shade600,
+                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.w500,
                             ),
-                      // Status indicator if accepted
+                          ),
+                          const SizedBox(width: 4),
+                          SizedBox(
+                            width: 20,
+                            height: 10,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildTypingDot(400),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                          : Text(
+                        lastMessage,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       if (acceptedBy != null) ...[
                         const SizedBox(height: 8),
                         _buildStatusChip(
-                          acceptedBy == currentUserId
-                              ? 'Accepted by you'
-                              : 'Accepted',
+                          acceptedBy == currentUserId ? 'Accepted by you' : 'Accepted',
                           acceptedBy == currentUserId,
                         ),
                       ],
                     ],
                   ),
                 ),
-                // Arrow indicator
-                Icon(
-                  Icons.chevron_right,
-                  color: Colors.grey.shade400,
-                ),
+                Icon(Icons.chevron_right, color: Colors.grey.shade400),
               ],
             ),
           ),
@@ -1138,12 +984,9 @@ class ModernChatCard extends StatelessWidget {
           ? ClipRRect(
         borderRadius: BorderRadius.circular(26),
         child: Image.network(
-          photoUrl.startsWith('http')
-              ? photoUrl
-              : '${ApiConstants.imagebaseUrl}$photoUrl',
+          photoUrl.startsWith('http') ? photoUrl : '${ApiConstants.imagebaseUrl}$photoUrl',
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) =>
-              _buildAvatarFallback(name),
+          errorBuilder: (context, error, stackTrace) => _buildAvatarFallback(name),
         ),
       )
           : _buildAvatarFallback(name),
@@ -1186,8 +1029,7 @@ class ModernChatCard extends StatelessWidget {
             text,
             style: TextStyle(
               fontSize: 10,
-              color:
-              isCurrentUser ? Colors.green.shade700 : Colors.blue.shade700,
+              color: isCurrentUser ? Colors.green.shade700 : Colors.blue.shade700,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1196,7 +1038,6 @@ class ModernChatCard extends StatelessWidget {
     );
   }
 
-  // Build animated typing dots
   static Widget _buildTypingDot(int delay) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -1227,9 +1068,6 @@ class ModernChatCard extends StatelessWidget {
           },
         );
       },
-      onEnd: () {
-        // Animation will naturally loop via TweenAnimationBuilder
-      },
     );
   }
 
@@ -1256,7 +1094,7 @@ class ModernChatCard extends StatelessWidget {
   }
 }
 
-// Trip Request Card Widget - Minimal version that navigates to full page
+// ✅ UPDATED: TripRequestCard with real tracking integration
 class TripRequestCard extends StatefulWidget {
   final TripRequest request;
   final String currentUserId;
@@ -1265,6 +1103,7 @@ class TripRequestCard extends StatefulWidget {
   final VoidCallback? onDecline;
   final VoidCallback? onWithdraw;
   final VoidCallback? onRefresh;
+  final OrderTrackingService trackingService; // ✅ NEW: Tracking service
 
   const TripRequestCard({
     Key? key,
@@ -1275,6 +1114,7 @@ class TripRequestCard extends StatefulWidget {
     this.onDecline,
     this.onWithdraw,
     this.onRefresh,
+    required this.trackingService, // ✅ NEW: Required parameter
   }) : super(key: key);
 
   @override
@@ -1282,8 +1122,6 @@ class TripRequestCard extends StatefulWidget {
 }
 
 class _TripRequestCardState extends State<TripRequestCard> {
-  // Hardcoded tracking stage for now (0-3)
-  // 0 = Order Confirmed, 1 = Picked Up, 2 = In Transit, 3 = Delivered
   int _currentTrackingStage = 0;
 
   String _formatDate(String dateStr) {
@@ -1342,7 +1180,6 @@ class _TripRequestCardState extends State<TripRequestCard> {
     );
   }
 
-  // Mini tracking progress indicator
   Widget _buildMiniTrackingProgress() {
     return Row(
       children: [
@@ -1369,7 +1206,6 @@ class _TripRequestCardState extends State<TripRequestCard> {
   @override
   Widget build(BuildContext context) {
     final isAccepted = widget.request.status.toLowerCase() == 'accepted';
-    final isTraveler = widget.request.travelerId == widget.currentUserId;
 
     return GestureDetector(
       onTap: () {
@@ -1390,6 +1226,7 @@ class _TripRequestCardState extends State<TripRequestCard> {
                 });
               },
               onRefresh: widget.onRefresh,
+              trackingService: widget.trackingService, // ✅ NEW: Pass service
             ),
           ),
         );
@@ -1411,7 +1248,6 @@ class _TripRequestCardState extends State<TripRequestCard> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Avatar
               CircleAvatar(
                 radius: 24,
                 backgroundColor: widget.isReceived ? Colors.orange.shade100 : Colors.blue.shade100,
@@ -1422,13 +1258,10 @@ class _TripRequestCardState extends State<TripRequestCard> {
                 ),
               ),
               const SizedBox(width: 12),
-
-              // Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header row
                     Row(
                       children: [
                         Expanded(
@@ -1445,8 +1278,6 @@ class _TripRequestCardState extends State<TripRequestCard> {
                       ],
                     ),
                     const SizedBox(height: 6),
-
-                    // Route
                     Row(
                       children: [
                         Icon(Icons.location_on, size: 14, color: Colors.green.shade600),
@@ -1483,8 +1314,6 @@ class _TripRequestCardState extends State<TripRequestCard> {
                       ],
                     ),
                     const SizedBox(height: 6),
-
-                    // Date
                     Row(
                       children: [
                         Icon(Icons.calendar_today, size: 12, color: Colors.blue.shade600),
@@ -1495,8 +1324,6 @@ class _TripRequestCardState extends State<TripRequestCard> {
                         ),
                       ],
                     ),
-
-                    // Show tracking progress for accepted requests
                     if (isAccepted) ...[
                       const SizedBox(height: 10),
                       Row(
@@ -1516,7 +1343,6 @@ class _TripRequestCardState extends State<TripRequestCard> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      // Track Order button
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
@@ -1538,6 +1364,7 @@ class _TripRequestCardState extends State<TripRequestCard> {
                                     });
                                   },
                                   onRefresh: widget.onRefresh,
+                                  trackingService: widget.trackingService, // ✅ NEW
                                 ),
                               ),
                             );
@@ -1555,8 +1382,6 @@ class _TripRequestCardState extends State<TripRequestCard> {
                         ),
                       ),
                     ],
-
-                    // Action buttons for pending requests
                     if (widget.request.status.toLowerCase() == 'pending') ...[
                       const SizedBox(height: 12),
                       if (widget.isReceived)
@@ -1613,8 +1438,6 @@ class _TripRequestCardState extends State<TripRequestCard> {
                   ],
                 ),
               ),
-
-              // Arrow
               Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 24),
             ],
           ),
@@ -1639,9 +1462,7 @@ class _TripRequestCardState extends State<TripRequestCard> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// TripRequestDetailPage - Full page view of trip request details
-// ═══════════════════════════════════════════════════════════════════════════
+// ✅ UPDATED: TripRequestDetailPage with real API integration
 class TripRequestDetailPage extends StatefulWidget {
   final TripRequest request;
   final String currentUserId;
@@ -1652,6 +1473,7 @@ class TripRequestDetailPage extends StatefulWidget {
   final int initialTrackingStage;
   final Function(int)? onTrackingStageChanged;
   final VoidCallback? onRefresh;
+  final OrderTrackingService trackingService; // ✅ NEW
 
   const TripRequestDetailPage({
     Key? key,
@@ -1664,6 +1486,7 @@ class TripRequestDetailPage extends StatefulWidget {
     this.initialTrackingStage = 0,
     this.onTrackingStageChanged,
     this.onRefresh,
+    required this.trackingService, // ✅ NEW
   }) : super(key: key);
 
   @override
@@ -1672,9 +1495,8 @@ class TripRequestDetailPage extends StatefulWidget {
 
 class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
   late int _currentTrackingStage;
-  bool _isCompletingTrip = false;
+  bool _isUpdatingStage = false;
 
-  // Tracking stages data
   final List<Map<String, dynamic>> _trackingStages = [
     {
       'title': 'Order Confirmed',
@@ -1810,54 +1632,59 @@ class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
     );
   }
 
-  // Upgrade tracking stage (only traveler can do this)
-  void _upgradeTrackingStage() {
-    if (_currentTrackingStage < 3) {
-      setState(() {
-        _currentTrackingStage++;
-      });
-      widget.onTrackingStageChanged?.call(_currentTrackingStage);
-    }
-  }
+  // ✅ NEW: Real API call to update tracking stage
+  Future<void> _upgradeTrackingStage() async {
+    if (_currentTrackingStage >= 3 || _isUpdatingStage) return;
 
-  // Complete trip API call
-  Future<void> _completeTrip() async {
     setState(() {
-      _isCompletingTrip = true;
-      _currentTrackingStage = 3; // Auto-update to Delivered stage
+      _isUpdatingStage = true;
     });
 
-    // Sync with parent card
-    widget.onTrackingStageChanged?.call(3);
-
     try {
-      // TODO: Replace with actual API call
-      // final response = await TripRequestService().completeTripRequest(widget.request.id);
+      // Get the order ID from the trip request
+      // Note: You'll need to ensure your TripRequest model has an orderId field
+      final orderId = widget.request.orderId; // ✅ ADD THIS FIELD TO TripRequest model
 
-      // Simulating API call for now
-      await Future.delayed(const Duration(seconds: 1));
+      // Call the appropriate API based on current stage
+      final newStage = await widget.trackingService.updateTrackingStage(
+        orderId,
+        _currentTrackingStage,
+      );
 
-      if (mounted) {
+      if (newStage != null && mounted) {
+        setState(() {
+          _currentTrackingStage = newStage;
+        });
+        widget.onTrackingStageChanged?.call(newStage);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Trip completed successfully!'),
+            content: Text('Order updated to: ${_trackingStages[newStage]['title']}'),
             backgroundColor: Colors.green.shade600,
           ),
         );
-        widget.onRefresh?.call();
-        Navigator.pop(context);
+
+        // If we've reached the delivered stage (stage 4), refresh and go back
+        if (newStage >= 3) {
+          widget.onRefresh?.call();
+          await Future.delayed(const Duration(seconds: 1));
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update tracking stage'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-        // Revert stage on error
-        setState(() {
-          _currentTrackingStage = 2;
-        });
-        widget.onTrackingStageChanged?.call(2);
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to complete trip: $e'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1865,16 +1692,13 @@ class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
     } finally {
       if (mounted) {
         setState(() {
-          _isCompletingTrip = false;
+          _isUpdatingStage = false;
         });
       }
     }
   }
 
-  // Build tracking timeline widget
   Widget _buildTrackingTimeline() {
-    final isTraveler = widget.request.travelerId == widget.currentUserId;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1894,7 +1718,6 @@ class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Timeline indicator
                 Column(
                   children: [
                     Container(
@@ -1925,7 +1748,6 @@ class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
                   ],
                 ),
                 const SizedBox(width: 16),
-                // Stage info
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -1980,16 +1802,27 @@ class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
               ],
             ),
           ],
-          // Update Status button (available for both traveler and order creator)
+          // ✅ UPDATED: Real API integration button
           if (_currentTrackingStage < 3) ...[
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _upgradeTrackingStage,
-                icon: const Icon(Icons.arrow_upward, size: 18),
+                onPressed: _isUpdatingStage ? null : _upgradeTrackingStage,
+                icon: _isUpdatingStage
+                    ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+                    : const Icon(Icons.arrow_upward, size: 18),
                 label: Text(
-                  'Update to: ${_trackingStages[_currentTrackingStage + 1]['title']}',
+                  _isUpdatingStage
+                      ? 'Updating...'
+                      : 'Update to: ${_trackingStages[_currentTrackingStage + 1]['title']}',
                   style: const TextStyle(fontSize: 14),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -2011,377 +1844,406 @@ class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
   @override
   Widget build(BuildContext context) {
     final isAccepted = widget.request.status.toLowerCase() == 'accepted';
-    final isTraveler = widget.request.travelerId == widget.currentUserId;
-    // Show complete button when at In Transit stage (2) - clicking will update to Delivered and complete
-    final showCompleteButton = isAccepted && _currentTrackingStage == 2;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        backgroundColor: widget.isReceived ? Colors.orange.shade600 : Colors.blue.shade600,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.isReceived ? 'Request Details' : 'Your Request',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+        backgroundColor: Colors.grey.shade50,
+        appBar: AppBar(
+          backgroundColor: widget.isReceived ? Colors.orange.shade600 : Colors.blue.shade600,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
           ),
+          title: Text(
+            widget.isReceived ? 'Request Details' : 'Your Request',
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+        body: Column(
+            children: [
+        Expanded(
+        child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Status Header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          widget.isReceived ? Icons.call_received : Icons.call_made,
-                          size: 48,
-                          color: widget.isReceived ? Colors.orange.shade600 : Colors.blue.shade600,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          widget.isReceived ? 'Request Received' : 'Request Sent',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: widget.isReceived ? Colors.orange.shade700 : Colors.blue.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatusBadge(widget.request.status),
-                      ],
+                  Icon(
+                    widget.isReceived ? Icons.call_received : Icons.call_made,
+                    size: 48,
+                    color: widget.isReceived ? Colors.orange.shade600 : Colors.blue.shade600,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.isReceived ? 'Request Received' : 'Request Sent',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: widget.isReceived ? Colors.orange.shade700 : Colors.blue.shade700,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
+                  _buildStatusBadge(widget.request.status),
+                ],
+              ),
+            ),
+              const SizedBox(height: 20),
 
-                  // Order Tracking Section (only for accepted requests)
-                  if (isAccepted) ...[
-                    const Text(
-                      'Order Tracking',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
+              // Order Tracking Section
+              if (isAccepted) ...[
+                const Text(
+                  'Order Tracking',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildTrackingTimeline(),
+                const SizedBox(height: 20),
+              ],
+
+              // Route Section
+              const Text(
+                'Route Details',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
                     ),
-                    const SizedBox(height: 12),
-                    _buildTrackingTimeline(),
-                    const SizedBox(height: 20),
                   ],
-
-                  // Route Section
-                  const Text(
-                    'Route Details',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
+                ),
+                child: Column(
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 16,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade600,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.green.shade800, width: 2),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'From',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.request.source,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 7),
-                          child: Container(
-                            width: 2,
-                            height: 40,
-                            color: Colors.grey.shade300,
+                        Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade600,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.green.shade800, width: 2),
                           ),
                         ),
-                        Row(
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'From',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.request.source,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 7),
+                      child: Container(
+                        width: 2,
+                        height: 40,
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade600,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.red.shade800, width: 2),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'To',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.request.destination,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Trip Details Section
+              const Text(
+                'Trip Details',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              _buildDetailRow(
+                Icons.calendar_today,
+                'Travel Date',
+                _formatDate(widget.request.travelDate),
+                Colors.blue,
+              ),
+              const SizedBox(height: 12),
+
+              _buildDetailRow(
+                Icons.directions_car,
+                'Vehicle Info',
+                widget.request.vehicleInfo,
+                Colors.purple,
+              ),
+              const SizedBox(height: 12),
+
+              // PNR Display
+              if (widget.request.pnr != null && widget.request.pnr!.trim().isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.indigo.shade50, Colors.indigo.shade100],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.indigo.shade300, width: 2),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.shade600,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.confirmation_number,
+                          size: 24,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 16,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade600,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.red.shade800, width: 2),
+                            Text(
+                              'PNR/Ticket Number',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.indigo.shade700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'To',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.request.destination,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.indigo.shade200),
+                              ),
+                              child: Text(
+                                widget.request.pnr!,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.indigo.shade900,
+                                  letterSpacing: 1.2,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Trip Details Section
-                  const Text(
-                    'Trip Details',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow(
-                    Icons.calendar_today,
-                    'Travel Date',
-                    _formatDate(widget.request.travelDate),
-                    Colors.blue,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow(
-                    Icons.directions_car,
-                    'Vehicle Info',
-                    widget.request.vehicleInfo,
-                    Colors.purple,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDetailRow(
-                          Icons.access_time,
-                          'Departure',
-                          widget.request.departureDatetime,
-                          Colors.green,
-                        ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildDetailRow(
-                          Icons.access_time_filled,
-                          'Delivery',
-                          widget.request.travelDate,
-                          Colors.red,
-                        ),
+                      IconButton(
+                        icon: Icon(Icons.copy, color: Colors.indigo.shade600),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: widget.request.pnr!));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('PNR copied to clipboard'),
+                              backgroundColor: Colors.green.shade600,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        tooltip: 'Copy PNR',
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            ),
-          ),
+                ),
+                const SizedBox(height: 12),
+              ],
 
-          // Bottom Action Buttons
-          if (widget.request.status.toLowerCase() == 'pending')
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDetailRow(
+                      Icons.access_time,
+                      'Departure',
+                      widget.request.departureDatetime,
+                      Colors.green,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildDetailRow(
+                      Icons.access_time_filled,
+                      'Delivery',
+                      widget.request.travelDate,
+                      Colors.red,
+                    ),
                   ),
                 ],
               ),
-              child: SafeArea(
-                child: widget.isReceived
-                    ? Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                widget.onDecline?.call();
-                              },
-                              icon: const Icon(Icons.close, size: 20),
-                              label: const Text('Decline'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red.shade600,
-                                side: BorderSide(color: Colors.red.shade300, width: 1.5),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+
+              const SizedBox(height: 24),
+            ],
+        ),
+        ),
+        ),
+
+              // Bottom Action Buttons (for pending requests only)
+              if (widget.request.status.toLowerCase() == 'pending')
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    child: widget.isReceived
+                        ? Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              widget.onDecline?.call();
+                            },
+                            icon: const Icon(Icons.close, size: 20),
+                            label: const Text('Decline'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red.shade600,
+                              side: BorderSide(color: Colors.red.shade300, width: 1.5),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            flex: 2,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                widget.onAccept?.call();
-                              },
-                              icon: const Icon(Icons.check, size: 20),
-                              label: const Text('Accept Request'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.shade600,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 2,
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            widget.onWithdraw?.call();
-                          },
-                          icon: const Icon(Icons.cancel_outlined, size: 20),
-                          label: const Text('Withdraw Request'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.orange.shade700,
-                            side: BorderSide(color: Colors.orange.shade300, width: 1.5),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                         ),
-                      ),
-              ),
-            ),
-
-          // Complete Trip Button (shown when tracking is at stage 3 - Delivered)
-          if (showCompleteButton)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: SafeArea(
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _isCompletingTrip ? null : _completeTrip,
-                    icon: _isCompletingTrip
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              widget.onAccept?.call();
+                            },
+                            icon: const Icon(Icons.check, size: 20),
+                            label: const Text('Accept Request'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade600,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
                             ),
-                          )
-                        : const Icon(Icons.check_circle, size: 24),
-                    label: Text(
-                      _isCompletingTrip ? 'Completing...' : 'Complete Trip',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    )
+                        : SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          widget.onWithdraw?.call();
+                        },
+                        icon: const Icon(Icons.cancel_outlined, size: 20),
+                        label: const Text('Withdraw Request'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.orange.shade700,
+                          side: BorderSide(color: Colors.orange.shade300, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
                     ),
                   ),
                 ),
-              ),
-            ),
-        ],
-      ),
+            ],
+        ),
     );
   }
 }

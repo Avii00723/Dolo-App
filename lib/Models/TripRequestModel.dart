@@ -7,6 +7,8 @@ class TripRequestSendRequest {
   final String orderId;
   final String travelDate; // Format: YYYY-MM-DDTHH:MM:SSZ (delivery datetime)
   final String vehicleInfo;
+  final String vehicleType; // NEW: Vehicle type (train, flight, bus, etc.)
+  final String? pnr; // NEW: PNR/Ticket number (optional)
   final String source;
   final String destination;
   final String departureDatetime; // Format: YYYY-MM-DDTHH:MM:SSZ
@@ -17,6 +19,8 @@ class TripRequestSendRequest {
     required this.orderId,
     required this.travelDate,
     required this.vehicleInfo,
+    required this.vehicleType,
+    this.pnr,
     required this.source,
     required this.destination,
     required this.departureDatetime,
@@ -29,10 +33,16 @@ class TripRequestSendRequest {
       'order_id': orderId,
       'travel_date': travelDate, // ISO datetime format
       'vehicle_info': vehicleInfo,
+      'vehicle_type': vehicleType.toLowerCase(), // Ensure lowercase
       'source': source,
       'destination': destination,
       'departure_datetime': departureDatetime, // ISO datetime format
     };
+
+    // Add PNR if provided
+    if (pnr != null && pnr!.isNotEmpty) {
+      json['pnr'] = pnr!;
+    }
 
     // Add comments if provided
     if (comments != null && comments!.isNotEmpty) {
@@ -68,6 +78,7 @@ class TripRequestSendResponse {
     };
   }
 }
+
 // ============================================
 // Accept Trip Request Models
 // ============================================
@@ -85,7 +96,7 @@ class TripRequestAcceptRequest {
 
   Map<String, dynamic> toJson() {
     return {
-      'order_creator_hashed_id': orderCreatorId, // ✅ FIXED: API expects order_creator_hashed_id
+      'order_creator_hashed_id': orderCreatorId,
       'trip_request_id': tripRequestId,
       'negotiatedPrice': negotiatedPrice,
     };
@@ -121,16 +132,18 @@ class TripRequestAcceptResponse {
 // ============================================
 
 class TripRequest {
-  final String id; // Maps to hashed_id from API
-  final String travelerId; // Maps to traveler_hashed_id from API
-  final String orderId; // Maps to order_hashed_id from API
+  final String id;
+  final String travelerId;
+  final String orderId;
   final String travelDate;
   final String vehicleInfo;
+  final String vehicleType;
+  final String? pnr;
   final String source;
   final String destination;
-  final String departureDatetime; // Updated: API now uses departure_datetime
+  final String departureDatetime;
   final String status;
-  final String? origin; // Additional field from API (same as source typically)
+  final String? origin;
   final String? createdAt;
   final String? comments;
 
@@ -140,6 +153,8 @@ class TripRequest {
     required this.orderId,
     required this.travelDate,
     required this.vehicleInfo,
+    required this.vehicleType,
+    this.pnr,
     required this.source,
     required this.destination,
     required this.departureDatetime,
@@ -156,6 +171,8 @@ class TripRequest {
       orderId: json['order_id']?.toString() ?? '',
       travelDate: json['travel_date']?.toString() ?? '',
       vehicleInfo: json['vehicle_info']?.toString() ?? '',
+      vehicleType: json['vehicle_type']?.toString() ?? '',
+      pnr: json['pnr']?.toString(),
       source: json['source']?.toString() ?? '',
       destination: json['destination']?.toString() ?? '',
       departureDatetime: json['departure_datetime']?.toString() ?? '',
@@ -173,6 +190,8 @@ class TripRequest {
       'order_hashed_id': orderId,
       'travel_date': travelDate,
       'vehicle_info': vehicleInfo,
+      'vehicle_type': vehicleType,
+      'pnr': pnr,
       'source': source,
       'destination': destination,
       'departure_datetime': departureDatetime,

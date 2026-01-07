@@ -44,7 +44,8 @@ class ApiConstants {
 
   // Media - TTS
   static const String ttsStreamUrl = 'https://api.dzdx.in/v1/media/tts/stream';
-
+  static const String submitRating = '$baseUrl/ratings';
+  static const String getUserRatings = '$baseUrl/ratings/user';
   // Google Maps API Key
   // ⚠️ IMPORTANT: Replace this with your actual Google Maps API Key
   // Get it from: https://console.cloud.google.com/

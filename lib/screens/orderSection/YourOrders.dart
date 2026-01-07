@@ -4,6 +4,8 @@ import 'dart:async';
 import '../../Controllers/OrderService.dart';
 import '../../Controllers/TripRequestService.dart';
 import '../../Controllers/AuthService.dart';
+import '../../Controllers/ratingservice.dart';
+import '../../Models/RatingModel.dart';
 import '../Inbox Section/indoxscreen.dart';
 import '../../Models/OrderModel.dart' as OrderModels;
 import '../../Models/TripRequestModel.dart';
@@ -123,6 +125,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   Map<String, List<TripRequestDisplay>> tripRequestsByOrder = {};
   bool isLoadingMyOrders = false;
   bool isLoadingMyRequests = false;
+  final RatingService _ratingService = RatingService();
 
   @override
   void initState() {
@@ -457,7 +460,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       ),
     );
   }
-
   Future<void> _completeOrder(OrderDisplay order) async {
     if (currentUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -476,12 +478,15 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
 
     try {
+      // ✅ STEP 1: Show rating dialog and get user input
       final ratingData = await _showRatingDialog(order);
 
       if (ratingData == null) {
+        // User canceled the rating dialog
         return;
       }
 
+      // ✅ STEP 2: Show loading indicator
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -504,10 +509,28 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         );
       }
 
+      // ✅ STEP 3: Complete the order first
       final success = await _orderService.completeOrder(order.id, currentUserId!);
 
-      if (success && mounted) {
-        print('📝 Rating: ${ratingData['rating']} stars');
+      if (!success) {
+        throw Exception('Failed to complete order');
+      }
+
+      // ✅ STEP 4: Submit rating after order completion
+      final ratingRequest = RatingRequest(
+        orderId: order.id,
+        raterUserId: currentUserId!, // Order creator (current user)
+        ratedUserId: order.matchedTravellerId ?? '', // Traveler who delivered
+        rating: ratingData['rating'].toInt(),
+        feedback: ratingData['feedback'].isEmpty ? null : ratingData['feedback'],
+      );
+
+      // ✅ STEP 5: Submit rating to API
+      await _ratingService.submitRating(ratingRequest);
+
+      // ✅ STEP 6: Show success message
+      if (mounted) {
+        print('📊 Rating: ${ratingData['rating']} stars');
         print('💬 Feedback: ${ratingData['feedback']}');
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -516,7 +539,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
               children: [
                 Icon(Icons.check_circle, color: Colors.white),
                 SizedBox(width: 12),
-                Text('Order completed successfully!'),
+                Text('Order completed and rating submitted!'),
               ],
             ),
             backgroundColor: Colors.green[600],
@@ -524,17 +547,26 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           ),
         );
 
-        // ✅ Immediate refresh
+        // ✅ STEP 7: Refresh data
         await _loadAllData();
       }
     } catch (e) {
       if (mounted) {
         String errorMessage = 'Failed to complete order';
 
-        if (e.toString().contains('KYC_NOT_APPROVED')) {
+        // Handle specific errors
+        if (e.toString().contains('RATING_ALREADY_SUBMITTED')) {
+          errorMessage = 'Rating has already been submitted for this order.';
+        } else if (e.toString().contains('ORDER_NOT_DELIVERED')) {
+          errorMessage = 'Order must be delivered before rating.';
+        } else if (e.toString().contains('KYC_NOT_APPROVED')) {
           errorMessage = 'KYC not approved. Please complete KYC verification.';
         } else if (e.toString().contains('ORDER_NOT_FOUND')) {
           errorMessage = 'Order not found or you don\'t have permission.';
+        } else if (e.toString().contains('INVALID_INPUT')) {
+          errorMessage = 'Invalid rating input. Please try again.';
+        } else if (e.toString().contains('UNAUTHORIZED')) {
+          errorMessage = 'You are not authorized to rate this order.';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(

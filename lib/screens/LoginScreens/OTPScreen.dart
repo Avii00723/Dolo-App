@@ -65,11 +65,12 @@ class _OTPScreenState extends State<OTPScreen> {
         await DeviceTokenService.initialize();
 
         if (mounted) {
+          // ✅ Skip profile prompt popup for new users - go directly to signup
           UserProfileHelper.checkUserAndNavigate(
             context,
             userId: verifyResponse.userId,
             kycStatus: verifyResponse.kycStatus,
-            showProfilePrompt: verifyResponse.showProfilePrompt,
+            showProfilePrompt: false, // ✅ Always set to false to skip popup
           );
         }
       } else {
