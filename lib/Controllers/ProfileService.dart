@@ -14,9 +14,7 @@ class ProfileService {
         parser: (json) => UserProfile.fromJson(json['profile']),
       );
 
-      // Check if user doesn't exist (404 or specific error message)
       if (!response.success) {
-        // Clear session and return null to trigger logout
         await AuthService.clearUserSession();
         return null;
       }
@@ -24,7 +22,6 @@ class ProfileService {
       return response.data;
     } catch (e) {
       print('❌ Error fetching user profile: $e');
-      // If error indicates user doesn't exist, clear session
       if (e.toString().contains('404') ||
           e.toString().contains('user does not exist') ||
           e.toString().contains('not found')) {
@@ -33,6 +30,28 @@ class ProfileService {
       return null;
     }
   }
+
+  Future<Map<String, dynamic>?> getUserTrustScore(String userId) async {
+    try {
+      print('🌐 TrustScore API URL: ${ApiConstants.getUserTrustScore}/$userId'); // ✅ DEBUG
+      final response = await _api.get(
+        '${ApiConstants.getUserTrustScore}/$userId',
+      );
+
+      print('📡 TrustScore Response: success=${response.success}, data=${response.data}'); // ✅ DEBUG
+
+      if (response.success) {
+        print('✅ TrustScore fetched: ${response.data}'); // ✅ DEBUG
+        return response.data;
+      }
+      print('❌ TrustScore API returned !success'); // ✅ DEBUG
+      return null;
+    } catch (e) {
+      print('💥 TrustScore ERROR: $e'); // ✅ CRITICAL DEBUG
+      return null;
+    }
+  }
+
 
   // Update user profile by userId
   Future<bool> updateUserProfile(String userId, Map<String, dynamic> updates) async {
@@ -43,7 +62,6 @@ class ProfileService {
       );
 
       if (!response.success) {
-        // Check if user doesn't exist
         await AuthService.clearUserSession();
         return false;
       }

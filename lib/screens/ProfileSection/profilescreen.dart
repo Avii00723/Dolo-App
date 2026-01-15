@@ -20,6 +20,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin {
   final ProfileService _profileService = ProfileService();
   UserProfile? userProfile;
+  Map<String, dynamic>? trustScoreData; // ✅ NEW: Trust score data
   String? userId;
   bool isLoading = true;
   bool profileExists = false;
@@ -47,7 +48,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     super.dispose();
   }
 
-  // ✅ MODIFIED: Enhanced user data loading with navigation to login if user doesn't exist
+  // ✅ MODIFIED: Enhanced to fetch trust score in parallel
   Future<void> _loadUserData() async {
     try {
       setState(() {
@@ -63,12 +64,19 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         return;
       }
 
-      // ✅ Fetch user profile
-      final profile = await _profileService.getUserProfile(userId!);
+      // ✅ Fetch both profile and trust score in parallel
+      final results = await Future.wait([
+        _profileService.getUserProfile(userId!),
+        _profileService.getUserTrustScore(userId!), // ✅ NEW
+      ]);
+
+      final profile = results[0] as UserProfile?;
+      final trustScore = results[1] as Map<String, dynamic>?;
 
       if (profile != null) {
         setState(() {
           userProfile = profile;
+          trustScoreData = trustScore; // ✅ NEW: Store trust score
           profileExists = true;
           isLoading = false;
           notificationsEnabled = true;
@@ -76,7 +84,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         _animationController.forward();
       } else {
         // ✅ Profile is null - could mean user doesn't exist
-        // Check if session was cleared (indicates user doesn't exist)
         final stillLoggedIn = await AuthService.isLoggedIn();
 
         if (!stillLoggedIn) {
@@ -87,6 +94,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           setState(() {
             profileExists = false;
             isLoading = false;
+            trustScoreData = null; // ✅ NEW: Clear trust score
           });
         }
       }
@@ -101,12 +109,10 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
 
   // ✅ NEW: Navigate to login screen and clear all routes
   Future<void> _navigateToLogin(String message) async {
-    // Ensure session is cleared
     await AuthService.clearUserSession();
 
     if (!mounted) return;
 
-    // Show message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -123,16 +129,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       ),
     );
 
-    // Small delay to show message
     await Future.delayed(const Duration(milliseconds: 500));
 
     if (!mounted) return;
 
-    // Navigate to login and remove all previous routes
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (context) => const LoginSignupScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const LoginSignupScreen()),
           (Route<dynamic> route) => false,
     );
   }
@@ -150,11 +152,8 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           setState(() {
             notificationsEnabled = enabled;
           });
-          _showSuccessSnackBar(
-              enabled ? 'Notifications enabled' : 'Notifications disabled'
-          );
+          _showSuccessSnackBar(enabled ? 'Notifications enabled' : 'Notifications disabled');
         } else {
-          // Check if session was cleared (user doesn't exist)
           final stillLoggedIn = await AuthService.isLoggedIn();
           if (!stillLoggedIn) {
             print('🚨 User session cleared during update - user does not exist');
@@ -168,6 +167,90 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       _showErrorSnackBar('Failed to update notification preference');
     }
   }
+
+  // ✅ NEW: Trust score getter methods
+  int _getTrustScore() {
+    return trustScoreData?['trust_score'] ?? 0;
+  }
+
+  int _getMaxTrustScore() {
+    return trustScoreData?['max_score'] ?? 7;
+  }
+
+  double _getTrustScorePercentage() {
+    final score = _getTrustScore();
+    final maxScore = _getMaxTrustScore();
+    return maxScore > 0 ? (score / maxScore) * 100 : 0;
+  }
+
+  Widget _buildTrustScoreWidget() {
+    // ✅ FIXED: Show actual data even for incomplete profiles
+    if (trustScoreData == null) {
+      return _buildPendingTrustScoreChip();
+    }
+
+    final score = _getTrustScore();
+    final percentage = _getTrustScorePercentage();
+
+    // Color based on score (2/7 = 28% → Red/Orange)
+    Color scoreColor;
+    if (percentage >= 90) scoreColor = Colors.green;
+    else if (percentage >= 70) scoreColor = Colors.lightGreen;
+    else if (percentage >= 40) scoreColor = Colors.orange;
+    else scoreColor = Colors.red[400]!; // Low score
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: scoreColor.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: scoreColor.withOpacity(0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.security, color: scoreColor, size: 12),
+          const SizedBox(width: 2),
+          Text(
+            '$score/${_getMaxTrustScore()}',
+            style: TextStyle(
+              color: scoreColor,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// ✅ NEW: Separate method for true pending state
+  Widget _buildPendingTrustScoreChip() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.security, color: Colors.grey[500], size: 12),
+          const SizedBox(width: 2),
+          Text(
+            'Pending',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   String _getDisplayName() {
     return userProfile?.name ?? 'Complete Profile';
@@ -192,7 +275,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     if (nameParts.length >= 2) {
       return '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
     }
-    return name[0].toUpperCase();
+    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
   }
 
   // ✅ Logout dialog method
@@ -228,61 +311,37 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             ),
             ElevatedButton(
               onPressed: () async {
-                // Close confirmation dialog first
                 Navigator.of(dialogContext).pop();
-
-                // Show loading dialog
                 showDialog(
                   context: context,
                   barrierDismissible: false,
                   builder: (BuildContext loadingContext) {
                     return WillPopScope(
                       onWillPop: () async => false,
-                      child: const Center(
-                        child: CircularProgressIndicator(),
-                      ),
+                      child: const Center(child: CircularProgressIndicator()),
                     );
                   },
                 );
 
                 try {
-                  // Clear secure storage
                   await AuthService.clearUserSession();
-
-                  // Small delay to ensure storage is cleared
                   await Future.delayed(const Duration(milliseconds: 300));
-
-                  // Close loading dialog - Use rootNavigator
                   if (context.mounted) {
                     Navigator.of(context, rootNavigator: true).pop();
                   }
-
-                  // Small delay before navigation
                   await Future.delayed(const Duration(milliseconds: 100));
-
-                  // Navigate to login screen and remove all previous routes
                   if (context.mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (context) => const LoginSignupScreen(),
-                      ),
+                      MaterialPageRoute(builder: (context) => const LoginSignupScreen()),
                           (Route<dynamic> route) => false,
                     );
                   }
                 } catch (e) {
                   print('❌ Logout error: $e');
-                  // Close loading dialog on error
                   if (context.mounted) {
                     Navigator.of(context, rootNavigator: true).pop();
-                  }
-
-                  // Show error message
-                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Logout failed: $e'),
-                        backgroundColor: Colors.red,
-                      ),
+                      SnackBar(content: Text('Logout failed: $e'), backgroundColor: Colors.red),
                     );
                   }
                 }
@@ -290,9 +349,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               child: const Text('Logout'),
             ),
@@ -302,7 +359,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  /// Reset tutorial - allows user to replay all tutorials
   Future<void> _resetTutorial() async {
     showDialog(
       context: context,
@@ -336,10 +392,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(dialogContext);
-
-                // Reset all tutorials
                 await TutorialService.resetAllTutorials();
-
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -353,9 +406,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF001127),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               child: const Text('Reset Tutorial'),
             ),
@@ -365,9 +416,8 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-// ✅ NEW: Build gradient avatar with initials
+  // ✅ NEW: Build gradient avatar with initials
   Widget _buildGradientAvatar(String name, double radius) {
-    // Generate initials
     String initials = 'U';
     if (name.isNotEmpty) {
       final nameParts = name.trim().split(' ');
@@ -378,7 +428,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       }
     }
 
-    // Generate color based on name for consistent colors
     final colorIndex = name.isNotEmpty ? name.codeUnitAt(0) % 10 : 0;
     final gradientColors = [
       [Color(0xFF667eea), Color(0xFF764ba2)],
@@ -490,7 +539,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                                 height: 70,
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
-                                  // Fallback to gradient avatar
                                   return _buildGradientAvatar(_getDisplayName(), 35);
                                 },
                               ),
@@ -520,13 +568,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                           ),
                       ],
                     ),
-
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ✅ Name with Rating in same row
+                          // Name with Rating
                           Row(
                             children: [
                               Flexible(
@@ -541,30 +588,19 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              // ✅ Show rating only if profile is complete
                               if (_isProfileComplete()) ...[
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 3,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                   decoration: BoxDecoration(
                                     color: Colors.lightBlue[50],
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.lightBlue[200]!,
-                                      width: 1,
-                                    ),
+                                    border: Border.all(color: Colors.lightBlue[200]!, width: 1),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(
-                                        Icons.star,
-                                        color: Colors.lightBlue[700],
-                                        size: 14,
-                                      ),
+                                      Icon(Icons.star, color: Colors.lightBlue[700], size: 14),
                                       const SizedBox(width: 3),
                                       Text(
                                         '4.6',
@@ -583,20 +619,22 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                           const SizedBox(height: 4),
                           Text(
                             _getPhoneNumber(),
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: Colors.grey[600], fontSize: 14),
                           ),
                           const SizedBox(height: 8),
-                          _buildProfileStatusChip(),
+                          // ✅ FIXED: Use Wrap for responsive chip layout
+                          Wrap(
+                            spacing: 8,  // Horizontal spacing between chips
+                            runSpacing: 4,  // Vertical spacing if wraps
+                            children: [
+                              _buildProfileStatusChip(),
+                              _buildTrustScoreWidget(),
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.chevron_right,
-                      color: Colors.grey[400],
-                    ),
+                    Icon(Icons.chevron_right, color: Colors.grey[400]),
                   ],
                 ),
               ],
@@ -606,7 +644,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       ),
     );
   }
-
 
   Widget _buildProfileStatusChip() {
     if (!_isProfileComplete()) {
@@ -624,11 +661,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             SizedBox(width: 4),
             Text(
               'Incomplete',
-              style: TextStyle(
-                color: Colors.orange,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -648,11 +681,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             SizedBox(width: 4),
             Text(
               'VERIFIED',
-              style: TextStyle(
-                color: Colors.green,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -675,33 +704,15 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           color: (iconColor ?? AppColors.primary).withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(
-          icon,
-          color: iconColor ?? AppColors.primary,
-          size: 20,
-        ),
+        child: Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
       ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+      title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
       subtitle: subtitle != null
-          ? Text(
-        subtitle,
-        style: TextStyle(
-          color: Colors.grey[600],
-          fontSize: 12,
-        ),
-      )
+          ? Text(subtitle, style: TextStyle(color: Colors.grey[600], fontSize: 12))
           : null,
       trailing: trailing ?? const Icon(Icons.chevron_right, size: 16),
       onTap: onTap,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     );
   }
 
@@ -713,17 +724,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: Text(
             title,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(color: Colors.grey[600], fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),
         Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 1,
           child: Column(children: items),
         ),
@@ -777,28 +782,17 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         surfaceTintColor: Colors.white,
         title: const Text(
           'Profile',
-          style: TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
+          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 20),
         ),
         centerTitle: true,
         actions: [
           NotificationBellIcon(
-            onNotificationHandled: () {
-              // Refresh profile after handling a notification
-              _loadUserData();
-            },
+            onNotificationHandled: () => _loadUserData(),
           ),
           if (isLoading)
             const Padding(
               padding: EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
             )
           else
             IconButton(
@@ -837,9 +831,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         icon: Icons.language,
                         title: 'Language',
                         subtitle: 'English',
-                        onTap: () {
-                          _showSuccessSnackBar('Language selection coming soon!');
-                        },
+                        onTap: () => _showSuccessSnackBar('Language selection coming soon!'),
                         iconColor: Colors.blue,
                       ),
                       _buildMenuItem(
@@ -864,18 +856,14 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         icon: Icons.help_outline,
                         title: 'Support',
                         subtitle: 'Get help and contact us',
-                        onTap: () {
-                          _showSuccessSnackBar('Support page coming soon!');
-                        },
+                        onTap: () => _showSuccessSnackBar('Support page coming soon!'),
                         iconColor: Colors.cyan,
                       ),
                       _buildMenuItem(
                         icon: Icons.feedback_outlined,
                         title: 'Send Feedback',
                         subtitle: 'Help us improve',
-                        onTap: () {
-                          _showSuccessSnackBar('Feedback form coming soon!');
-                        },
+                        onTap: () => _showSuccessSnackBar('Feedback form coming soon!'),
                         iconColor: Colors.green,
                       ),
                     ],
@@ -891,9 +879,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         foregroundColor: const Color(0xFF001127),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: const BorderSide(color: Color(0xFF001127)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),
@@ -908,9 +894,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         backgroundColor: Colors.red,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),
