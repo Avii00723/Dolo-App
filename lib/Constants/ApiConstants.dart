@@ -51,5 +51,5 @@ class ApiConstants {
   // Get it from: https://console.cloud.google.com/
   // Required APIs: Directions API, Geocoding API, Maps SDK for Android/iOS
   static const String googleMapsApiKey =
-      'AIzaSyDQtNoIW22hko1eCS4ItjsO2JvtwDHJwkY';
+      'AIzaSyD1p7YCYS0TKCVDqJSGU_x2nJgquJy92Es';
 }
