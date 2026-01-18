@@ -42,6 +42,10 @@ dependencies:
   just_audio: ^0.9.40
   tutorial_coach_mark: ^1.2.11
   firebase_messaging: ^15.2.4
+  carousel_slider: ^5.1.1
+  animated_bottom_navigation_bar: ^1.4.0
+#  motion_tab_bar: ^2.0.4
+  motion_tab_bar_v2: ^0.4.0
 
 
 dev_dependencies:

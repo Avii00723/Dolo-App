@@ -1,6 +1,7 @@
 import '../Constants/ApiService.dart';
 import '../Constants/ApiConstants.dart';
 import '../Models/LoginModel.dart';
+import '../Models/TrustScoreModel.dart';
 import 'AuthService.dart';
 
 class ProfileService {
@@ -30,24 +31,24 @@ class ProfileService {
       return null;
     }
   }
-
-  Future<Map<String, dynamic>?> getUserTrustScore(String userId) async {
+  Future<TrustScore?> getUserTrustScore(String userId) async {
     try {
-      print('🌐 TrustScore API URL: ${ApiConstants.getUserTrustScore}/$userId'); // ✅ DEBUG
+      print('🌐 TrustScore API URL: ${ApiConstants.getUserTrustScore}/$userId');
       final response = await _api.get(
         '${ApiConstants.getUserTrustScore}/$userId',
+        parser: (json) => TrustScore.fromJson(json), // Add this parser
       );
 
-      print('📡 TrustScore Response: success=${response.success}, data=${response.data}'); // ✅ DEBUG
+      print('📡 TrustScore Response: success=${response.success}, data=${response.data}');
 
       if (response.success) {
-        print('✅ TrustScore fetched: ${response.data}'); // ✅ DEBUG
-        return response.data;
+        print('✅ TrustScore fetched: ${response.data}');
+        return response.data as TrustScore?;
       }
-      print('❌ TrustScore API returned !success'); // ✅ DEBUG
+      print('❌ TrustScore API returned !success');
       return null;
     } catch (e) {
-      print('💥 TrustScore ERROR: $e'); // ✅ CRITICAL DEBUG
+      print('💥 TrustScore ERROR: $e');
       return null;
     }
   }

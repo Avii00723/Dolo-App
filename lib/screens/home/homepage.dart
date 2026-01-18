@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:dolo/screens/Inbox%20Section/indoxscreen.dart';
-import 'package:dolo/screens/ProfileSection/profilescreen.dart';
+import 'package:dolo/screens/home/home.dart';
 import 'package:dolo/screens/orderSection/CreateOrderPage.dart';
 import 'package:dolo/screens/orderSection/YourOrders.dart';
 import 'package:flutter/material.dart';
+import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
+import 'package:motion_tab_bar_v2/motion-tab-controller.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../screens/send_page.dart';
 import '../../Controllers/tutorial_service.dart';
@@ -16,160 +18,67 @@ class HomePageWithNav extends StatefulWidget {
   State<HomePageWithNav> createState() => _HomePageWithNavState();
 }
 
-class _HomePageWithNavState extends State<HomePageWithNav> with WidgetsBindingObserver {
-  int _selectedIndex = 0;
+class _HomePageWithNavState extends State<HomePageWithNav>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
+  MotionTabBarController? _motionTabBarController;
   TutorialCoachMark? _tutorialCoachMark;
 
-  // GlobalKeys for tutorial targets
-  final GlobalKey _createButtonKey = GlobalKey();
+  final GlobalKey _homeButtonKey = GlobalKey();
   final GlobalKey _searchButtonKey = GlobalKey();
+  final GlobalKey _createButtonKey = GlobalKey();
   final GlobalKey _ordersButtonKey = GlobalKey();
   final GlobalKey _inboxButtonKey = GlobalKey();
-  final GlobalKey _profileButtonKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _motionTabBarController = MotionTabBarController(
+      initialIndex: 0,
+      length: 5,
+      vsync: this,
+    );
     _checkAndShowTutorial();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _motionTabBarController?.dispose();
     super.dispose();
   }
 
-  // Method to switch to Orders tab (called by CreateOrderPage)
   void switchToOrdersTab() {
-    setState(() {
-      _selectedIndex = 2; // Your Orders is at index 2
-    });
+    _motionTabBarController?.index = 3;
   }
 
-  // Fixed pages list with callback
-  List<Widget> get _pages {
-    return [
-      CreateOrderPage(onOrderCreated: switchToOrdersTab), // Pass callback
-      const SendPage(), // Search (index 1)
-      const YourOrdersPage(), // Your Orders (index 2)
-      const InboxScreen(), // Inbox (index 3)
-      const ProfilePage(), // Profile (index 4)
-    ];
-  }
+  List<Widget> get _pages => [
+    const ModernHomeScreen(),
+    const SendPage(),
+    CreateOrderPage(onOrderCreated: switchToOrdersTab),
+    const YourOrdersPage(),
+    const InboxScreen(),
+  ];
 
-  // Fixed navigation items - same for all users
-  List<BottomNavigationBarItem> _navItems() {
-    return [
-      BottomNavigationBarItem(
-        icon: Container(
-          key: _createButtonKey,
-          child: const Icon(Icons.add_circle_outline),
-        ),
-        label: 'Create',
-        activeIcon: const Icon(Icons.add_circle, size: 28),
-      ),
-      BottomNavigationBarItem(
-        icon: Container(
-          key: _searchButtonKey,
-          child: const Icon(Icons.search),
-        ),
-        label: 'Search',
-        activeIcon: const Icon(Icons.search, size: 28),
-      ),
-      BottomNavigationBarItem(
-        icon: Container(
-          key: _ordersButtonKey,
-          child: const Icon(Icons.bookmark_border),
-        ),
-        label: 'Your Orders',
-        activeIcon: const Icon(Icons.bookmark, size: 28),
-      ),
-      BottomNavigationBarItem(
-        icon: Container(
-          key: _inboxButtonKey,
-          child: const Icon(Icons.chat_bubble_outline),
-        ),
-        label: 'Inbox',
-        activeIcon: const Icon(Icons.chat_bubble, size: 28),
-      ),
-      BottomNavigationBarItem(
-        icon: Container(
-          key: _profileButtonKey,
-          child: const Icon(Icons.person_outline),
-        ),
-        label: 'Profile',
-        activeIcon: const Icon(Icons.person, size: 28),
-      ),
-    ];
-  }
-
-  void _onItemTapped(int index) {
-    // Ensure index is within valid range
-    if (index >= _pages.length || index < 0) return;
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
-  /// Check if tutorial should be shown for new users
   Future<void> _checkAndShowTutorial() async {
-    // Wait for the widget to be built
     await Future.delayed(const Duration(milliseconds: 500));
-
     if (!mounted) return;
-
-    // Check if home tutorial has been completed
     final isCompleted = await TutorialService.isHomeTutorialCompleted();
-
     if (!isCompleted) {
       _showTutorial();
     }
   }
 
-  /// Show the home page tutorial
   void _showTutorial() {
     final targets = [
-      TutorialHelper.createTarget(
-        key: _createButtonKey,
-        title: 'Create Order',
-        description: 'Tap here to create a new delivery order. You can send packages, documents, or any items you need delivered.',
-        order: 1,
-        align: ContentAlign.top,
-      ),
-      TutorialHelper.createTarget(
-        key: _searchButtonKey,
-        title: 'Search Trips',
-        description: 'Find available delivery trips posted by other users. You can join trips going in your direction to save money.',
-        order: 2,
-        align: ContentAlign.top,
-      ),
-      TutorialHelper.createTarget(
-        key: _ordersButtonKey,
-        title: 'Your Orders',
-        description: 'View all your delivery orders and trip requests. Track the status of your deliveries and manage them easily.',
-        order: 3,
-        align: ContentAlign.top,
-      ),
-      TutorialHelper.createTarget(
-        key: _inboxButtonKey,
-        title: 'Inbox & Chat',
-        description: 'Communicate with other users about your orders. Get real-time updates and notifications about your deliveries.',
-        order: 4,
-        align: ContentAlign.top,
-      ),
-      TutorialHelper.createFinalTarget(
-        key: _profileButtonKey,
-        title: 'Your Profile',
-        description: 'Manage your account settings, view your delivery history, and update your personal information.',
-        order: 5,
-        align: ContentAlign.top,
-        onFinish: () async {
-          await TutorialService.markHomeTutorialCompleted();
-        },
-      ),
+      TutorialHelper.createTarget(key: _homeButtonKey, title: 'Home', description: 'Your main dashboard...', order: 1, align: ContentAlign.top),
+      TutorialHelper.createTarget(key: _searchButtonKey, title: 'Search Trips', description: 'Find available...', order: 2, align: ContentAlign.top),
+      TutorialHelper.createTarget(key: _createButtonKey, title: 'Create Order', description: 'Create a new...', order: 3, align: ContentAlign.top),
+      TutorialHelper.createTarget(key: _ordersButtonKey, title: 'Your Orders', description: 'View and manage...', order: 4, align: ContentAlign.top),
+      TutorialHelper.createFinalTarget(key: _inboxButtonKey, title: 'Inbox & Chat', description: 'Communicate...', order: 5, align: ContentAlign.top, onFinish: () async {
+        await TutorialService.markHomeTutorialCompleted();
+      }),
     ];
-
     _tutorialCoachMark = TutorialCoachMark(
       targets: targets,
       colorShadow: const Color(0xFF001127),
@@ -180,65 +89,63 @@ class _HomePageWithNavState extends State<HomePageWithNav> with WidgetsBindingOb
         TutorialService.markHomeTutorialCompleted();
         return true;
       },
-      onFinish: () {
-        TutorialService.markHomeTutorialCompleted();
-      },
+      onFinish: () => TutorialService.markHomeTutorialCompleted(),
     );
-
     _tutorialCoachMark?.show(context: context);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Ensure selected index is within bounds
-    if (_selectedIndex >= _pages.length) {
-      _selectedIndex = 0;
-    }
-
     return Scaffold(
-      extendBody: false, // CHANGED: Set to false to prevent overlap
-      backgroundColor: Colors.grey[50],
-      body: IndexedStack(
-        index: _selectedIndex,
+      extendBody: true,
+      backgroundColor: Colors.white,
+      body: TabBarView(
+        physics: const NeverScrollableScrollPhysics(),
+        controller: _motionTabBarController,
         children: _pages,
       ),
       bottomNavigationBar: Container(
-        margin: const EdgeInsets.only(left: 8, right: 8, bottom: 12),
+        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), // Reduced vertical padding
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
+          borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-              spreadRadius: 2,
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(25),
-          child: BottomNavigationBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            type: BottomNavigationBarType.fixed,
-            currentIndex: _selectedIndex,
-            onTap: _onItemTapped,
-            selectedItemColor: const Color(0xFF001127),
-            unselectedItemColor: Colors.grey[600],
-            showSelectedLabels: true,
-            showUnselectedLabels: true,
-            selectedFontSize: 12,
-            unselectedFontSize: 10,
-            iconSize: 24,
-            selectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.w600,
-            ),
-            unselectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.w400,
-            ),
-            items: _navItems(),
+        child: MotionTabBar(
+          controller: _motionTabBarController,
+          initialSelectedTab: "Home",
+          labels: const ["Home", "Search", "Create", "Orders", "Inbox"],
+          icons: const [
+            Icons.home_outlined, Icons.search, Icons.add,
+            Icons.receipt_long_outlined, Icons.chat_bubble_outline
+          ],
+          labelAlwaysVisible: true,
+          tabIconColor: Colors.grey[600],
+          tabIconSize: 24.0,
+          tabIconSelectedSize: 24.0,
+          tabSelectedColor: const Color(0xFF2C3E50),
+          tabIconSelectedColor: Colors.white,
+          tabBarColor: Colors.white, // Changed from transparent to white
+          textStyle: TextStyle(
+            fontSize: 11,
+            color: Colors.grey[700],
+            fontWeight: FontWeight.w500,
+            height: 1.0, // Reduced line height
           ),
+          tabBarHeight: 55, // Reduced height
+          onTabItemSelected: (int value) {
+            setState(() {
+              _motionTabBarController!.index = value;
+            });
+          },
+          badges: [null, null, null, null, null],
         ),
       ),
     );

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'OTPScreen.dart';
 import '../../Controllers/LoginService.dart';
-import '../../Widgets/ModernInputField.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,6 +14,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController phoneController = TextEditingController();
   final LoginService _loginService = LoginService();
   bool isLoading = false;
+  String selectedCountryCode = '+91';
 
   void sendOTP() async {
     String phoneNumber = phoneController.text.trim();
@@ -48,7 +48,6 @@ class _LoginScreenState extends State<LoginScreen> {
               builder: (context) => OTPScreen(
                 phoneNumber: phoneNumber,
                 userId: response.userId,
-                // You can pass OTP for debugging if needed: otp: response.otp,
               ),
             ),
           );
@@ -77,108 +76,204 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(height: 50),
-              Column(
-                children: [
-                  Center(
-                    child: Image.asset(
-                      'assets/images/companynamelogo.png',
-                      height: 190,
-                      width: 190,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.black,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Stack(
-                            children: [
-                              Positioned(
-                                left: 16,
-                                top: 16,
-                                child: Icon(
-                                  Icons.inbox_outlined,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
-                              ),
-                              Positioned(
-                                right: 12,
-                                bottom: 12,
-                                child: Icon(
-                                  Icons.refresh,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 60),
+
+                // Logo
+                Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(height: 16),
-                  const SizedBox(height: 24),
-                  const Center(
+                  child: Center(
                     child: Text(
-                      'Login',
+                      'LOGO',
                       style: TextStyle(
-                        fontSize: 28,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF001127),
+                        color: Colors.grey[600],
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
 
-              const SizedBox(height: 60),
+                const SizedBox(height: 80),
 
-              // Phone Number Input with Modern Design
-              ModernInputField(
-                controller: phoneController,
-                label: "Phone Number",
-                hint: "Enter your phone number",
-                prefixIcon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-                enabled: !isLoading,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-              ),
-
-              const SizedBox(height: 40),
-
-              // Continue Button
-              ModernButton(
-                text: "Send OTP",
-                onPressed: isLoading ? null : sendOTP,
-                isLoading: isLoading,
-              ),
-
-              const SizedBox(height: 280),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Text(
-                  'By continuing, you agree to our Terms\nof Service and Privacy Policy',
+                // Title
+                const Text(
+                  'Log In To Your\nAccount',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[700],
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                    height: 1.2,
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 12),
+
+                // Subtitle
+                Text(
+                  'Log In Via Mobile Number Verification',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                // Welcome Card
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Welcome!',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Phone Number Input with Country Code
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Row(
+                          children: [
+                            // Country Code Dropdown
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  right: BorderSide(color: Colors.grey[300]!),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Text(
+                                    '🇮🇳',
+                                    style: TextStyle(fontSize: 20),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    selectedCountryCode,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: Colors.grey[600],
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Phone Number Input
+                            Expanded(
+                              child: TextField(
+                                controller: phoneController,
+                                keyboardType: TextInputType.phone,
+                                enabled: !isLoading,
+                                maxLength: 10,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Phone Number',
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
+                                  counterText: '',
+                                ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Get OTP Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: isLoading ? null : sendOTP,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF001127),
+                            disabledBackgroundColor: Colors.grey[400],
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: isLoading
+                              ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                              : const Text(
+                            'Get OTP',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         ),
       ),

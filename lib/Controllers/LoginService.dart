@@ -34,13 +34,43 @@ class LoginService {
   }
 
   // Complete User Profile
-  Future<ProfileUpdateResponse?> completeProfile(ProfileUpdateRequest data) async {
-    final response = await _api.post(
-      ApiConstants.completeProfile,
-      body: data.toJson(),
-      parser: (json) => ProfileUpdateResponse.fromJson(json),
-    );
-    return response.success ? response.data : null;
+  Future<SignupResponse?> completeSignup(SignupRequest request) async {
+    try {
+      print('📤 Calling /users/signup API');
+      print('Request body: ${request.toJson()}');
+
+      final response = await _api.post(
+        ApiConstants.completeSignup, // This should be '/users/signup'
+        body: request.toJson(),
+        parser: (json) => SignupResponse.fromJson(json),
+      );
+
+      print('📥 Signup API response: ${response.data}');
+      return response.data;
+    } catch (e) {
+      print('❌ Error completing signup: $e');
+      return null;
+    }
+  }
+
+  // UPDATED: Complete Profile (now only for profile image upload)
+  Future<CompleteProfileResponse?> completeProfile(CompleteProfileRequest request) async {
+    try {
+      print('📤 Calling /users/complete-profile API');
+      print('Request body: ${request.toJson()}');
+
+      final response = await _api.post(
+        ApiConstants.completeProfile, // This should be '/users/complete-profile'
+        body: request.toJson(),
+        parser: (json) => CompleteProfileResponse.fromJson(json),
+      );
+
+      print('📥 Complete Profile API response: ${response.data}');
+      return response.data;
+    } catch (e) {
+      print('❌ Error completing profile: $e');
+      return null;
+    }
   }
 
   // Start KYC process

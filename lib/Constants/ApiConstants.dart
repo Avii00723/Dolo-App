@@ -10,6 +10,10 @@ class ApiConstants {
   static const String getUserProfile = '$baseUrl/users/profile';
   static const String updateUserProfile = '$baseUrl/users/profile';
   static const String uploadKyc = '$baseUrl/users/upload-kyc';
+  static const String completeSignup = '$baseUrl/users/signup';
+  static const String getUserTrustScore = '$baseUrl/users/trust-score';
+
+
 
   // Orders
   static const String createOrder = '$baseUrl/orders/create';
@@ -46,7 +50,6 @@ class ApiConstants {
   static const String ttsStreamUrl = 'https://api.dzdx.in/v1/media/tts/stream';
   static const String submitRating = '$baseUrl/ratings';
   static const String getUserRatings = '$baseUrl/ratings/user';
-  static const String getUserTrustScore = '$baseUrl/users/trust-score';
 
   // Google Maps API Key
   // ⚠️ IMPORTANT: Replace this with your actual Google Maps API Key

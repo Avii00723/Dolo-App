@@ -6,7 +6,7 @@ import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
 import '../../Controllers/SocketService.dart';
 import '../../Controllers/TripRequestService.dart';
-import '../../Controllers/OrderTrackingService.dart'; // ✅ NEW: Import tracking service
+import '../../Controllers/OrderTrackingService.dart';
 import '../../Models/TripRequestModel.dart';
 import '../../widgets/NotificationBellIcon.dart';
 import '../../Constants/ApiConstants.dart';
@@ -28,7 +28,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   String? _currentUserId;
   final SocketService _socketService = SocketService();
   final TripRequestService _tripRequestService = TripRequestService();
-  final OrderTrackingService _trackingService = OrderTrackingService(); // ✅ NEW: Tracking service
+  final OrderTrackingService _trackingService = OrderTrackingService();
   late TabController _tabController;
 
   Map<String, bool> _typingStatus = {};
@@ -39,8 +39,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   bool _isLoadingRequests = true;
   String? _requestsErrorMessage;
 
-  bool _isReceivedExpanded = true;
-  bool _isSentExpanded = true;
+  String _selectedFilter = 'All';
+  final List<String> _filters = ['All', 'Request Sent', 'Request Received'];
 
   @override
   void initState() {
@@ -89,16 +89,12 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           _isLoading = false;
           _errorMessage = null;
         });
-
-        print('✅ Loaded ${conversations.length} conversations from API');
       } else {
         setState(() {
           _conversations = [];
           _isLoading = false;
           _errorMessage = result['error'] as String?;
         });
-
-        print('⚠️ API failed: ${result['error']}');
       }
     } catch (e) {
       if (!mounted) return;
@@ -108,8 +104,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         _isLoading = false;
         _errorMessage = 'Network error: $e';
       });
-
-      print('❌ Exception loading inbox: $e');
     }
   }
 
@@ -143,8 +137,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         _isLoadingRequests = false;
         _requestsErrorMessage = null;
       });
-
-      print('✅ Loaded ${sent.length} sent requests and ${received.length} received requests');
     } catch (e) {
       if (!mounted) return;
 
@@ -154,8 +146,6 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         _isLoadingRequests = false;
         _requestsErrorMessage = 'Failed to load requests: $e';
       });
-
-      print('❌ Exception loading trip requests: $e');
     }
   }
 
@@ -187,21 +177,28 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
         });
 
         _socketService.onReceiveMessage((data) {
-          print('📬 New message received, refreshing inbox');
           _loadInbox();
         });
-
-        print('✅ Inbox WebSocket initialized');
       }
     } catch (e) {
       print('❌ Error initializing inbox WebSocket: $e');
     }
   }
 
+  List<TripRequest> get _filteredRequests {
+    if (_selectedFilter == 'All') {
+      return [..._receivedRequests, ..._sentRequests];
+    } else if (_selectedFilter == 'Request Sent') {
+      return _sentRequests;
+    } else {
+      return _receivedRequests;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
@@ -214,44 +211,188 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           ),
         ),
         centerTitle: false,
-        actions: [
-          NotificationBellIcon(
-            onNotificationHandled: () {
-              _loadInbox();
-              _loadTripRequests();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: () {
-              _loadInbox();
-              _loadTripRequests();
-            },
-            tooltip: 'Refresh',
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.blue,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.blue,
-          tabs: const [
-            Tab(icon: Icon(Icons.chat), text: 'Chats'),
-            Tab(icon: Icon(Icons.request_page), text: 'Requests'),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildBody(),
-          _buildRequestsTab(),
+          // Tab Bar with rounded design
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(25),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildTab(
+                    'Chats',
+                    _tabController.index == 0,
+                    _conversations.length,
+                        () {
+                      _tabController.animateTo(0);
+                      setState(() {});
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: _buildTab(
+                    'Requests',
+                    _tabController.index == 1,
+                    _sentRequests.length + _receivedRequests.length,
+                        () {
+                      _tabController.animateTo(1);
+                      setState(() {});
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Filter chips for Requests tab
+          if (_tabController.index == 1) ...[
+            Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: _filters.map((filter) {
+                  final count = filter == 'All'
+                      ? _sentRequests.length + _receivedRequests.length
+                      : filter == 'Request Sent'
+                      ? _sentRequests.length
+                      : _receivedRequests.length;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _buildFilterChip(filter, count),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+
+          // Content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildChatsTab(),
+                _buildRequestsTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildTab(String label, bool isSelected, int count, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isSelected
+              ? [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.black87 : Colors.grey,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.grey.shade200
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                count.toString(),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.black87 : Colors.grey,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, int count) {
+    final isSelected = _selectedFilter == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedFilter = label;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.grey.shade200 : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.grey.shade300,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.black87 : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                count.toString(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.black87 : Colors.grey.shade600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatsTab() {
     if (_currentUserId == null) {
       return _buildNotLoggedInState();
     }
@@ -261,30 +402,54 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     }
 
     if (_conversations.isEmpty) {
-      if (_errorMessage != null) {
-        return _buildErrorState();
-      }
       return _buildEmptyState();
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadInbox,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _conversations.length,
-        itemBuilder: (context, index) {
-          final conversation = _conversations[index];
-          final chatId = conversation['chat_id']?.toString() ?? '';
-          final isTyping = _typingStatus[chatId] ?? false;
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: _conversations.length,
+      itemBuilder: (context, index) {
+        final conversation = _conversations[index];
+        return ModernChatCard(
+          conversation: conversation,
+          currentUserId: _currentUserId!,
+          onTap: () => _openChat(conversation),
+        );
+      },
+    );
+  }
 
-          return ModernChatCard(
-            conversation: conversation,
-            currentUserId: _currentUserId!,
-            isOtherUserTyping: isTyping,
-            onTap: () => _openChat(conversation),
-          );
-        },
-      ),
+  Widget _buildRequestsTab() {
+    if (_currentUserId == null) {
+      return _buildNotLoggedInState();
+    }
+
+    if (_isLoadingRequests) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_filteredRequests.isEmpty) {
+      return _buildEmptyRequestsState();
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _filteredRequests.length,
+      itemBuilder: (context, index) {
+        final request = _filteredRequests[index];
+        final isReceived = request.travelerId != _currentUserId;
+
+        return ModernRequestCard(
+          request: request,
+          currentUserId: _currentUserId!,
+          isReceived: isReceived,
+          onAccept: isReceived ? () => _acceptRequest(request) : null,
+          onDecline: isReceived ? () => _declineRequest(request) : null,
+          onWithdraw: !isReceived ? () => _withdrawRequest(request) : null,
+          onRefresh: _loadTripRequests,
+          trackingService: _trackingService,
+        );
+      },
     );
   }
 
@@ -296,7 +461,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           Icon(Icons.login, size: 64, color: Colors.grey.shade400),
           const SizedBox(height: 16),
           Text(
-            'Please log in to view messages',
+            'Please log in to continue',
             style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
           ),
         ],
@@ -309,79 +474,47 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.chat_bubble_outline, size: 60, color: Colors.grey.shade400),
-          ),
-          const SizedBox(height: 24),
+          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
           Text(
             'No Chats Available',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
           ),
           const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              'Start chatting by accepting trip requests or sending messages',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _loadInbox,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
+          Text(
+            'Start chatting by accepting trip requests',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildEmptyRequestsState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to Load Messages',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.request_page_outlined, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'No Trip Requests',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
             ),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage ?? 'Unknown error occurred',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _loadInbox,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade600,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No requests to display',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+          ),
+        ],
       ),
     );
   }
@@ -396,231 +529,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           otherUserName: conversation['other_user_name'],
         ),
       ),
-    ).then((_) {
-      _loadInbox();
-    });
-  }
-
-  Widget _buildRequestsTab() {
-    if (_currentUserId == null) {
-      return _buildNotLoggedInState();
-    }
-
-    if (_isLoadingRequests) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_requestsErrorMessage != null) {
-      return _buildRequestsErrorState();
-    }
-
-    if (_sentRequests.isEmpty && _receivedRequests.isEmpty) {
-      return _buildEmptyRequestsState();
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadTripRequests,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_receivedRequests.isNotEmpty) ...[
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    _isReceivedExpanded = !_isReceivedExpanded;
-                  });
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.inbox, size: 20, color: Colors.orange.shade700),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Received Requests',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${_receivedRequests.length}',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange.shade700),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        _isReceivedExpanded ? Icons.expand_less : Icons.expand_more,
-                        size: 24,
-                        color: Colors.grey.shade600,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (_isReceivedExpanded) ...[
-                ..._receivedRequests.map((request) => TripRequestCard(
-                  request: request,
-                  currentUserId: _currentUserId!,
-                  isReceived: true,
-                  onAccept: () => _acceptRequest(request),
-                  onDecline: () => _declineRequest(request),
-                  onWithdraw: null,
-                  onRefresh: _loadTripRequests,
-                  trackingService: _trackingService, // ✅ NEW: Pass tracking service
-                )),
-              ],
-              const SizedBox(height: 24),
-            ],
-            if (_sentRequests.isNotEmpty) ...[
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    _isSentExpanded = !_isSentExpanded;
-                  });
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.send, size: 20, color: Colors.blue.shade700),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Sent Requests',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${_sentRequests.length}',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        _isSentExpanded ? Icons.expand_less : Icons.expand_more,
-                        size: 24,
-                        color: Colors.grey.shade600,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (_isSentExpanded) ...[
-                ..._sentRequests.map((request) => TripRequestCard(
-                  request: request,
-                  currentUserId: _currentUserId!,
-                  isReceived: false,
-                  onAccept: null,
-                  onDecline: null,
-                  onWithdraw: () => _withdrawRequest(request),
-                  onRefresh: _loadTripRequests,
-                  trackingService: _trackingService, // ✅ NEW: Pass tracking service
-                )),
-              ],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyRequestsState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.request_page_outlined, size: 60, color: Colors.grey.shade400),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No Trip Requests',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              'You haven\'t sent or received any trip requests yet',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _loadTripRequests,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRequestsErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to Load Requests',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _requestsErrorMessage ?? 'Unknown error occurred',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _loadTripRequests,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade600,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    ).then((_) => _loadInbox());
   }
 
   Future<void> _acceptRequest(TripRequest request) async {
@@ -697,7 +606,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Decline Trip Request'),
-        content: Text('Are you sure you want to decline this request from ${request.source} to ${request.destination}?'),
+        content: Text('Decline this request from ${request.source} to ${request.destination}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -748,7 +657,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Withdraw Trip Request'),
-        content: Text('Are you sure you want to withdraw your request for ${request.source} to ${request.destination}?'),
+        content: Text('Withdraw your request for ${request.source} to ${request.destination}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -795,56 +704,42 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   }
 }
 
-// ModernChatCard remains the same as in your original code
+// Modern Chat Card
 class ModernChatCard extends StatelessWidget {
   final Map<String, dynamic> conversation;
   final String currentUserId;
-  final bool isOtherUserTyping;
   final VoidCallback onTap;
 
   const ModernChatCard({
     Key? key,
     required this.conversation,
     required this.currentUserId,
-    this.isOtherUserTyping = false,
     required this.onTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final otherUserName = conversation['other_user_name'] ?? 'Unknown User';
-    final otherUserPhoto = conversation['other_user_photo'];
-    final origin = conversation['origin'] ?? 'Unknown';
-    final destination = conversation['destination'] ?? 'Unknown';
     final lastMessage = conversation['lastMessage'] ?? 'No messages yet';
     final lastMessageTime = conversation['lastMessageTime'];
-    final acceptedBy = conversation['accepted_by'];
-    final orderId = conversation['order_id'];
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
               children: [
-                _buildAvatar(otherUserPhoto, otherUserName),
-                const SizedBox(width: 16),
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor: Colors.grey.shade300,
+                  child: Icon(Icons.person, color: Colors.grey.shade600, size: 28),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -865,209 +760,31 @@ class ModernChatCard extends StatelessWidget {
                           ),
                           Text(
                             _formatTime(lastMessageTime),
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade500,
-                              fontWeight: FontWeight.w500,
+                              color: Colors.grey,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.local_shipping, size: 12, color: Colors.blue.shade700),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              flex: 2,
-                              child: Text(
-                                '$origin → $destination',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.blue.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              flex: 1,
-                              child: Text(
-                                '#$orderId',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.blue.shade600,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      isOtherUserTyping
-                          ? Row(
-                        children: [
-                          Text(
-                            'typing',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.green.shade600,
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          SizedBox(
-                            width: 20,
-                            height: 10,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _buildTypingDot(400),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                          : Text(
+                      Text(
                         lastMessage,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                          height: 1.3,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (acceptedBy != null) ...[
-                        const SizedBox(height: 8),
-                        _buildStatusChip(
-                          acceptedBy == currentUserId ? 'Accepted by you' : 'Accepted',
-                          acceptedBy == currentUserId,
-                        ),
-                      ],
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: Colors.grey.shade400),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildAvatar(String? photoUrl, String name) {
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [Colors.blue.shade400, Colors.blue.shade600],
-        ),
-      ),
-      child: photoUrl != null && photoUrl.isNotEmpty
-          ? ClipRRect(
-        borderRadius: BorderRadius.circular(26),
-        child: Image.network(
-          photoUrl.startsWith('http') ? photoUrl : '${ApiConstants.imagebaseUrl}$photoUrl',
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildAvatarFallback(name),
-        ),
-      )
-          : _buildAvatarFallback(name),
-    );
-  }
-
-  Widget _buildAvatarFallback(String name) {
-    return Center(
-      child: Text(
-        name.isNotEmpty ? name[0].toUpperCase() : 'U',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusChip(String text, bool isCurrentUser) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: isCurrentUser ? Colors.green.shade50 : Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: isCurrentUser ? Colors.green.shade200 : Colors.blue.shade200,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isCurrentUser ? Icons.check_circle : Icons.handshake,
-            size: 12,
-            color: isCurrentUser ? Colors.green.shade700 : Colors.blue.shade700,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 10,
-              color: isCurrentUser ? Colors.green.shade700 : Colors.blue.shade700,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static Widget _buildTypingDot(int delay) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 600),
-      builder: (context, value, child) {
-        return FutureBuilder(
-          future: Future.delayed(Duration(milliseconds: delay)),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return Container(
-                width: 4,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.green.shade300,
-                  shape: BoxShape.circle,
-                ),
-              );
-            }
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 4,
-              height: 4,
-              decoration: BoxDecoration(
-                color: value > 0.5 ? Colors.green.shade600 : Colors.green.shade300,
-                shape: BoxShape.circle,
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -1080,11 +797,11 @@ class ModernChatCard extends StatelessWidget {
       final difference = now.difference(time);
 
       if (difference.inDays == 0) {
-        return DateFormat('HH:mm').format(time);
+        return 'Today';
       } else if (difference.inDays == 1) {
         return 'Yesterday';
       } else if (difference.inDays < 7) {
-        return DateFormat('EEE').format(time);
+        return DateFormat('EEEE').format(time);
       } else {
         return DateFormat('MMM dd').format(time);
       }
@@ -1094,8 +811,8 @@ class ModernChatCard extends StatelessWidget {
   }
 }
 
-// ✅ UPDATED: TripRequestCard with real tracking integration
-class TripRequestCard extends StatefulWidget {
+// Modern Request Card
+class ModernRequestCard extends StatelessWidget {
   final TripRequest request;
   final String currentUserId;
   final bool isReceived;
@@ -1103,9 +820,9 @@ class TripRequestCard extends StatefulWidget {
   final VoidCallback? onDecline;
   final VoidCallback? onWithdraw;
   final VoidCallback? onRefresh;
-  final OrderTrackingService trackingService; // ✅ NEW: Tracking service
+  final OrderTrackingService trackingService;
 
-  const TripRequestCard({
+  const ModernRequestCard({
     Key? key,
     required this.request,
     required this.currentUserId,
@@ -1114,1136 +831,176 @@ class TripRequestCard extends StatefulWidget {
     this.onDecline,
     this.onWithdraw,
     this.onRefresh,
-    required this.trackingService, // ✅ NEW: Required parameter
+    required this.trackingService,
   }) : super(key: key);
-
-  @override
-  State<TripRequestCard> createState() => _TripRequestCardState();
-}
-
-class _TripRequestCardState extends State<TripRequestCard> {
-  int _currentTrackingStage = 0;
 
   String _formatDate(String dateStr) {
     try {
       final date = DateTime.parse(dateStr);
-      return DateFormat('MMM dd, yyyy').format(date);
+      return DateFormat('dd MMM, yyyy ; ha').format(date);
     } catch (e) {
       return dateStr;
     }
   }
 
-  Widget _buildStatusBadge(String status) {
-    Color backgroundColor;
-    Color textColor;
-
-    switch (status.toLowerCase()) {
-      case 'pending':
-        backgroundColor = Colors.orange.shade50;
-        textColor = Colors.orange.shade700;
-        break;
-      case 'accepted':
-        backgroundColor = Colors.green.shade50;
-        textColor = Colors.green.shade700;
-        break;
-      case 'declined':
-        backgroundColor = Colors.red.shade50;
-        textColor = Colors.red.shade700;
-        break;
-      case 'withdrawn':
-        backgroundColor = Colors.grey.shade50;
-        textColor = Colors.grey.shade700;
-        break;
-      case 'completed':
-        backgroundColor = Colors.blue.shade50;
-        textColor = Colors.blue.shade700;
-        break;
-      default:
-        backgroundColor = Colors.grey.shade50;
-        textColor = Colors.grey.shade700;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: textColor,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMiniTrackingProgress() {
-    return Row(
-      children: [
-        for (int i = 0; i < 4; i++) ...[
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: i <= _currentTrackingStage ? Colors.green.shade600 : Colors.grey.shade300,
-              shape: BoxShape.circle,
-            ),
-          ),
-          if (i < 3)
-            Container(
-              width: 16,
-              height: 2,
-              color: i < _currentTrackingStage ? Colors.green.shade600 : Colors.grey.shade300,
-            ),
-        ],
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isAccepted = widget.request.status.toLowerCase() == 'accepted';
+    final isPending = request.status.toLowerCase() == 'pending';
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TripRequestDetailPage(
-              request: widget.request,
-              currentUserId: widget.currentUserId,
-              isReceived: widget.isReceived,
-              onAccept: widget.onAccept,
-              onDecline: widget.onDecline,
-              onWithdraw: widget.onWithdraw,
-              initialTrackingStage: _currentTrackingStage,
-              onTrackingStageChanged: (newStage) {
-                setState(() {
-                  _currentTrackingStage = newStage;
-                });
-              },
-              onRefresh: widget.onRefresh,
-              trackingService: widget.trackingService, // ✅ NEW: Pass service
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isReceived ? const Color(0xFFD4F4DD) : const Color(0xFFE0F2FE),
+          width: 3,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with avatar and menu
+          Row(
             children: [
               CircleAvatar(
-                radius: 24,
-                backgroundColor: widget.isReceived ? Colors.orange.shade100 : Colors.blue.shade100,
-                child: Icon(
-                  widget.isReceived ? Icons.call_received : Icons.call_made,
-                  color: widget.isReceived ? Colors.orange.shade700 : Colors.blue.shade700,
-                  size: 20,
-                ),
+                radius: 20,
+                backgroundColor: Colors.grey.shade300,
+                child: Icon(Icons.person, color: Colors.grey.shade600, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.isReceived ? 'Request Received' : 'Request Sent',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: widget.isReceived ? Colors.orange.shade700 : Colors.blue.shade700,
-                            ),
-                          ),
-                        ),
-                        _buildStatusBadge(widget.request.status),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(Icons.location_on, size: 14, color: Colors.green.shade600),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            widget.request.source,
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Icon(Icons.arrow_downward, size: 12, color: Colors.grey.shade400),
-                        const SizedBox(width: 6),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Icon(Icons.location_on, size: 14, color: Colors.red.shade600),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            widget.request.destination,
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(Icons.calendar_today, size: 12, color: Colors.blue.shade600),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatDate(widget.request.travelDate),
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                    if (isAccepted) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Icon(Icons.local_shipping, size: 14, color: Colors.green.shade600),
-                          const SizedBox(width: 6),
-                          _buildMiniTrackingProgress(),
-                          const SizedBox(width: 8),
-                          Text(
-                            _getTrackingStageName(_currentTrackingStage),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      isReceived ? request.travelerId : request.orderId,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
                       ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TripRequestDetailPage(
-                                  request: widget.request,
-                                  currentUserId: widget.currentUserId,
-                                  isReceived: widget.isReceived,
-                                  onAccept: widget.onAccept,
-                                  onDecline: widget.onDecline,
-                                  onWithdraw: widget.onWithdraw,
-                                  initialTrackingStage: _currentTrackingStage,
-                                  onTrackingStageChanged: (newStage) {
-                                    setState(() {
-                                      _currentTrackingStage = newStage;
-                                    });
-                                  },
-                                  onRefresh: widget.onRefresh,
-                                  trackingService: widget.trackingService, // ✅ NEW
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.track_changes, size: 16),
-                          label: const Text('Track Order', style: TextStyle(fontSize: 12)),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.green.shade700,
-                            side: BorderSide(color: Colors.green.shade300),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
+                    ),
+                    Text(
+                      isReceived ? '↙ Sent you an request' : '↗ You sent an request',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
                       ),
-                    ],
-                    if (widget.request.status.toLowerCase() == 'pending') ...[
-                      const SizedBox(height: 12),
-                      if (widget.isReceived)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: widget.onDecline,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red.shade600,
-                                  side: BorderSide(color: Colors.red.shade300),
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text('Decline', style: TextStyle(fontSize: 12)),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: widget.onAccept,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green.shade600,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text('Accept', style: TextStyle(fontSize: 12)),
-                              ),
-                            ),
-                          ],
-                        )
-                      else
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: widget.onWithdraw,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.orange.shade700,
-                              side: BorderSide(color: Colors.orange.shade300),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text('Withdraw', style: TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                    ],
+                    ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 24),
+              IconButton(
+                icon: const Icon(Icons.more_vert, color: Colors.grey),
+                onPressed: () {},
+              ),
             ],
           ),
-        ),
-      ),
-    );
-  }
+          const SizedBox(height: 16),
 
-  String _getTrackingStageName(int stage) {
-    switch (stage) {
-      case 0:
-        return 'Confirmed';
-      case 1:
-        return 'Picked Up';
-      case 2:
-        return 'In Transit';
-      case 3:
-        return 'Delivered';
-      default:
-        return 'Unknown';
-    }
-  }
-}
-
-// ✅ UPDATED: TripRequestDetailPage with real API integration
-class TripRequestDetailPage extends StatefulWidget {
-  final TripRequest request;
-  final String currentUserId;
-  final bool isReceived;
-  final VoidCallback? onAccept;
-  final VoidCallback? onDecline;
-  final VoidCallback? onWithdraw;
-  final int initialTrackingStage;
-  final Function(int)? onTrackingStageChanged;
-  final VoidCallback? onRefresh;
-  final OrderTrackingService trackingService; // ✅ NEW
-
-  const TripRequestDetailPage({
-    Key? key,
-    required this.request,
-    required this.currentUserId,
-    required this.isReceived,
-    this.onAccept,
-    this.onDecline,
-    this.onWithdraw,
-    this.initialTrackingStage = 0,
-    this.onTrackingStageChanged,
-    this.onRefresh,
-    required this.trackingService, // ✅ NEW
-  }) : super(key: key);
-
-  @override
-  State<TripRequestDetailPage> createState() => _TripRequestDetailPageState();
-}
-
-class _TripRequestDetailPageState extends State<TripRequestDetailPage> {
-  late int _currentTrackingStage;
-  bool _isUpdatingStage = false;
-
-  final List<Map<String, dynamic>> _trackingStages = [
-    {
-      'title': 'Order Confirmed',
-      'subtitle': 'Your order has been confirmed',
-      'icon': Icons.check_circle,
-    },
-    {
-      'title': 'Picked Up',
-      'subtitle': 'Package picked up from sender',
-      'icon': Icons.inventory_2,
-    },
-    {
-      'title': 'In Transit',
-      'subtitle': 'Package is on the way',
-      'icon': Icons.local_shipping,
-    },
-    {
-      'title': 'Delivered',
-      'subtitle': 'Package delivered successfully',
-      'icon': Icons.where_to_vote,
-    },
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _currentTrackingStage = widget.initialTrackingStage;
-  }
-
-  String _formatDate(String dateStr) {
-    try {
-      final date = DateTime.parse(dateStr);
-      return DateFormat('MMM dd, yyyy').format(date);
-    } catch (e) {
-      return dateStr;
-    }
-  }
-
-  Widget _buildStatusBadge(String status) {
-    Color backgroundColor;
-    Color textColor;
-    IconData icon;
-
-    switch (status.toLowerCase()) {
-      case 'pending':
-        backgroundColor = Colors.orange.shade50;
-        textColor = Colors.orange.shade700;
-        icon = Icons.pending;
-        break;
-      case 'accepted':
-        backgroundColor = Colors.green.shade50;
-        textColor = Colors.green.shade700;
-        icon = Icons.check_circle;
-        break;
-      case 'declined':
-        backgroundColor = Colors.red.shade50;
-        textColor = Colors.red.shade700;
-        icon = Icons.cancel;
-        break;
-      case 'withdrawn':
-        backgroundColor = Colors.grey.shade50;
-        textColor = Colors.grey.shade700;
-        icon = Icons.undo;
-        break;
-      default:
-        backgroundColor = Colors.grey.shade50;
-        textColor = Colors.grey.shade700;
-        icon = Icons.info;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: textColor),
-          const SizedBox(width: 6),
-          Text(
-            status.toUpperCase(),
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(IconData icon, String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 24, color: color),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
+          // Route information
+          Row(
+            children: [
+              const Icon(Icons.circle, size: 8, color: Colors.black87),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${request.source} → ${request.destination}',
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ NEW: Real API call to update tracking stage
-  Future<void> _upgradeTrackingStage() async {
-    if (_currentTrackingStage >= 3 || _isUpdatingStage) return;
-
-    setState(() {
-      _isUpdatingStage = true;
-    });
-
-    try {
-      // Get the order ID from the trip request
-      // Note: You'll need to ensure your TripRequest model has an orderId field
-      final orderId = widget.request.orderId; // ✅ ADD THIS FIELD TO TripRequest model
-
-      // Call the appropriate API based on current stage
-      final newStage = await widget.trackingService.updateTrackingStage(
-        orderId,
-        _currentTrackingStage,
-      );
-
-      if (newStage != null && mounted) {
-        setState(() {
-          _currentTrackingStage = newStage;
-        });
-        widget.onTrackingStageChanged?.call(newStage);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Order updated to: ${_trackingStages[newStage]['title']}'),
-            backgroundColor: Colors.green.shade600,
-          ),
-        );
-
-        // If we've reached the delivered stage (stage 4), refresh and go back
-        if (newStage >= 3) {
-          widget.onRefresh?.call();
-          await Future.delayed(const Duration(seconds: 1));
-          if (mounted) {
-            Navigator.pop(context);
-          }
-        }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to update tracking stage'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUpdatingStage = false;
-        });
-      }
-    }
-  }
-
-  Widget _buildTrackingTimeline() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          for (int i = 0; i < _trackingStages.length; i++) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: i <= _currentTrackingStage
-                            ? Colors.green.shade600
-                            : Colors.grey.shade300,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        i <= _currentTrackingStage
-                            ? Icons.check
-                            : _trackingStages[i]['icon'] as IconData,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                    if (i < _trackingStages.length - 1)
-                      Container(
-                        width: 3,
-                        height: 50,
-                        color: i < _currentTrackingStage
-                            ? Colors.green.shade600
-                            : Colors.grey.shade300,
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _trackingStages[i]['title'] as String,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: i <= _currentTrackingStage
-                                ? Colors.green.shade700
-                                : Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _trackingStages[i]['subtitle'] as String,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                        if (i == _currentTrackingStage && i < 3) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'Current Status',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade700,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (i < _trackingStages.length - 1)
-                          const SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          // ✅ UPDATED: Real API integration button
-          if (_currentTrackingStage < 3) ...[
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isUpdatingStage ? null : _upgradeTrackingStage,
-                icon: _isUpdatingStage
-                    ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-                    : const Icon(Icons.arrow_upward, size: 18),
-                label: Text(
-                  _isUpdatingStage
-                      ? 'Updating...'
-                      : 'Update to: ${_trackingStages[_currentTrackingStage + 1]['title']}',
-                  style: const TextStyle(fontSize: 14),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isAccepted = widget.request.status.toLowerCase() == 'accepted';
-
-    return Scaffold(
-        backgroundColor: Colors.grey.shade50,
-        appBar: AppBar(
-          backgroundColor: widget.isReceived ? Colors.orange.shade600 : Colors.blue.shade600,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Text(
-            widget.isReceived ? 'Request Details' : 'Your Request',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          centerTitle: true,
-        ),
-        body: Column(
-            children: [
-        Expanded(
-        child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-            Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    widget.isReceived ? Icons.call_received : Icons.call_made,
-                    size: 48,
-                    color: widget.isReceived ? Colors.orange.shade600 : Colors.blue.shade600,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.isReceived ? 'Request Received' : 'Request Sent',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: widget.isReceived ? Colors.orange.shade700 : Colors.blue.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildStatusBadge(widget.request.status),
-                ],
-              ),
-            ),
-              const SizedBox(height: 20),
-
-              // Order Tracking Section
-              if (isAccepted) ...[
-                const Text(
-                  'Order Tracking',
-                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 12),
-                _buildTrackingTimeline(),
-                const SizedBox(height: 20),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-              // Route Section
+          // Departure info
+          Row(
+            children: [
+              const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+              const SizedBox(width: 6),
               const Text(
-                'Route Details',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
+                'Departure',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 16,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade600,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.green.shade800, width: 2),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'From',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                widget.request.source,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 7),
-                      child: Container(
-                        width: 2,
-                        height: 40,
-                        color: Colors.grey.shade300,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          width: 16,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade600,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.red.shade800, width: 2),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'To',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                widget.request.destination,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _formatDate(request.travelDate),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
 
-              // Trip Details Section
-              const Text(
-                'Trip Details',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              _buildDetailRow(
-                Icons.calendar_today,
-                'Travel Date',
-                _formatDate(widget.request.travelDate),
-                Colors.blue,
-              ),
-              const SizedBox(height: 12),
-
-              _buildDetailRow(
-                Icons.directions_car,
-                'Vehicle Info',
-                widget.request.vehicleInfo,
-                Colors.purple,
-              ),
-              const SizedBox(height: 12),
-
-              // PNR Display
-              if (widget.request.pnr != null && widget.request.pnr!.trim().isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.indigo.shade50, Colors.indigo.shade100],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.indigo.shade300, width: 2),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.indigo.shade600,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.confirmation_number,
-                          size: 24,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'PNR/Ticket Number',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.indigo.shade700,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.indigo.shade200),
-                              ),
-                              child: Text(
-                                widget.request.pnr!,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.indigo.shade900,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.copy, color: Colors.indigo.shade600),
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: widget.request.pnr!));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('PNR copied to clipboard'),
-                              backgroundColor: Colors.green.shade600,
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                        tooltip: 'Copy PNR',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
+          // Action buttons for pending requests
+          if (isPending) ...[
+            const SizedBox(height: 16),
+            if (isReceived)
               Row(
                 children: [
                   Expanded(
-                    child: _buildDetailRow(
-                      Icons.access_time,
-                      'Departure',
-                      widget.request.departureDatetime,
-                      Colors.green,
+                    child: OutlinedButton.icon(
+                      onPressed: onDecline,
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Decline'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        backgroundColor: const Color(0xFFFEE2E2),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildDetailRow(
-                      Icons.access_time_filled,
-                      'Delivery',
-                      widget.request.travelDate,
-                      Colors.red,
+                    child: ElevatedButton.icon(
+                      onPressed: onAccept,
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text('Accept'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ),
                 ],
-              ),
-
-              const SizedBox(height: 24),
-            ],
-        ),
-        ),
-        ),
-
-              // Bottom Action Buttons (for pending requests only)
-              if (widget.request.status.toLowerCase() == 'pending')
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: SafeArea(
-                    child: widget.isReceived
-                        ? Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              widget.onDecline?.call();
-                            },
-                            icon: const Icon(Icons.close, size: 20),
-                            label: const Text('Decline'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red.shade600,
-                              side: BorderSide(color: Colors.red.shade300, width: 1.5),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              widget.onAccept?.call();
-                            },
-                            icon: const Icon(Icons.check, size: 20),
-                            label: const Text('Accept Request'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade600,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 2,
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                        : SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          widget.onWithdraw?.call();
-                        },
-                        icon: const Icon(Icons.cancel_outlined, size: 20),
-                        label: const Text('Withdraw Request'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.orange.shade700,
-                          side: BorderSide(color: Colors.orange.shade300, width: 1.5),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onWithdraw,
+                  icon: const Icon(Icons.undo, size: 18),
+                  label: const Text('Withdraw'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange,
+                    side: const BorderSide(color: Colors.orange),
+                    backgroundColor: const Color(0xFFFFF7ED),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                 ),
-            ],
-        ),
+              ),
+          ],
+        ],
+      ),
     );
   }
 }

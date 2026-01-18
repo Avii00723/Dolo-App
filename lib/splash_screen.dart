@@ -1,4 +1,5 @@
 import 'package:dolo/screens/LoginScreens/LoginSignupScreen.dart';
+import 'package:dolo/screens/LoginScreens/login_page.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -17,7 +18,7 @@ class _SplashScreenState extends State<SplashScreen> {
     // Delay for 3 seconds then navigate
     Timer(const Duration(seconds: 3), () {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginSignupScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     });
   }
