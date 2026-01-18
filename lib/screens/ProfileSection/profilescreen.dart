@@ -1,3 +1,4 @@
+import 'package:dolo/screens/LoginScreens/login_page.dart';
 import 'package:flutter/material.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Constants/ApiConstants.dart';
@@ -247,7 +248,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                   await Future.delayed(const Duration(milliseconds: 100));
                   if (context.mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => const LoginSignupScreen()),
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
                           (Route<dynamic> route) => false,
                     );
                   }
