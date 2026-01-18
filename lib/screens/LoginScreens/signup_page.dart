@@ -304,7 +304,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   child: AbsorbPointer(
                     child: _buildTextField(
                       controller: _dobController,
-                      hintText: 'Date of Birth (Optional)',
+                      hintText: 'Date of Birth',
                       suffixIcon: Icons.calendar_today,
                       validator: null, // Optional field
                     ),
@@ -317,7 +317,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Gender (Optional)',
+                      'Gender',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
