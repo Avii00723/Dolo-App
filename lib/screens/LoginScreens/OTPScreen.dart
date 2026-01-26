@@ -74,6 +74,7 @@ class _OTPScreenState extends State<OTPScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => SignupScreen(
+                  widget.phoneNumber,
                   isKycRequired: false,
                   userId: verifyResponse.userId,
                 ),

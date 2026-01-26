@@ -1,3 +1,4 @@
+import 'package:dolo/screens/LoginScreens/kyc_screen.dart';
 import 'package:flutter/material.dart';
 import '../../Controllers/LoginService.dart';
 import '../../Controllers/AuthService.dart';
@@ -6,13 +7,15 @@ import 'package:dolo/screens/home/homepage.dart';
 
 class SignupScreen extends StatefulWidget {
   final bool isKycRequired;
+  final String phoneNumber;
   final String? userId;
 
-  const SignupScreen({
-    Key? key,
-    this.isKycRequired = false,
-    this.userId,
-  }) : super(key: key);
+  const SignupScreen(
+      this.phoneNumber, {
+        Key? key,
+        this.isKycRequired = false,
+        this.userId,
+      }) : super(key: key);
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -30,7 +33,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _isLoading = false;
   String? _currentUserId;
-  String _selectedGender = 'male';
+  String? _selectedGender;
 
   @override
   void initState() {
@@ -67,8 +70,7 @@ class _SignupScreenState extends State<SignupScreen> {
       debugPrint('❌ Error loading userId: $e');
     }
   }
-
-  // Submit signup form - NEW API LOGIC
+// Submit signup form
   Future<void> _submitSignup() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -95,15 +97,19 @@ class _SignupScreenState extends State<SignupScreen> {
         return;
       }
 
-      // Create signup request with NEW API structure
+      // Create signup request
       final signupRequest = SignupRequest(
         userId: userId,
         name: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim(),
+        lastName: _lastNameController.text.trim().isNotEmpty
+            ? _lastNameController.text.trim()
+            : null,
         email: _emailController.text.trim(),
-        dob: _dobController.text.trim().isNotEmpty ? _dobController.text.trim() : null,
-        gender: _selectedGender,
-        isEmailVerified: true, // Assuming email is verified during signup
+        dob: _dobController.text.trim().isNotEmpty
+            ? _dobController.text.trim()
+            : null,
+        gender: _selectedGender ?? 'male',
+        isEmailVerified: true,
       );
 
       debugPrint('Calling signup API with data: ${signupRequest.toJson()}');
@@ -128,19 +134,15 @@ class _SignupScreenState extends State<SignupScreen> {
       }
 
       _showSnackBar('Profile created successfully!');
-
       await Future.delayed(const Duration(seconds: 1));
 
       if (mounted) {
-        // Navigate based on nextScreen response
-        if (signupResult.nextScreen == 'KYC') {
-          // Navigate to KYC screen or show KYC prompt
-          debugPrint('KYC required - navigating to home');
-        }
-
+        // Navigate to KYC screen with userId
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+          MaterialPageRoute(
+            builder: (context) => KycUploadScreen(userId: userId!),
+          ),
               (route) => false,
         );
       }
@@ -156,7 +158,6 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     }
   }
-
   // Pick date of birth
   Future<void> _pickDateOfBirth() async {
     final DateTime? picked = await showDatePicker(
@@ -168,7 +169,7 @@ class _SignupScreenState extends State<SignupScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF001127),
+              primary: Color(0xFF2D2D2D),
             ),
           ),
           child: child!,
@@ -178,7 +179,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (picked != null) {
       setState(() {
-        _dobController.text = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+        _dobController.text =
+        '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
       });
     }
   }
@@ -200,13 +202,33 @@ class _SignupScreenState extends State<SignupScreen> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Form(
-            key: _formKey,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 60),
+                const SizedBox(height: 40),
+
+                // Logo placeholder
+                Container(
+                  width: 140,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'LOGO',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
 
                 // Sign Up Title
                 const Text(
@@ -214,165 +236,218 @@ class _SignupScreenState extends State<SignupScreen> {
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF001127),
+                    color: Color(0xFF2D2D2D),
                   ),
                 ),
+
                 const SizedBox(height: 8),
 
-                // Subtitle
+                // Phone number subtitle
                 Text(
-                  'Enter Information to Create a Account',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
+                  'Enter Information for + 91 ${widget.phoneNumber}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF666666),
                   ),
                 ),
-                const SizedBox(height: 30),
 
-                // Tagline
-                const Text(
-                  'Lets Learn and Celebrate\nFestivals Together!',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF001127),
-                    height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
                 const SizedBox(height: 40),
 
-                // First Name and Last Name in Row
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _firstNameController,
-                        hintText: 'First Name',
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          if (value.trim().length < 2) {
-                            return 'Min 2 chars';
-                          }
-                          return null;
-                        },
+                // Form Card
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _lastNameController,
-                        hintText: 'Last Name',
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          if (value.trim().length < 2) {
-                            return 'Min 2 chars';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Email Field
-                _buildTextField(
-                  controller: _emailController,
-                  hintText: 'Email',
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                    if (!emailRegex.hasMatch(value.trim())) {
-                      return 'Please enter a valid email address';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Date of Birth Field (Optional)
-                GestureDetector(
-                  onTap: _pickDateOfBirth,
-                  child: AbsorbPointer(
-                    child: _buildTextField(
-                      controller: _dobController,
-                      hintText: 'Date of Birth',
-                      suffixIcon: Icons.calendar_today,
-                      validator: null, // Optional field
-                    ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 20),
-
-                // Gender Selection
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Gender',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _buildGenderOption('Male', 'male'),
+                        // Section title
+                        const Text(
+                          'Enter info/tagline',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2D2D2D),
+                          ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildGenderOption('Female', 'female'),
+
+                        const SizedBox(height: 32),
+
+                        // First Name and Last Name Row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _firstNameController,
+                                hintText: 'First Name',
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Required';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _lastNameController,
+                                hintText: 'Last Name',
+                                validator: null,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Email Field
+                        _buildTextField(
+                          controller: _emailController,
+                          hintText: 'Email',
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                            if (!emailRegex.hasMatch(value.trim())) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Date of Birth Field
+                        GestureDetector(
+                          onTap: _pickDateOfBirth,
+                          child: AbsorbPointer(
+                            child: _buildTextField(
+                              controller: _dobController,
+                              hintText: 'Date of Birth',
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please select your date of birth';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Gender Dropdown
+                        DropdownButtonFormField<String>(
+                          value: _selectedGender,
+                          decoration: InputDecoration(
+                            hintText: 'Gender',
+                            hintStyle: TextStyle(
+                              fontSize: 15,
+                              color: Colors.grey[500],
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 18,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF2D2D2D),
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'male',
+                              child: Text('Male'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'female',
+                              child: Text('Female'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'other',
+                              child: Text('Other'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedGender = value;
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please select your gender';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Get Started Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _submitSignup,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2D2D2D),
+                              disabledBackgroundColor: Colors.grey[400],
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                              ),
+                            )
+                                : const Text(
+                              'Get Started',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 40),
-
-                // Get Started Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _submitSignup,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF001127),
-                      disabledBackgroundColor: Colors.grey[400],
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                      ),
-                    )
-                        : const Text(
-                      'Get Started',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
                   ),
                 ),
+
                 const SizedBox(height: 40),
               ],
             ),
@@ -387,7 +462,6 @@ class _SignupScreenState extends State<SignupScreen> {
     required String hintText,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
-    IconData? suffixIcon,
   }) {
     return TextFormField(
       controller: controller,
@@ -396,21 +470,20 @@ class _SignupScreenState extends State<SignupScreen> {
           ? TextCapitalization.none
           : TextCapitalization.words,
       style: const TextStyle(
-        fontSize: 14,
-        color: Color(0xFF001127),
+        fontSize: 15,
+        color: Color(0xFF2D2D2D),
       ),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(
-          fontSize: 14,
-          color: Colors.grey[400],
+          fontSize: 15,
+          color: Colors.grey[500],
         ),
-        suffixIcon: suffixIcon != null ? Icon(suffixIcon, color: Colors.grey[600]) : null,
         filled: true,
-        fillColor: Colors.grey[50],
+        fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 20,
-          vertical: 16,
+          vertical: 18,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
@@ -422,7 +495,10 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
-          borderSide: const BorderSide(color: Color(0xFF001127), width: 1.5),
+          borderSide: const BorderSide(
+            color: Color(0xFF2D2D2D),
+            width: 1.5,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
@@ -434,63 +510,6 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
       ),
       validator: validator,
-    );
-  }
-
-  Widget _buildGenderOption(String label, String value) {
-    final isSelected = _selectedGender == value;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedGender = value;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF001127) : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? const Color(0xFF001127) : Colors.grey[400]!,
-                  width: 2,
-                ),
-                color: isSelected ? const Color(0xFF001127) : Colors.transparent,
-              ),
-              child: isSelected
-                  ? const Center(
-                child: Icon(
-                  Icons.circle,
-                  size: 10,
-                  color: Colors.white,
-                ),
-              )
-                  : null,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? Colors.black : Colors.grey[700],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

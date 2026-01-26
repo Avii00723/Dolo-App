@@ -71,14 +71,42 @@ class _HomePageWithNavState extends State<HomePageWithNav>
 
   void _showTutorial() {
     final targets = [
-      TutorialHelper.createTarget(key: _homeButtonKey, title: 'Home', description: 'Your main dashboard...', order: 1, align: ContentAlign.top),
-      TutorialHelper.createTarget(key: _searchButtonKey, title: 'Search Trips', description: 'Find available...', order: 2, align: ContentAlign.top),
-      TutorialHelper.createTarget(key: _createButtonKey, title: 'Create Order', description: 'Create a new...', order: 3, align: ContentAlign.top),
-      TutorialHelper.createTarget(key: _ordersButtonKey, title: 'Your Orders', description: 'View and manage...', order: 4, align: ContentAlign.top),
-      TutorialHelper.createFinalTarget(key: _inboxButtonKey, title: 'Inbox & Chat', description: 'Communicate...', order: 5, align: ContentAlign.top, onFinish: () async {
-        await TutorialService.markHomeTutorialCompleted();
-      }),
+      TutorialHelper.createTarget(
+          key: _homeButtonKey,
+          title: 'Home',
+          description: 'Your main dashboard...',
+          order: 1,
+          align: ContentAlign.top),
+      TutorialHelper.createTarget(
+          key: _searchButtonKey,
+          title: 'Search Trips',
+          description: 'Find available...',
+          order: 2,
+          align: ContentAlign.top),
+      TutorialHelper.createTarget(
+          key: _createButtonKey,
+          title: 'Create Order',
+          description: 'Create a new...',
+          order: 3,
+          align: ContentAlign.top),
+      TutorialHelper.createTarget(
+          key: _ordersButtonKey,
+          title: 'Your Orders',
+          description: 'View and manage...',
+          order: 4,
+          align: ContentAlign.top),
+      TutorialHelper.createFinalTarget(
+        key: _inboxButtonKey,
+        title: 'Inbox & Chat',
+        description: 'Communicate...',
+        order: 5,
+        align: ContentAlign.top,
+        onFinish: () async {
+          await TutorialService.markHomeTutorialCompleted();
+        },
+      ),
     ];
+
     _tutorialCoachMark = TutorialCoachMark(
       targets: targets,
       colorShadow: const Color(0xFF001127),
@@ -91,61 +119,68 @@ class _HomePageWithNavState extends State<HomePageWithNav>
       },
       onFinish: () => TutorialService.markHomeTutorialCompleted(),
     );
+
     _tutorialCoachMark?.show(context: context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
+      resizeToAvoidBottomInset: false, // 🔥 KEY FIX
       backgroundColor: Colors.white,
+
       body: TabBarView(
         physics: const NeverScrollableScrollPhysics(),
         controller: _motionTabBarController,
         children: _pages,
       ),
-      bottomNavigationBar: Container(
-        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), // Reduced vertical padding
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: MotionTabBar(
-          controller: _motionTabBarController,
-          initialSelectedTab: "Home",
-          labels: const ["Home", "Search", "Create", "Orders", "Inbox"],
-          icons: const [
-            Icons.home_outlined, Icons.search, Icons.add,
-            Icons.receipt_long_outlined, Icons.chat_bubble_outline
-          ],
-          labelAlwaysVisible: true,
-          tabIconColor: Colors.grey[600],
-          tabIconSize: 24.0,
-          tabIconSelectedSize: 24.0,
-          tabSelectedColor: const Color(0xFF2C3E50),
-          tabIconSelectedColor: Colors.white,
-          tabBarColor: Colors.white, // Changed from transparent to white
-          textStyle: TextStyle(
-            fontSize: 11,
-            color: Colors.grey[700],
-            fontWeight: FontWeight.w500,
-            height: 1.0, // Reduced line height
+
+      // 🔒 FIXED BOTTOM NAVIGATION
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          tabBarHeight: 55, // Reduced height
-          onTabItemSelected: (int value) {
-            setState(() {
-              _motionTabBarController!.index = value;
-            });
-          },
-          badges: [null, null, null, null, null],
+          child: MotionTabBar(
+            controller: _motionTabBarController,
+            initialSelectedTab: "Home",
+            labels: const ["Home", "Search", "Create", "Orders", "Inbox"],
+            icons: const [
+              Icons.home_outlined,
+              Icons.search,
+              Icons.add,
+              Icons.receipt_long_outlined,
+              Icons.chat_bubble_outline
+            ],
+            labelAlwaysVisible: true,
+            tabIconColor: Colors.grey,
+            tabIconSize: 24.0,
+            tabIconSelectedSize: 24.0,
+            tabSelectedColor: const Color(0xFF2C3E50),
+            tabIconSelectedColor: Colors.white,
+            tabBarColor: Colors.white,
+            textStyle: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+            tabBarHeight: 55,
+            onTabItemSelected: (int value) {
+              setState(() {
+                _motionTabBarController!.index = value;
+              });
+            },
+            badges: const [null, null, null, null, null],
+          ),
         ),
       ),
     );

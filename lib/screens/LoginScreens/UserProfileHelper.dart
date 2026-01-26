@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Add this import
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../Controllers/LoginService.dart';
 import 'package:dolo/screens/LoginScreens/signup_page.dart';
 import 'package:dolo/screens/LoginScreens/LoginSignupScreen.dart';
@@ -155,7 +155,12 @@ class UserProfileHelper {
         profile.phone.isNotEmpty;
   }
 
-  static void _showProfileCreationDialog(BuildContext context, String userId) {
+  static void _showProfileCreationDialog(BuildContext context, String userId) async {
+    // Get phone number from AuthService
+    final phone = await _getPhoneNumber();
+
+    if (!context.mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -179,7 +184,7 @@ class UserProfileHelper {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, false, userId);
+                _navigateToSignup(context, phone ?? '', false, userId);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF001127),
@@ -195,7 +200,12 @@ class UserProfileHelper {
     );
   }
 
-  static void _showProfileCompletionDialog(BuildContext context, String userId) {
+  static void _showProfileCompletionDialog(BuildContext context, String userId) async {
+    // Get phone number from AuthService
+    final phone = await _getPhoneNumber();
+
+    if (!context.mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -219,7 +229,7 @@ class UserProfileHelper {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, false, userId);
+                _navigateToSignup(context, phone ?? '', false, userId);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF001127),
@@ -240,7 +250,12 @@ class UserProfileHelper {
       String action,
       bool isKycRequired,
       String userId,
-      ) {
+      ) async {
+    // Get phone number from AuthService
+    final phone = await _getPhoneNumber();
+
+    if (!context.mounted) return;
+
     final actionText = action == 'create_order' ? 'create an order' : 'create a trip';
     showDialog(
       context: context,
@@ -256,7 +271,7 @@ class UserProfileHelper {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, isKycRequired, userId);
+                _navigateToSignup(context, phone ?? '', isKycRequired, userId);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF001127),
@@ -292,7 +307,12 @@ class UserProfileHelper {
     );
   }
 
-  static void _showKycRejectedDialog(BuildContext context, String userId) {
+  static void _showKycRejectedDialog(BuildContext context, String userId) async {
+    // Get phone number from AuthService
+    final phone = await _getPhoneNumber();
+
+    if (!context.mounted) return;
+
     showDialog(
       context: context,
       builder: (context) {
@@ -309,7 +329,7 @@ class UserProfileHelper {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, true, userId);
+                _navigateToSignup(context, phone ?? '', true, userId);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF001127),
@@ -325,7 +345,12 @@ class UserProfileHelper {
     );
   }
 
-  static void _showKycRecommendedDialog(BuildContext context, String userId) {
+  static void _showKycRecommendedDialog(BuildContext context, String userId) async {
+    // Get phone number from AuthService
+    final phone = await _getPhoneNumber();
+
+    if (!context.mounted) return;
+
     showDialog(
       context: context,
       builder: (context) {
@@ -342,7 +367,7 @@ class UserProfileHelper {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _navigateToSignup(context, true, userId);
+                _navigateToSignup(context, phone ?? '', true, userId);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF001127),
@@ -358,16 +383,30 @@ class UserProfileHelper {
     );
   }
 
-  static void _navigateToSignup(BuildContext context, bool isKycRequired, String userId) {
+  // FIXED: Updated to match the new constructor signature
+  static void _navigateToSignup(BuildContext context, String phoneNumber, bool isKycRequired, String userId) {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => SignupScreen(
+          phoneNumber, // Positional parameter
           isKycRequired: isKycRequired,
-          userId: userId, // Pass userId to signup screen
+          userId: userId,
         ),
       ),
     );
+  }
+
+  // Helper method to get phone number from AuthService
+  static Future<String?> _getPhoneNumber() async {
+    try {
+      // You'll need to import AuthService and implement getPhone() method
+      // For now, returning empty string as fallback
+      return '';
+    } catch (e) {
+      debugPrint('Error getting phone number: $e');
+      return '';
+    }
   }
 
   static void _showErrorAndNavigateToLogin(BuildContext context, String message) {

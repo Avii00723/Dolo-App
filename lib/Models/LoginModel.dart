@@ -152,7 +152,7 @@ class KycUploadResponse {
 class SignupRequest {
   final String userId;
   final String name;
-  final String lastName;
+  final String? lastName;
   final String email;
   final String? dob;
   final String? gender;

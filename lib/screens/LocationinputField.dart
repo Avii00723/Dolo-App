@@ -1,10 +1,9 @@
-// Enhanced Location Input Field with Full Screen Search
+// Enhanced Location Input Field with Full Screen Search - FIXED VERSION
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_places_autocomplete_text_field/google_places_autocomplete_text_field.dart';
 import '../Services/LocationService.dart';
 import '../../Constants/colorconstant.dart';
-import '../../Widgets/ModernInputField.dart';
 
 class EnhancedLocationInputField extends StatefulWidget {
   final TextEditingController controller;
@@ -41,16 +40,28 @@ class _EnhancedLocationInputFieldState
         GestureDetector(
           onTap: () => _showLocationSearchScreen(context),
           child: AbsorbPointer(
-            child: ModernInputField(
+            child: TextField(
               controller: widget.controller,
-              label: widget.label,
-              hint: widget.hint,
-              prefixIcon: widget.icon,
               readOnly: true,
-              showClearButton: false,
-              suffixIcon: Icon(
-                Icons.arrow_drop_down,
-                color: AppColors.primary,
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                prefixIcon: Icon(widget.icon, size: 20, color: Colors.grey[600]),
+                filled: true,
+                fillColor: Colors.grey[50],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[400]!),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
             ),
           ),
@@ -144,14 +155,21 @@ class LocationSearchScreen extends StatefulWidget {
 }
 
 class _LocationSearchScreenState extends State<LocationSearchScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
+  late TextEditingController _searchController;
+  late FocusNode _searchFocusNode;
   bool isLoadingCurrentLocation = false;
 
   @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    _searchFocusNode = FocusNode();
+  }
+
+  @override
   void dispose() {
-    _searchController.dispose();
     _searchFocusNode.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -251,26 +269,26 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                     ),
                                     child: isLoadingCurrentLocation
                                         ? const SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Colors.white),
-                                            ),
-                                          )
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                        AlwaysStoppedAnimation<Color>(
+                                            Colors.white),
+                                      ),
+                                    )
                                         : const Icon(
-                                            Icons.gps_fixed,
-                                            color: Colors.white,
-                                            size: 24,
-                                          ),
+                                      Icons.gps_fixed,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           isLoadingCurrentLocation
@@ -287,7 +305,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                           'Auto-detect your current position',
                                           style: TextStyle(
                                             color:
-                                                Colors.white.withOpacity(0.9),
+                                            Colors.white.withOpacity(0.9),
                                             fontSize: 13,
                                           ),
                                         ),
@@ -362,7 +380,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                               focusNode: _searchFocusNode,
                               config: const GoogleApiConfig(
                                 apiKey:
-                                    'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
+                                'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
                                 countries: ['in'],
                                 fetchPlaceDetailsWithCoordinates: true,
                                 debounceTime: 400,
@@ -373,9 +391,9 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                     prediction.lng != null) {
                                   final position = Position(
                                     latitude:
-                                        double.parse(prediction.lat.toString()),
+                                    double.parse(prediction.lat.toString()),
                                     longitude:
-                                        double.parse(prediction.lng.toString()),
+                                    double.parse(prediction.lng.toString()),
                                     timestamp: DateTime.now(),
                                     accuracy: 0.0,
                                     altitude: 0.0,
@@ -389,11 +407,13 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                   final address = prediction.description ?? '';
                                   widget.onLocationSelected(position, address);
 
-                                  _showSuccessSnackBar(
-                                      context,
-                                      widget.isOrigin
-                                          ? '✅ Origin location selected'
-                                          : '✅ Destination location selected');
+                                  if (mounted) {
+                                    _showSuccessSnackBar(
+                                        context,
+                                        widget.isOrigin
+                                            ? '✅ Origin location selected'
+                                            : '✅ Destination location selected');
+                                  }
                                 }
                               },
                               onSuggestionClicked: (prediction) {
@@ -402,8 +422,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                 _searchController.text = description;
                                 _searchController.selection =
                                     TextSelection.fromPosition(
-                                  TextPosition(offset: description.length),
-                                );
+                                      TextPosition(offset: description.length),
+                                    );
                               },
                               decoration: InputDecoration(
                                 hintText: 'Search for a location...',
@@ -422,14 +442,16 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                 ),
                                 suffixIcon: _searchController.text.isNotEmpty
                                     ? IconButton(
-                                        icon: Icon(Icons.clear,
-                                            color: Colors.grey[600]),
-                                        onPressed: () {
-                                          setState(() {
-                                            _searchController.clear();
-                                          });
-                                        },
-                                      )
+                                  icon: Icon(Icons.clear,
+                                      color: Colors.grey[600]),
+                                  onPressed: () {
+                                    if (mounted) {
+                                      setState(() {
+                                        _searchController.clear();
+                                      });
+                                    }
+                                  },
+                                )
                                     : null,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
@@ -491,10 +513,6 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                               ],
                             ),
                           ),
-
-                          // Recent/Popular Locations Section (Optional)
-                          // const SizedBox(height: 24),
-                          // _buildPopularLocationsSection(),
                         ],
                       ),
                     ),
@@ -508,84 +526,9 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     );
   }
 
-  Widget _buildPopularLocationsSection() {
-    final popularLocations = [
-      {'name': 'Home', 'icon': Icons.home, 'color': Colors.orange},
-      {'name': 'Work', 'icon': Icons.work, 'color': Colors.blue},
-      {'name': 'Recent', 'icon': Icons.history, 'color': Colors.purple},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quick Access',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: popularLocations.map((location) {
-            return Container(
-              decoration: BoxDecoration(
-                color: (location['color'] as Color).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: (location['color'] as Color).withOpacity(0.3),
-                ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () {
-                    // Handle quick access tap
-                    _showSnackBar(
-                      context,
-                      '${location['name']} location - Feature coming soon!',
-                      Colors.blue,
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          location['icon'] as IconData,
-                          color: location['color'] as Color,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          location['name'] as String,
-                          style: TextStyle(
-                            color: location['color'] as Color,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
+
     setState(() {
       isLoadingCurrentLocation = true;
     });
@@ -603,23 +546,29 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
 
         widget.onLocationSelected(position, displayAddress);
 
-        _showSuccessSnackBar(
-          context,
-          '✅ Current location obtained successfully!',
-        );
+        if (mounted) {
+          _showSuccessSnackBar(
+            context,
+            '✅ Current location obtained successfully!',
+          );
+        }
       } else {
-        _showSnackBar(
-          context,
-          'Please enable location services and grant permission.',
-          Colors.orange,
-        );
+        if (mounted) {
+          _showSnackBar(
+            context,
+            'Please enable location services and grant permission.',
+            Colors.orange,
+          );
+        }
       }
     } catch (e) {
-      _showSnackBar(
-        context,
-        'Error getting location: $e',
-        Colors.red,
-      );
+      if (mounted) {
+        _showSnackBar(
+          context,
+          'Error getting location: $e',
+          Colors.red,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -630,6 +579,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   }
 
   void _showSuccessSnackBar(BuildContext context, String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -649,6 +599,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   }
 
   void _showSnackBar(BuildContext context, String message, Color color) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -657,8 +608,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               color == Colors.green
                   ? Icons.check_circle
                   : color == Colors.red
-                      ? Icons.error_outline
-                      : Icons.info_outline,
+                  ? Icons.error_outline
+                  : Icons.info_outline,
               color: Colors.white,
               size: 20,
             ),

@@ -65,11 +65,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final GlobalKey _imagePickerKey = GlobalKey();
   final GlobalKey _sendButtonKey = GlobalKey();
 
-  // Negotiation state (dummy data for now)
-  final double _basePrice = 1000.0; // Base price for negotiation
-  double _currentOfferedPrice = 1000.0; // Current offered price
-  final double _priceRangePercent = 0.10; // 10% range
-
   @override
   void initState() {
     super.initState();
@@ -129,23 +124,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await _loadMessages();
   }
 
-  // Initialize WebSocket connection
   Future<void> _initializeWebSocket() async {
     try {
       await _socketService.connect();
 
       if (_socketService.isConnected) {
-        // Join the chat room
         _socketService.joinRoom(widget.chatId);
 
-        // Listen for incoming messages via WebSocket
         _socketService.onReceiveMessage((data) {
           print('📬 Received message via WebSocket: $data');
-          // Refresh messages to show the new message
           _loadMessages(silent: true);
         });
 
-        // Listen for typing indicators
         _socketService.onUserTyping((data) {
           final typingUserId = data['userId'] as String?;
           print('🔍 ChatScreen - Typing event received: userId=$typingUserId, currentUserId=$_currentUserId, mounted=$mounted');
@@ -157,7 +147,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 _isOtherUserTyping = true;
               });
 
-              // Auto-hide typing indicator after 3 seconds
               _typingIndicatorTimer?.cancel();
               _typingIndicatorTimer = Timer(const Duration(seconds: 3), () {
                 if (mounted) {
@@ -167,11 +156,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   });
                 }
               });
-            } else {
-              print('⚠️ ChatScreen - Not mounted, skipping typing indicator');
             }
-          } else {
-            print('⚠️ ChatScreen - Ignoring typing: userId is null or is current user');
           }
         });
 
@@ -182,14 +167,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  // Send typing indicator with debounce
   void _onTextChanged() {
     if (_messageController.text.isEmpty) {
       _typingTimer?.cancel();
       return;
     }
 
-    // Debounce: Only send typing indicator every 2 seconds while typing
     _typingTimer?.cancel();
     _typingTimer = Timer(const Duration(milliseconds: 500), () {
       if (_socketService.isConnected) {
@@ -198,42 +181,36 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
   }
 
-  /// Check if tutorial should be shown for new users
   Future<void> _checkAndShowTutorial() async {
-    // Wait for the widget to be built and messages to load
     await Future.delayed(const Duration(seconds: 2));
-
     if (!mounted) return;
 
-    // Check if chat tutorial has been completed
     final isCompleted = await TutorialService.isChatTutorialCompleted();
-
     if (!isCompleted) {
       _showTutorial();
     }
   }
 
-  /// Show the chat screen tutorial
   void _showTutorial() {
     final targets = [
       TutorialHelper.createTarget(
         key: _messageInputKey,
         title: 'Type Your Message',
-        description: 'Type your message here to communicate with the other user. The other person will see a typing indicator when you are typing.',
+        description: 'Type your message here to communicate with the other user.',
         order: 1,
         align: ContentAlign.top,
       ),
       TutorialHelper.createTarget(
         key: _imagePickerKey,
         title: 'Send Images',
-        description: 'Tap this button to attach images from your gallery or camera. You can send photos of items, documents, or any visual information.',
+        description: 'Tap this button to attach images from your gallery or camera.',
         order: 2,
         align: ContentAlign.top,
       ),
       TutorialHelper.createFinalTarget(
         key: _sendButtonKey,
         title: 'Send Message',
-        description: 'Tap this button to send your message. You can also swipe on messages to reply to specific messages in the conversation.',
+        description: 'Tap this button to send your message.',
         order: 3,
         align: ContentAlign.top,
         onFinish: () async {
@@ -283,7 +260,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (result['success'] == true) {
         final apiMessages = result['messages'] as List;
         final convertedMessages = apiMessages.map((msg) {
-          // Convert messageId to int, handling both String and int types
           final messageIdRaw = msg['id'];
           final messageId = messageIdRaw is int ? messageIdRaw : int.tryParse(messageIdRaw.toString()) ?? 0;
 
@@ -295,18 +271,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           final replyMessage = msg['reply_message'];
           final replySenderName = msg['reply_sender_name'];
 
-          // ✅ CORRECTED: Handle seen status - 1 = read, 0 = not read
           final seenValue = msg['seen'];
           final seen = (seenValue == 1 || seenValue == true);
           final seenAt = msg['seen_at'];
 
           final hasMedia = mediaUrl != null && mediaUrl.isNotEmpty;
 
-          // Track unseen messages from other users (seen = 0 means not read)
           if (!seen && senderId != _currentUserId) {
             _unseenMessageIds.add(messageId);
           } else if (seen && _unseenMessageIds.contains(messageId)) {
-            // Remove from unseen if it was marked as seen
             _unseenMessageIds.remove(messageId);
           }
 
@@ -329,7 +302,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'mediaUrl': hasMedia ? mediaUrl : null,
             'replyToId': replyToId,
             'replyData': replyData,
-            'seen': seen, // true if seen = 1, false if seen = 0
+            'seen': seen,
             'seenAt': seenAt != null ? DateTime.parse(seenAt) : null,
           };
         }).toList();
@@ -456,294 +429,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       final chatIdInt = int.tryParse(widget.chatId);
       if (chatIdInt == null || _currentUserId == null) return;
-
-      // Uncomment when backend API is ready
-      // final result = await ChatService.markMessagesAsSeen(
-      //   chatId: chatIdInt,
-      //   messageIds: messageIds,
-      // );
-      //
-      // if (result['success'] == true) {
-      //   setState(() {
-      //     _unseenMessageIds.removeAll(messageIds);
-      //     // Update seen status in local messages
-      //     for (var msg in messages) {
-      //       if (messageIds.contains(msg['messageId'])) {
-      //         msg['seen'] = true; // Mark as read (1)
-      //         msg['seenAt'] = DateTime.now();
-      //       }
-      //     }
-      //   });
-      //   print('✅ Marked ${messageIds.length} messages as seen');
-      // }
     } catch (e) {
       print('❌ Error marking messages as seen: $e');
     }
-  }
-
-  // Show negotiation dialog with plus/minus buttons
-  void _showNegotiationDialog() {
-    final minPrice = _basePrice * (1 - _priceRangePercent);
-    final maxPrice = _basePrice * (1 + _priceRangePercent);
-    double tempOfferedPrice = _currentOfferedPrice;
-    final priceStep = _basePrice * 0.01; // 1% step for each button press
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.monetization_on,
-                            color: Colors.green.shade600,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        const Expanded(
-                          child: Text(
-                            'Negotiate Price',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Offered Price Card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.green.shade400, Colors.green.shade600],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Your Offered Price',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Price with Plus/Minus buttons
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Minus Button
-                              Material(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                                child: InkWell(
-                                  onTap: tempOfferedPrice > minPrice
-                                      ? () {
-                                          setDialogState(() {
-                                            tempOfferedPrice = (tempOfferedPrice - priceStep).clamp(minPrice, maxPrice);
-                                          });
-                                        }
-                                      : null,
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(14),
-                                    child: Icon(
-                                      Icons.remove,
-                                      color: tempOfferedPrice > minPrice
-                                          ? Colors.white
-                                          : Colors.white.withOpacity(0.3),
-                                      size: 15,
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              // Price Display
-                              Flexible(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '₹${tempOfferedPrice.toStringAsFixed(0)}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // Plus Button
-                              Material(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                                child: InkWell(
-                                  onTap: tempOfferedPrice < maxPrice
-                                      ? () {
-                                          setDialogState(() {
-                                            tempOfferedPrice = (tempOfferedPrice + priceStep).clamp(minPrice, maxPrice);
-                                          });
-                                        }
-                                      : null,
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(14),
-                                    child: Icon(
-                                      Icons.add,
-                                      color: tempOfferedPrice < maxPrice
-                                          ? Colors.white
-                                          : Colors.white.withOpacity(0.3),
-                                      size: 15,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Price Range Info
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Min: ₹${minPrice.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          '±10%',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Max: ₹${maxPrice.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Action Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: BorderSide(color: Colors.grey.shade300),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                _currentOfferedPrice = tempOfferedPrice;
-                              });
-                              Navigator.pop(context);
-                              _showSnackBar(
-                                'Price offer sent: ₹${tempOfferedPrice.toStringAsFixed(0)}',
-                                Colors.green,
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade600,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Send Offer',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   Future<void> _pickImages() async {
@@ -871,15 +559,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     if (_errorMessage != null && messages.isEmpty) {
       return Scaffold(
-        backgroundColor: Colors.grey.shade50,
-        appBar: _buildModernAppBar(),
+        backgroundColor: const Color(0xFFF5F5F5),
+        appBar: _buildAppBar(),
         body: _buildErrorState(),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: _buildModernAppBar(),
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: _buildAppBar(),
       body: Column(
         children: [
           Expanded(child: _buildMessagesList()),
@@ -891,129 +579,53 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  PreferredSizeWidget _buildModernAppBar() {
+  PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      elevation: 0,
+      elevation: 0.5,
       backgroundColor: Colors.white,
       systemOverlayStyle: SystemUiOverlayStyle.dark,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios, color: Colors.black87, size: 20),
+        icon: const Icon(Icons.arrow_back, color: Colors.black87),
         onPressed: () => Navigator.pop(context),
       ),
       title: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [Colors.blue.shade400, Colors.blue.shade600],
-              ),
-            ),
-            child: _buildAvatarFallback(),
-          ),
+          _buildProfileAvatar(otherUserData['name'] ?? 'U', false, 40),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  otherUserData['name'] ?? 'Unknown User',
-                  style: const TextStyle(
-                    color: Colors.black87,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        'Order #${widget.orderId}',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.withOpacity(0.5),
-                            blurRadius: 4,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Live',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            child: Text(
+              otherUserData['name'] ?? 'Unknown User',
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
       ),
       actions: [
-        NotificationBellIcon(
-          onNotificationHandled: () {
-            // Refresh messages after handling a notification
-            _loadMessages(silent: true);
+        IconButton(
+          icon: const Icon(Icons.phone, color: Colors.black87),
+          onPressed: () {},
+        ),
+        PopupMenuButton(
+          icon: const Icon(Icons.more_vert, color: Colors.black87),
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'refresh',
+              child: Text('Refresh'),
+            ),
+          ],
+          onSelected: (value) {
+            if (value == 'refresh') {
+              _loadMessages(silent: false);
+            }
           },
         ),
-        if (_isRefreshing)
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation(Colors.grey.shade600),
-              ),
-            ),
-          )
-        else
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: () => _loadMessages(silent: false),
-            tooltip: 'Refresh',
-          ),
       ],
-    );
-  }
-
-  Widget _buildAvatarFallback() {
-    final name = otherUserData['name'] ?? 'U';
-    return Center(
-      child: Text(
-        name[0].toUpperCase(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
     );
   }
 
@@ -1027,48 +639,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       child: ListView.builder(
         controller: _scrollController,
         reverse: true,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         itemCount: messages.length + (_isOtherUserTyping ? 1 : 0),
         itemBuilder: (context, index) {
-          // Show typing indicator as first item (bottom of reversed list)
           if (index == 0 && _isOtherUserTyping) {
-            print('🎨 Building typing indicator widget (index: $index, _isOtherUserTyping: $_isOtherUserTyping)');
             return _buildTypingIndicator();
           }
 
-          // Adjust index if typing indicator is shown
           final messageIndex = _isOtherUserTyping ? index - 1 : index;
           final message = messages[messages.length - 1 - messageIndex];
           final isMe = message['senderId'] == _currentUserId;
 
-          return Dismissible(
-            key: Key('${message['messageId']}_$index'),
-            direction: DismissDirection.horizontal,
-            confirmDismiss: (direction) async {
-              _setReplyMessage(message['messageId'].toString(), message);
-              return false;
-            },
-            background: Container(
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.only(left: 20),
-              child: Icon(
-                Icons.reply,
-                color: Colors.blue.shade600,
-                size: 28,
-              ),
-            ),
-            secondaryBackground: Container(
-              alignment: Alignment.centerRight,
-              padding: const EdgeInsets.only(right: 20),
-              child: Icon(
-                Icons.reply,
-                color: Colors.blue.shade600,
-                size: 28,
-              ),
-            ),
-            child: ModernMessageBubble(
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: EnhancedMessageBubble(
               message: message,
-              messageId: message['messageId'].toString(),
               isMe: isMe,
               currentUserId: _currentUserId,
               onReply: (messageData) => _setReplyMessage(message['messageId'].toString(), messageData),
@@ -1109,14 +694,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               color: Colors.grey.shade700,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Send a message to get started',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-            ),
-          ),
         ],
       ),
     );
@@ -1143,26 +720,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 color: Colors.grey.shade700,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage ?? 'Unknown error occurred',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
-              textAlign: TextAlign.center,
-            ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () => _loadMessages(silent: false),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
             ),
           ],
         ),
@@ -1189,7 +751,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(
-            color: isReplyToMe ? Colors.teal.shade400 : Colors.blue.shade600,
+            color: Colors.blue.shade600,
             width: 3,
           ),
         ),
@@ -1206,7 +768,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   'Replying to $senderName',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isReplyToMe ? Colors.teal.shade700 : Colors.blue.shade700,
+                    color: Colors.blue.shade700,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1262,7 +824,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     onTap: () => _removeImage(index),
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         color: Colors.black54,
                         shape: BoxShape.circle,
                       ),
@@ -1284,7 +846,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Widget _buildMessageInput() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -1297,68 +859,215 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       child: SafeArea(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            IconButton(
-              key: _imagePickerKey,
-              icon: Icon(Icons.image, color: Colors.blue.shade600),
-              onPressed: _showImagePickerOptions,
-              tooltip: 'Add Images',
-            ),
-            // IconButton(
-            //   icon: Icon(Icons.monetization_on, color: Colors.green.shade600),
-            //   onPressed: _showNegotiationDialog,
-            //   tooltip: 'Negotiate Price',
-            // ),
             Expanded(
               child: Container(
                 key: _messageInputKey,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(24),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(color: Colors.grey.shade300),
                 ),
-                child: TextField(
-                  controller: _messageController,
-                  maxLines: null,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    hintText: replyingToMessage != null
-                        ? 'Reply to message...'
-                        : 'Type a message...',
-                    hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        maxLines: null,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          hintText: 'I.....',
+                          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 15),
+                      ),
                     ),
-                  ),
-                  style: const TextStyle(fontSize: 16),
+                    IconButton(
+                      key: _imagePickerKey,
+                      icon: Icon(Icons.attach_file, color: Colors.grey.shade600, size: 22),
+                      onPressed: _showImagePickerOptions,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                  ],
                 ),
               ),
             ),
             const SizedBox(width: 8),
             Container(
               key: _sendButtonKey,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: _isUploadingImages
-                    ? Colors.grey
-                    : Colors.blue.shade600,
+                gradient: LinearGradient(
+                  colors: _isUploadingImages
+                      ? [Colors.grey, Colors.grey]
+                      : [const Color(0xFF6B4FE8), const Color(0xFF8B6FFF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: _isUploadingImages
-                    ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6B4FE8).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                )
-                    : const Icon(Icons.send, color: Colors.white, size: 20),
-                onPressed: _isUploadingImages ? null : _sendMessage,
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _isUploadingImages ? null : _sendMessage,
+                  borderRadius: BorderRadius.circular(24),
+                  child: Center(
+                    child: _isUploadingImages
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                        : const Text(
+                      'S',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          _buildProfileAvatar(otherUserData['name'] ?? 'U', false, 32),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Typing',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 24,
+                  height: 10,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildDot(0),
+                      _buildDot(150),
+                      _buildDot(300),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDot(int delay) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      builder: (context, value, child) {
+        return FutureBuilder(
+          future: Future.delayed(Duration(milliseconds: delay)),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  shape: BoxShape.circle,
+                ),
+              );
+            }
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: value > 0.5 ? Colors.grey.shade600 : Colors.grey.shade400,
+                shape: BoxShape.circle,
+              ),
+            );
+          },
+        );
+      },
+      onEnd: () {
+        if (mounted && _isOtherUserTyping) {
+          setState(() {});
+        }
+      },
+    );
+  }
+
+  Widget _buildProfileAvatar(String name, bool isMe, double size) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: isMe
+              ? [const Color(0xFF6B4FE8), const Color(0xFF8B6FFF)]
+              : [Colors.grey.shade400, Colors.grey.shade500],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: size * 0.4,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
@@ -1550,90 +1259,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  // Build typing indicator widget
-  Widget _buildTypingIndicator() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${otherUserData['name'] ?? 'User'} is typing',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 20,
-                  height: 10,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildDot(0),
-                      _buildDot(200),
-                      _buildDot(400),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build animated dot for typing indicator
-  Widget _buildDot(int delay) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 600),
-      builder: (context, value, child) {
-        return FutureBuilder(
-          future: Future.delayed(Duration(milliseconds: delay)),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return Container(
-                width: 4,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  shape: BoxShape.circle,
-                ),
-              );
-            }
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 4,
-              height: 4,
-              decoration: BoxDecoration(
-                color: value > 0.5 ? Colors.grey.shade600 : Colors.grey.shade400,
-                shape: BoxShape.circle,
-              ),
-            );
-          },
-        );
-      },
-      onEnd: () {
-        // Restart animation
-        if (mounted && _isOtherUserTyping) {
-          setState(() {});
-        }
-      },
-    );
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -1648,10 +1273,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-// ✅ ENHANCED: Modern Message Bubble Widget with Proper Seen Status (1 = read, 0 = not read)
-class ModernMessageBubble extends StatelessWidget {
+// Enhanced Message Bubble matching the design
+class EnhancedMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
-  final String messageId;
   final bool isMe;
   final String? currentUserId;
   final Function(Map<String, dynamic>) onReply;
@@ -1659,10 +1283,9 @@ class ModernMessageBubble extends StatelessWidget {
   final Function(String) onLaunchUrl;
   final Function(String) onDownloadImage;
 
-  const ModernMessageBubble({
+  const EnhancedMessageBubble({
     Key? key,
     required this.message,
-    required this.messageId,
     required this.isMe,
     required this.currentUserId,
     required this.onReply,
@@ -1675,105 +1298,90 @@ class ModernMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final messageText = message['message'] ?? '';
     final timestamp = message['timestamp'] as DateTime?;
-    final timeString = timestamp != null
-        ? DateFormat('hh:mm a').format(timestamp)
-        : '';
     final messageType = message['type'] ?? 'text';
     final mediaUrl = message['mediaUrl'];
     final hasReply = message['replyData'] != null;
-
-    // ✅ Get seen status: true if seen = 1, false if seen = 0
     final seen = message['seen'] == true;
 
     return GestureDetector(
       onLongPress: () => _showMessageOptions(context),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (!isMe) _buildAvatar(),
-            if (!isMe) const SizedBox(width: 8),
-            Flexible(
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.75,
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isMe) ...[
+            _buildAvatar(),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.7,
+              ),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isMe ? Colors.white : Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(isMe ? 16 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 16),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: isMe
-                      ? LinearGradient(
-                    colors: [Colors.blueGrey.shade600, Colors.blueGrey.shade500],
-                  )
-                      : null,
-                  color: isMe ? null : Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(16),
-                    topRight: const Radius.circular(16),
-                    bottomLeft: Radius.circular(isMe ? 16 : 4),
-                    bottomRight: Radius.circular(isMe ? 4 : 16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!isMe)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          message['senderName'] ?? 'Unknown',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue.shade700,
-                          ),
-                        ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hasReply) _buildReplySection(),
+                  if (messageType == 'image' && mediaUrl != null)
+                    _buildImageMessage(mediaUrl),
+                  if (messageText.isNotEmpty)
+                    SelectableText(
+                      messageText,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.4,
+                        color: Colors.grey.shade800,
                       ),
-                    if (hasReply) _buildWhatsAppStyleReplySection(),
-                    if (messageType == 'image' && mediaUrl != null)
-                      _buildImageMessage(mediaUrl),
-                    if (messageText.isNotEmpty) _buildTextMessage(messageText),
+                    ),
+                  if (timestamp != null) ...[
                     const SizedBox(height: 4),
                     Row(
                       mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Text(
-                          timeString,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isMe ? Colors.white70 : Colors.grey.shade500,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        // ✅ Show seen indicator only for messages sent by current user
-                        // Single checkmark = sent (seen = 0), Double checkmark = read (seen = 1)
                         if (isMe) ...[
-                          const SizedBox(width: 4),
                           Icon(
                             seen ? Icons.done_all : Icons.done,
-                            size: 16,
-                            color: seen ? Colors.lightBlueAccent : Colors.white70,
+                            size: 14,
+                            color: seen ? Colors.blue : Colors.grey.shade400,
                           ),
+                          const SizedBox(width: 4),
                         ],
+                        Text(
+                          DateFormat('hh:mm a').format(timestamp),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
                       ],
                     ),
                   ],
-                ),
+                ],
               ),
             ),
-            if (isMe) const SizedBox(width: 8),
-            if (isMe) _buildAvatar(),
+          ),
+          if (isMe) ...[
+            const SizedBox(width: 8),
+            _buildAvatar(),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -1781,16 +1389,17 @@ class ModernMessageBubble extends StatelessWidget {
   Widget _buildAvatar() {
     final name = message['senderName'] ?? 'U';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
-
     return Container(
-      width: 32,
-      height: 32,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
           colors: isMe
-              ? [Colors.blue.shade400, Colors.blue.shade600]
-              : [Colors.grey.shade400, Colors.grey.shade600],
+              ? [const Color(0xFF6B4FE8), const Color(0xFF8B6FFF)]
+              : [Colors.grey.shade400, Colors.grey.shade500],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
       ),
       child: Center(
@@ -1798,7 +1407,7 @@ class ModernMessageBubble extends StatelessWidget {
           initial,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -1806,69 +1415,48 @@ class ModernMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildWhatsAppStyleReplySection() {
+  Widget _buildReplySection() {
     final replyData = message['replyData'];
     if (replyData == null) return const SizedBox.shrink();
 
     final replyText = replyData['message'] ?? '';
     final replySenderName = replyData['sender_name'] ?? 'Unknown';
 
-    final currentUserName = message['senderName'];
-    final isReplyFromMe = replySenderName == currentUserName;
-    final displayName = isReplyFromMe ? 'You' : replySenderName;
-
-    return GestureDetector(
-      onTap: () {
-        print('📌 Tapped on reply - scroll to original message');
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isMe
-              ? Colors.black.withOpacity(0.15)
-              : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(8),
-          border: Border(
-            left: BorderSide(
-              color: isMe
-                  ? Colors.white.withOpacity(0.8)
-                  : (isReplyFromMe
-                  ? Colors.teal.shade400
-                  : Colors.grey.shade400),
-              width: 3,
-            ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(
+          left: BorderSide(
+            color: Colors.grey.shade400,
+            width: 3,
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              displayName,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: isMe
-                    ? Colors.white.withOpacity(0.95)
-                    : (isReplyFromMe
-                    ? Colors.teal.shade600
-                    : Colors.grey.shade600),
-              ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            replySenderName,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade600,
             ),
-            const SizedBox(height: 4),
-            Text(
-              replyText.isNotEmpty ? replyText : '📷 Photo',
-              style: TextStyle(
-                fontSize: 13,
-                color: isMe
-                    ? Colors.white.withOpacity(0.8)
-                    : Colors.grey.shade800,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            replyText.isNotEmpty ? replyText : '📷 Photo',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade800,
             ),
-          ],
-        ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
@@ -1894,14 +1482,7 @@ class ModernMessageBubble extends StatelessWidget {
                 height: 200,
                 width: 200,
                 color: Colors.grey[300],
-                child: Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                ),
+                child: const Center(child: CircularProgressIndicator()),
               );
             },
             errorBuilder: (context, error, stackTrace) {
@@ -1916,17 +1497,6 @@ class ModernMessageBubble extends StatelessWidget {
             },
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildTextMessage(String messageText) {
-    return SelectableText(
-      messageText,
-      style: TextStyle(
-        fontSize: 15,
-        height: 1.4,
-        color: isMe ? Colors.white : Colors.black87,
       ),
     );
   }
@@ -1979,19 +1549,6 @@ class ModernMessageBubble extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   onDownloadImage(mediaUrl);
-                },
-              ),
-            if (messageType == 'image' && mediaUrl != null)
-              ListTile(
-                leading: const Icon(Icons.open_in_new, color: Colors.orange),
-                title: const Text('Open Image'),
-                onTap: () {
-                  Navigator.pop(context);
-                  String fullUrl = mediaUrl;
-                  if (!mediaUrl.startsWith('http')) {
-                    fullUrl = '${ApiConstants.imagebaseUrl}$mediaUrl';
-                  }
-                  onLaunchUrl(fullUrl);
                 },
               ),
           ],

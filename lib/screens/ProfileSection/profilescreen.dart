@@ -724,7 +724,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         _buildActionButton(
                           'Upload your\nprofile picture',
                           Icons.person_outline,
-                              () {
+                              () async {
                             if (profileExists && userProfile != null && userId != null) {
                               Navigator.push(
                                 context,
@@ -740,10 +740,15 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                                 }
                               });
                             } else {
+                              // FIXED: Get phone number before navigating
+                              final phone = await AuthService.getPhone();
+                              if (!mounted) return;
+
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => SignupScreen(
+                                    phone ?? '', // Positional parameter - phone number
                                     isKycRequired: false,
                                     userId: userId,
                                   ),
@@ -885,14 +890,15 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
 
                   // Logout Button
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: OutlinedButton.icon(
                       onPressed: () => _showLogoutDialog(context),
-                      icon: const Icon(Icons.logout),
-                      label: const Text('Logout'),
+                      icon: const Icon(Icons.logout,color: Colors.white,),
+                      label: const Text('Logout',style: TextStyle(color: Colors.white),),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 14,horizontal: 20),
+                        backgroundColor: Colors.red,
                         side: BorderSide(color: Colors.grey[400]!),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),

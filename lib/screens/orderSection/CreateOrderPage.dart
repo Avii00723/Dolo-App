@@ -458,6 +458,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -508,7 +509,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-
                   ],
                 ),
               ],
@@ -529,42 +529,45 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           ),
 
           // Bottom Button
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isCreatingOrder
-                    ? null
-                    : (_currentStep == _totalSteps - 1 ? _createOrder : _nextStep),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[850],
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                ),
-                child: _isCreatingOrder
-                    ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                )
-                    : Text(
-                  _currentStep == _totalSteps - 1 ? 'POST' : 'NEXT',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+          SafeArea(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              margin: const EdgeInsets.only(bottom: 30),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isCreatingOrder
+                      ? null
+                      : (_currentStep == _totalSteps - 1 ? _createOrder : _nextStep),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[850],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                  child: _isCreatingOrder
+                      ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                      : Text(
+                    _currentStep == _totalSteps - 1 ? 'POST' : 'NEXT',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -594,18 +597,39 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInputField(
+          // UPDATED: Use EnhancedLocationInputField for Pickup
+          _buildLocationInputWrapper(
             label: 'Pickup City',
-            controller: pickupCityController,
-            hint: 'Eg. Mumbai',
-            icon: Icons.trip_origin,
+            child: EnhancedLocationInputField(
+              controller: pickupCityController,
+              label: '',
+              hint: 'Eg. Mumbai',
+              icon: Icons.trip_origin,
+              isOrigin: true,
+              onLocationSelected: (position) {
+                setState(() {
+                  originPosition = position;
+                });
+              },
+            ),
           ),
           const SizedBox(height: 20),
-          _buildInputField(
+
+          // UPDATED: Use EnhancedLocationInputField for Drop
+          _buildLocationInputWrapper(
             label: 'Drop City',
-            controller: dropCityController,
-            hint: 'Eg. Delhi',
-            icon: Icons.place,
+            child: EnhancedLocationInputField(
+              controller: dropCityController,
+              label: '',
+              hint: 'Eg. Delhi',
+              icon: Icons.place,
+              isOrigin: false,
+              onLocationSelected: (position) {
+                setState(() {
+                  destinationPosition = position;
+                });
+              },
+            ),
           ),
           const SizedBox(height: 20),
           _buildInputField(
@@ -651,6 +675,21 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           ),
         ],
       ),
+    );
+  }
+
+  // Helper widget to wrap location input and maintain consistent label styling
+  Widget _buildLocationInputWrapper({
+    required String label,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 8),
+        child,
+      ],
     );
   }
 

@@ -182,20 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     '🇮🇳',
                                     style: TextStyle(fontSize: 20),
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    selectedCountryCode,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    Icons.keyboard_arrow_down,
-                                    color: Colors.grey[600],
-                                    size: 20,
-                                  ),
+
                                 ],
                               ),
                             ),
