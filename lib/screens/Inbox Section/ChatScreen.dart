@@ -19,6 +19,8 @@ import '../../widgets/tutorial_helper.dart';
 import '../../widgets/NotificationBellIcon.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
+import '../UserProfileScreen.dart';
+
 class ChatScreen extends StatefulWidget {
   final String chatId;
   final String orderId;
@@ -320,6 +322,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
             if (firstOtherMessage.isNotEmpty) {
               otherUserData = {
+                'id': firstOtherMessage['senderId'],
                 'name': firstOtherMessage['senderName'] ?? widget.otherUserName ?? 'Unknown User',
                 'profileUrl': '',
               };
@@ -548,6 +551,36 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  // NEW METHOD: Navigate to user profile
+  void _navigateToUserProfile() {
+    String? otherUserId = otherUserData['id']?.toString();
+
+    // If we don't have the ID in otherUserData, try to get it from messages
+    if (otherUserId == null) {
+      for (var message in messages) {
+        if (message['senderId'] != _currentUserId) {
+          otherUserId = message['senderId'].toString();
+          break;
+        }
+      }
+    }
+
+    if (otherUserId != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserProfileScreen(
+            userId: otherUserId!,
+            userName: otherUserData['name'] ?? 'Unknown User',
+            profileUrl: otherUserData['profileUrl'],
+          ),
+        ),
+      );
+    } else {
+      _showSnackBar('Unable to load user profile', Colors.red);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -579,6 +612,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  // UPDATED: Make the app bar title tappable
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       elevation: 0.5,
@@ -588,23 +622,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         icon: const Icon(Icons.arrow_back, color: Colors.black87),
         onPressed: () => Navigator.pop(context),
       ),
-      title: Row(
-        children: [
-          _buildProfileAvatar(otherUserData['name'] ?? 'U', false, 40),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              otherUserData['name'] ?? 'Unknown User',
-              style: const TextStyle(
-                color: Colors.black87,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+      title: GestureDetector(
+        onTap: () => _navigateToUserProfile(),
+        child: Row(
+          children: [
+            _buildProfileAvatar(otherUserData['name'] ?? 'U', false, 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                otherUserData['name'] ?? 'Unknown User',
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+            Icon(
+              Icons.chevron_right,
+              color: Colors.grey.shade400,
+              size: 20,
+            ),
+          ],
+        ),
       ),
       actions: [
         IconButton(
@@ -615,13 +657,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           icon: const Icon(Icons.more_vert, color: Colors.black87),
           itemBuilder: (context) => [
             const PopupMenuItem(
+              value: 'profile',
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline, size: 20),
+                  SizedBox(width: 12),
+                  Text('View Profile'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
               value: 'refresh',
-              child: Text('Refresh'),
+              child: Row(
+                children: [
+                  Icon(Icons.refresh, size: 20),
+                  SizedBox(width: 12),
+                  Text('Refresh'),
+                ],
+              ),
             ),
           ],
           onSelected: (value) {
             if (value == 'refresh') {
               _loadMessages(silent: false);
+            } else if (value == 'profile') {
+              _navigateToUserProfile();
             }
           },
         ),
@@ -660,6 +720,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               onCopy: _copyMessage,
               onLaunchUrl: _launchUrl,
               onDownloadImage: _downloadImage,
+              onAvatarTap: isMe ? null : _navigateToUserProfile, // NEW: Add avatar tap callback
             ),
           );
         },
@@ -879,7 +940,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         maxLines: null,
                         textCapitalization: TextCapitalization.sentences,
                         decoration: InputDecoration(
-                          hintText: 'I.....',
+                          hintText: 'Type a message...',
                           hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
@@ -938,13 +999,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         valueColor: AlwaysStoppedAnimation(Colors.white),
                       ),
                     )
-                        : const Text(
-                      'S',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                        : const Icon(
+                      Icons.send,
+                      color: Colors.white,
+                      size: 20,
                     ),
                   ),
                 ),
@@ -1273,7 +1331,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-// Enhanced Message Bubble matching the design
+// Enhanced Message Bubble with avatar tap functionality
 class EnhancedMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final bool isMe;
@@ -1282,6 +1340,7 @@ class EnhancedMessageBubble extends StatelessWidget {
   final Function(String) onCopy;
   final Function(String) onLaunchUrl;
   final Function(String) onDownloadImage;
+  final VoidCallback? onAvatarTap; // NEW: Added callback for avatar tap
 
   const EnhancedMessageBubble({
     Key? key,
@@ -1292,6 +1351,7 @@ class EnhancedMessageBubble extends StatelessWidget {
     required this.onCopy,
     required this.onLaunchUrl,
     required this.onDownloadImage,
+    this.onAvatarTap, // NEW: Optional callback
   }) : super(key: key);
 
   @override
@@ -1386,10 +1446,12 @@ class EnhancedMessageBubble extends StatelessWidget {
     );
   }
 
+  // UPDATED: Make avatar tappable
   Widget _buildAvatar() {
     final name = message['senderName'] ?? 'U';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
-    return Container(
+
+    Widget avatarWidget = Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
@@ -1413,6 +1475,16 @@ class EnhancedMessageBubble extends StatelessWidget {
         ),
       ),
     );
+
+    // If not own message and callback is provided, make it tappable
+    if (!isMe && onAvatarTap != null) {
+      return GestureDetector(
+        onTap: onAvatarTap,
+        child: avatarWidget,
+      );
+    }
+
+    return avatarWidget;
   }
 
   Widget _buildReplySection() {
