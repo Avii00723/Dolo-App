@@ -22,7 +22,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin {
   final ProfileService _profileService = ProfileService();
   UserProfile? userProfile;
-  TrustScore? trustScoreData; // UPDATED TYPE
+  TrustScore? trustScoreData;
   String? userId;
   bool isLoading = true;
   bool profileExists = false;
@@ -31,6 +31,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   bool darkModeEnabled = false;
   late AnimationController _animationController;
   late Animation<double> _animation;
+
+  // Stats data (you can fetch these from your API)
+  int deliveredCount = 15;
+  int createdCount = 35;
+  double ratingsScore = 3.5;
 
   @override
   void initState() {
@@ -72,7 +77,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       ]);
 
       final profile = results[0] as UserProfile?;
-      final trustScore = results[1] as TrustScore?; // UPDATED TYPE
+      final trustScore = results[1] as TrustScore?;
 
       if (profile != null) {
         setState(() {
@@ -189,10 +194,28 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     return _getKycStatus() == 'approved';
   }
 
-  // UPDATED: Get trust score display
   String _getTrustScoreDisplay() {
     if (trustScoreData == null) return '0/7';
     return '${trustScoreData!.trustScore}/${trustScoreData!.maxScore}';
+  }
+
+  // Get profile completion percentage
+  int _getCompletionPercentage() {
+    if (trustScoreData == null) return 0;
+    return ((trustScoreData!.trustScore / trustScoreData!.maxScore) * 100).round();
+  }
+
+  // Check individual completion steps
+  bool _isProfilePictureUploaded() {
+    return trustScoreData?.breakdown?['profile_picture'] == 1;
+  }
+
+  bool _isEmailVerified() {
+    return trustScoreData?.breakdown?['email'] == 1;
+  }
+
+  bool _isKycCompleted() {
+    return _isKycVerified();
   }
 
   void _showLogoutDialog(BuildContext context) {
@@ -364,33 +387,108 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildActionButton(String label, IconData icon, VoidCallback onTap) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
+  // NEW: Build completion step card
+  Widget _buildCompletionStepCard({
+    required String title,
+    required String buttonText,
+    required IconData icon,
+    required bool isCompleted,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      width: 150,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(
+          color: isCompleted ? Colors.green.shade300 : Colors.grey.shade300,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-          child: Column(
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Icon with completion checkmark
+          Stack(
+            alignment: Alignment.center,
             children: [
-              Icon(icon, color: Colors.grey[700], size: 24),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isCompleted ? Colors.green.shade50 : Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 32,
+                  color: isCompleted ? Colors.green : Colors.grey.shade700,
+                ),
+              ),
+              if (isCompleted)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Title
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: isCompleted ? null : onTap,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isCompleted ? Colors.green : Colors.grey.shade300,
+                foregroundColor: isCompleted ? Colors.white : Colors.black87,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                isCompleted ? 'Completed' : buttonText,
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -622,16 +720,16 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                             )
                           else if (!_isProfileComplete())
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                shape: BoxShape.circle,
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
                                 'Unverified',
                                 style: TextStyle(
-                                  fontSize: 8,
-                                  color: Colors.grey[600],
+                                  fontSize: 10,
+                                  color: Colors.grey[700],
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -660,24 +758,37 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                   ),
                   const SizedBox(height: 24),
 
-                  // Stats Row - UPDATED with trust score
+                  // Stats Row - with Delivered widget
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 40),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildStatBox('Trust Score', _getTrustScoreDisplay(), Icons.verified_user_outlined),
-                        _buildStatBox('Ratings', '5.0 ★', Icons.star_outline),
-                        _buildStatBox('Created', '35', Icons.add_box_outlined),
+                        _buildStatBox('Delivered', '$deliveredCount', Icons.local_shipping_outlined),
+                        _buildStatBox('Ratings', '$ratingsScore/4', Icons.star_outline),
+                        _buildStatBox('Trust Score', _getTrustScoreDisplay(), Icons.shield_outlined),
+                        _buildStatBox('Created', '$createdCount', Icons.add_box_outlined),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Complete Profile Progress (if incomplete)
-                  if (!_isProfileComplete())
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  // Profile Completion Section
+                  if (!_isProfileComplete() || _getCompletionPercentage() < 100)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -687,106 +798,106 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                               const Text(
                                 'Complete your profile',
                                 style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                               Text(
-                                '(${trustScoreData?.trustScore ?? 0}/${trustScoreData?.maxScore ?? 7})',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
+                                '${_getCompletionPercentage()}%',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF001127),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
+
+                          // Progress bar
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
                             child: LinearProgressIndicator(
-                              value: trustScoreData != null
-                                  ? trustScoreData!.trustScore / trustScoreData!.maxScore
-                                  : 0.0,
+                              value: _getCompletionPercentage() / 100,
                               backgroundColor: Colors.grey[300],
                               valueColor: const AlwaysStoppedAnimation(Color(0xFF001127)),
                               minHeight: 8,
                             ),
                           ),
+                          const SizedBox(height: 20),
+
+                          // Completion Steps
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _buildCompletionStepCard(
+                                  title: 'Upload your\nprofile picture',
+                                  buttonText: 'Upload',
+                                  icon: Icons.person_outline,
+                                  isCompleted: _isProfilePictureUploaded(),
+                                  onTap: () async {
+                                    if (profileExists && userProfile != null && userId != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ProfileDetailsPage(
+                                            userProfile: userProfile!,
+                                            userId: userId!,
+                                          ),
+                                        ),
+                                      ).then((result) {
+                                        if (result == true) {
+                                          _loadUserData();
+                                        }
+                                      });
+                                    } else {
+                                      final phone = await AuthService.getPhone();
+                                      if (!mounted) return;
+
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => SignupScreen(
+                                            phone ?? '',
+                                            isKycRequired: false,
+                                            userId: userId,
+                                          ),
+                                        ),
+                                      ).then((result) {
+                                        if (result == true) {
+                                          _loadUserData();
+                                        }
+                                      });
+                                    }
+                                  },
+                                ),
+                                const SizedBox(width: 12),
+                                _buildCompletionStepCard(
+                                  title: 'Enter Valid\nEmail',
+                                  buttonText: 'Continue',
+                                  icon: Icons.email_outlined,
+                                  isCompleted: _isEmailVerified(),
+                                  onTap: () {
+                                    _showSuccessSnackBar('Email verification coming soon!');
+                                  },
+                                ),
+                                const SizedBox(width: 12),
+                                _buildCompletionStepCard(
+                                  title: 'Verify KYC',
+                                  buttonText: 'Continue',
+                                  icon: Icons.verified_user_outlined,
+                                  isCompleted: _isKycCompleted(),
+                                  onTap: () {
+                                    _showSuccessSnackBar('KYC verification coming soon!');
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-
-                  // Action Buttons
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    child: Row(
-                      children: [
-                        _buildActionButton(
-                          'Upload your\nprofile picture',
-                          Icons.person_outline,
-                              () async {
-                            if (profileExists && userProfile != null && userId != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ProfileDetailsPage(
-                                    userProfile: userProfile!,
-                                    userId: userId!,
-                                  ),
-                                ),
-                              ).then((result) {
-                                if (result == true) {
-                                  _loadUserData();
-                                }
-                              });
-                            } else {
-                              // FIXED: Get phone number before navigating
-                              final phone = await AuthService.getPhone();
-                              if (!mounted) return;
-
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => SignupScreen(
-                                    phone ?? '', // Positional parameter - phone number
-                                    isKycRequired: false,
-                                    userId: userId,
-                                  ),
-                                ),
-                              ).then((result) {
-                                if (result == true) {
-                                  _loadUserData();
-                                }
-                              });
-                            }
-                          },
-                        ),
-                        const SizedBox(width: 12),
-                        _buildActionButton(
-                          'Verify\nEmail',
-                          Icons.email_outlined,
-                              () {
-                            // Safe null/type checking for breakdown map
-                            final emailVerified = trustScoreData?.breakdown != null &&
-                                trustScoreData!.breakdown['email'] == 1;
-
-                            if (emailVerified) {
-                              _showSuccessSnackBar('Email already verified!');
-                            } else {
-                              _showSuccessSnackBar('Email verification coming soon!');
-                            }
-                          },
-                        ),
-
-                        const SizedBox(width: 12),
-                        _buildActionButton(
-                          'Verify KYC',
-                          Icons.verified_user_outlined,
-                              () => _showSuccessSnackBar('KYC verification coming soon!'),
-                        ),
-                      ],
-                    ),
-                  ),
 
                   // Account Details Section
                   Container(
@@ -893,11 +1004,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: OutlinedButton.icon(
                       onPressed: () => _showLogoutDialog(context),
-                      icon: const Icon(Icons.logout,color: Colors.white,),
-                      label: const Text('Logout',style: TextStyle(color: Colors.white),),
+                      icon: const Icon(Icons.logout, color: Colors.white),
+                      label: const Text('Logout', style: TextStyle(color: Colors.white)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 14,horizontal: 20),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                         backgroundColor: Colors.red,
                         side: BorderSide(color: Colors.grey[400]!),
                         shape: RoundedRectangleBorder(

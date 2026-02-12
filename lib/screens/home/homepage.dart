@@ -138,7 +138,8 @@ class _HomePageWithNavState extends State<HomePageWithNav>
       // 🔒 FIXED BOTTOM NAVIGATION
       bottomNavigationBar: SafeArea(
         child: Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: EdgeInsets.fromLTRB(2, 0, 2, 4),
+          // margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
