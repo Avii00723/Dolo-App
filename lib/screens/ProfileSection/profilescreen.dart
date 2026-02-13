@@ -6,6 +6,7 @@ import '../../Controllers/ProfileService.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/tutorial_service.dart';
 import '../../Models/TrustScoreModel.dart';
+import '../../widgets/TrustScoreWidget.dart';
 import '../LoginScreens/LoginSignupScreen.dart';
 import '../LoginScreens/signup_page.dart';
 import 'ProfileDetailPage.dart';
@@ -207,11 +208,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
 
   // Check individual completion steps
   bool _isProfilePictureUploaded() {
-    return trustScoreData?.breakdown?['profile_picture'] == 1;
+    return trustScoreData?.isProfileImageUploaded ?? false;
   }
 
   bool _isEmailVerified() {
-    return trustScoreData?.breakdown?['email'] == 1;
+    return trustScoreData?.isEmailVerified ?? false;
   }
 
   bool _isKycCompleted() {
@@ -698,7 +699,36 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                             child: CircleAvatar(
                               radius: 50,
                               backgroundColor: Colors.grey[300],
-                              child: Icon(
+                              child: userProfile?.photoURL != null && userProfile!.photoURL.isNotEmpty
+                                  ? ClipOval(
+                                child: Image.network(
+                                  userProfile!.photoURL.startsWith('http')
+                                      ? userProfile!.photoURL
+                                      : '${ApiConstants.imagebaseUrl}${userProfile!.photoURL}',
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Icon(
+                                      Icons.person,
+                                      size: 50,
+                                      color: Colors.grey[600],
+                                    );
+                                  },
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        value: loadingProgress.expectedTotalBytes != null
+                                            ? loadingProgress.cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                            : null,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              )
+                                  : Icon(
                                 Icons.person,
                                 size: 50,
                                 color: Colors.grey[600],
@@ -766,15 +796,27 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                       children: [
                         _buildStatBox('Delivered', '$deliveredCount', Icons.local_shipping_outlined),
                         _buildStatBox('Ratings', '$ratingsScore/4', Icons.star_outline),
-                        _buildStatBox('Trust Score', _getTrustScoreDisplay(), Icons.shield_outlined),
+                        _buildStatBox('Trust Score', trustScoreData != null ? '${trustScoreData!.trustScore}/${trustScoreData!.maxScore}' : '0/7', Icons.shield_outlined),
                         _buildStatBox('Created', '$createdCount', Icons.add_box_outlined),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
 
+                  // Trust Score Widget - Detailed View
+                  if (trustScoreData != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: TrustScoreWidget(
+                        trustScore: trustScoreData,
+                        showBreakdown: true,
+                        isCompact: false,
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+
                   // Profile Completion Section
-                  if (!_isProfileComplete() || _getCompletionPercentage() < 100)
+                  if (trustScoreData != null && trustScoreData!.completionPercentage < 100)
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                       padding: const EdgeInsets.all(16),
@@ -803,7 +845,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                                 ),
                               ),
                               Text(
-                                '${_getCompletionPercentage()}%',
+                                '${trustScoreData!.completionPercentage}%',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -818,7 +860,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
                             child: LinearProgressIndicator(
-                              value: _getCompletionPercentage() / 100,
+                              value: trustScoreData!.trustScore / trustScoreData!.maxScore,
                               backgroundColor: Colors.grey[300],
                               valueColor: const AlwaysStoppedAnimation(Color(0xFF001127)),
                               minHeight: 8,

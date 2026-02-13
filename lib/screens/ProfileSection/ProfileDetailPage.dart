@@ -4,6 +4,7 @@ import 'dart:io';
 import '../../Models/LoginModel.dart';
 import '../../Controllers/ProfileService.dart';
 import '../../Controllers/LoginService.dart';
+import '../../Controllers/ImageUploadService.dart';
 import '../../Constants/ApiConstants.dart';
 
 class ProfileDetailsPage extends StatefulWidget {
@@ -23,6 +24,7 @@ class ProfileDetailsPage extends StatefulWidget {
 class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   final ProfileService _profileService = ProfileService();
   final LoginService _loginService = LoginService();
+  final ImageUploadService _imageUploadService = ImageUploadService();
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
@@ -32,6 +34,8 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   final ImagePicker _picker = ImagePicker();
   bool _isUpdating = false;
   String _selectedGender = 'Male';
+  bool _isUploadingImage = false;
+  double _uploadProgress = 0.0;
 
   @override
   void initState() {
@@ -105,7 +109,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     }
   }
 
-  // UPDATED: Update profile - now only updates name (email cannot be changed per API)
+  // UPDATED: Update profile - now uploads profile picture if selected
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -116,7 +120,20 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     });
 
     try {
-      // Update name only (email cannot be changed per API documentation)
+      // If there's a new profile image, upload it first
+      String? uploadedImageUrl;
+      if (_newProfileImage != null) {
+        uploadedImageUrl = await _uploadProfileImage();
+        if (uploadedImageUrl == null) {
+          _showSnackBar('Failed to upload profile image', isError: true);
+          setState(() {
+            _isUpdating = false;
+          });
+          return;
+        }
+      }
+
+      // Update name
       Map<String, dynamic> updates = {
         'name': _nameController.text.trim(),
       };
@@ -127,12 +144,23 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
       );
 
       if (success) {
-        // If there's a new profile image, upload it separately
-        if (_newProfileImage != null) {
-          await _uploadProfileImage();
+        // If image was uploaded, call complete-profile endpoint
+        if (uploadedImageUrl != null) {
+          final completeProfileRequest = CompleteProfileRequest(
+            userId: widget.userId,
+            photoURL: uploadedImageUrl,
+          );
+
+          final profileCompleted = await _loginService.completeProfile(completeProfileRequest);
+          if (profileCompleted != null && profileCompleted.profileCompleted) {
+            _showSnackBar('Profile updated with new picture successfully!', isError: false);
+          } else {
+            _showSnackBar('Profile updated but image registration failed', isError: false);
+          }
+        } else {
+          _showSnackBar('Profile updated successfully!', isError: false);
         }
 
-        _showSnackBar('Profile updated successfully!', isError: false);
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) {
           Navigator.pop(context, true);
@@ -141,6 +169,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
         _showSnackBar('Failed to update profile', isError: true);
       }
     } catch (e) {
+      print('Error updating profile: $e');
       _showSnackBar('Error: $e', isError: true);
     } finally {
       if (mounted) {
@@ -151,33 +180,41 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     }
   }
 
-  // NEW: Upload profile image using complete-profile endpoint
-  Future<void> _uploadProfileImage() async {
+  // UPDATED: Upload profile image and return the image URL
+  Future<String?> _uploadProfileImage() async {
     try {
-      // In a real implementation, you would:
-      // 1. Upload the image to your server/storage
-      // 2. Get back the image URL
-      // 3. Call the complete-profile API with the photoURL
+      setState(() {
+        _isUploadingImage = true;
+        _uploadProgress = 0.0;
+      });
 
-      // For now, show a message
-      _showSnackBar('Profile image upload functionality coming soon!', isError: false);
-
-      // Example implementation when you have image upload endpoint:
-      /*
-      String uploadedImageUrl = await _uploadImageToServer(_newProfileImage!);
-
-      final completeProfileRequest = CompleteProfileRequest(
+      final response = await _imageUploadService.uploadProfilePicture(
         userId: widget.userId,
-        photoURL: uploadedImageUrl,
+        imageFile: _newProfileImage!,
+        onProgress: (progress) {
+          setState(() {
+            _uploadProgress = progress;
+          });
+        },
       );
 
-      final result = await _loginService.completeProfile(completeProfileRequest);
-      if (result != null && result.profileCompleted) {
-        _showSnackBar('Profile image updated!', isError: false);
+      if (response != null && response.success && response.imageUrl.isNotEmpty) {
+        print('✅ Image uploaded successfully: ${response.imageUrl}');
+        return response.imageUrl;
+      } else {
+        print('❌ Image upload failed: ${response?.message ?? 'Unknown error'}');
+        return null;
       }
-      */
     } catch (e) {
       print('Error uploading profile image: $e');
+      return null;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+          _uploadProgress = 0.0;
+        });
+      }
     }
   }
 
@@ -462,7 +499,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _isUpdating ? null : _updateProfile,
+                    onPressed: _isUpdating || _isUploadingImage ? null : _updateProfile,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF001127),
                       disabledBackgroundColor: Colors.grey[400],
@@ -472,14 +509,30 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                       ),
                       elevation: 0,
                     ),
-                    child: _isUpdating
-                        ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                      ),
+                    child: _isUpdating || _isUploadingImage
+                        ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        ),
+                        if (_isUploadingImage)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                      ],
                     )
                         : const Text(
                       'Save',

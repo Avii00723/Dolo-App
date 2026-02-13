@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../../Controllers/KYCService.dart';
+import '../home/homepage.dart';
 
 class KycUploadScreen extends StatefulWidget {
   final String userId;
@@ -196,8 +197,13 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
         actions: [
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop(true);
+              Navigator.of(context).pop(); // Close dialog
+              // Navigate to home screen instead of just popping
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+                (route) => false,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF001127),
