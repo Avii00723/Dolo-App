@@ -138,12 +138,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
       if (mounted) {
         // Navigate to KYC screen with userId
-        Navigator.pushAndRemoveUntil(
+        Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => KycUploadScreen(userId: userId!),
           ),
-              (route) => false,
         );
       }
     } catch (e, stackTrace) {

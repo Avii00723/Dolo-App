@@ -53,7 +53,6 @@ class TripRequestSendRequest {
       json['pnr'] = pnr!;
     }
 
-    print('📤 Trip Request JSON: $json');
     return json;
   }
 }
@@ -68,7 +67,6 @@ class TripRequestSendResponse {
   });
 
   factory TripRequestSendResponse.fromJson(Map<String, dynamic> json) {
-    print('📥 Trip Request Response: $json');
     return TripRequestSendResponse(
       message: json['message'] as String,
       tripRequestId: json['tripRequestId']?.toString() ?? '',

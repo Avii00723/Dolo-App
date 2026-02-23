@@ -1,10 +1,12 @@
+import 'package:dolo/Controllers/AuthService.dart';
+import 'package:dolo/Controllers/ProfileService.dart';
 import 'package:dolo/screens/NotificationsScreen.dart';
 import 'package:dolo/screens/ProfileSection/profilescreen.dart';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 
 class ModernHomeScreen extends StatefulWidget {
-  const ModernHomeScreen({Key? key}) : super(key: key);
+  const ModernHomeScreen({super.key});
 
   @override
   State<ModernHomeScreen> createState() => _ModernHomeScreenState();
@@ -13,6 +15,7 @@ class ModernHomeScreen extends StatefulWidget {
 class _ModernHomeScreenState extends State<ModernHomeScreen> {
   int _currentCarouselIndex = 0;
   int _currentStep = 0;
+  String? _userName;
 
   final List<Map<String, dynamic>> _carouselItems = [
     {
@@ -54,6 +57,25 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       'description': 'Get your delivery confirmed',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final userId = await AuthService.getUserId();
+    if (userId != null) {
+      final profileService = ProfileService();
+      final userProfile = await profileService.getUserProfile(userId);
+      if (userProfile != null) {
+        setState(() {
+          _userName = userProfile.name;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -205,10 +227,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           Text(
-            'Hello, Sunidhi',
-            style: TextStyle(
+            'Hello, ${_userName ?? 'there'}',
+            style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
@@ -427,7 +449,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: const Color.fromRGBO(0, 0, 0, 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
