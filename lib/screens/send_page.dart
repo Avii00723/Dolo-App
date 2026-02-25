@@ -14,6 +14,348 @@ import 'orderSection/SearchResultPage.dart';
 import 'orderSection/YourOrders.dart';
 import '../widgets/NotificationBellIcon.dart';
 
+// =============================================================================
+// DESIGN PRINCIPLE:
+//   GooglePlacesAutoCompleteTextFormField calls addListener() on BOTH the
+//   TextEditingController AND the FocusNode in its initState. If either has
+//   been disposed before initState runs, you get the "used after disposed" crash.
+//
+//   Solution: _PlacesField (StatefulWidget) owns BOTH internally.
+//   The parent passes only the initial text string and receives updates via
+//   callbacks. No disposed object ever crosses a widget-mount boundary.
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stopover data — stores text + position only. No controllers, no nodes.
+// ─────────────────────────────────────────────────────────────────────────────
+class _StopoverData {
+  String text;
+  Position? position;
+  _StopoverData({this.text = '', this.position});
+}
+
+// =============================================================================
+// _PlacesField
+// Owns its TextEditingController AND FocusNode — both created in initState,
+// both disposed in dispose(). The parent never touches them directly.
+// =============================================================================
+class _PlacesField extends StatefulWidget {
+  final String initialText;
+  final String labelText;
+  final String hintText;
+  final VoidCallback? onFocusGained;
+  final void Function(String text, Position position) onLocationSelected;
+
+  const _PlacesField({
+    Key? key,
+    required this.initialText,
+    required this.labelText,
+    required this.hintText,
+    this.onFocusGained,
+    required this.onLocationSelected,
+  }) : super(key: key);
+
+  @override
+  State<_PlacesField> createState() => _PlacesFieldState();
+}
+
+class _PlacesFieldState extends State<_PlacesField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    // Both created fresh here — guaranteed live when GooglePlaces reads them
+    _controller = TextEditingController(text: widget.initialText);
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (_focusNode.hasFocus) widget.onFocusGained?.call();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void requestFocus() {
+    if (mounted) FocusScope.of(context).requestFocus(_focusNode);
+  }
+
+  Position _makePosition(dynamic prediction) => Position(
+    latitude: double.parse(prediction.lat.toString()),
+    longitude: double.parse(prediction.lng.toString()),
+    timestamp: DateTime.now(),
+    accuracy: 0.0,
+    altitude: 0.0,
+    altitudeAccuracy: 0.0,
+    heading: 0.0,
+    headingAccuracy: 0.0,
+    speed: 0.0,
+    speedAccuracy: 0.0,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(widget.labelText,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        GooglePlacesAutoCompleteTextFormField(
+          // Always receives a fresh, live controller and focus node
+          textEditingController: _controller,
+          focusNode: _focusNode,
+          config: const GoogleApiConfig(
+            apiKey: 'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
+            countries: ['in'],
+            fetchPlaceDetailsWithCoordinates: true,
+            debounceTime: 400,
+          ),
+          onPredictionWithCoordinatesReceived: (prediction) {
+            if (prediction.lat == null || prediction.lng == null) return;
+            final text = prediction.description ?? '';
+            setState(() => _controller.text = text);
+            widget.onLocationSelected(text, _makePosition(prediction));
+          },
+          onSuggestionClicked: (prediction) {
+            final text = prediction.description ?? '';
+            _controller.text = text;
+            _controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: text.length),
+            );
+          },
+          decoration: InputDecoration(
+            hintText: widget.hintText,
+            prefixIcon: const Icon(Icons.location_on_outlined),
+            filled: true,
+            fillColor: Colors.grey.shade200,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// _StopoverRow — wraps _PlacesField with a remove button
+// =============================================================================
+class _StopoverRow extends StatefulWidget {
+  final int index;
+  final String initialText;
+  final VoidCallback onRemove;
+  final VoidCallback onFocusGained;
+  final void Function(String text, Position position) onLocationSelected;
+
+  const _StopoverRow({
+    Key? key,
+    required this.index,
+    required this.initialText,
+    required this.onRemove,
+    required this.onFocusGained,
+    required this.onLocationSelected,
+  }) : super(key: key);
+
+  @override
+  State<_StopoverRow> createState() => _StopoverRowState();
+}
+
+class _StopoverRowState extends State<_StopoverRow> {
+  final GlobalKey<_PlacesFieldState> _fieldKey = GlobalKey();
+
+  void requestFocus() => _fieldKey.currentState?.requestFocus();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: _PlacesField(
+              key: _fieldKey,
+              initialText: widget.initialText,
+              labelText: 'Stopover ${widget.index + 1}',
+              hintText: 'Eg. Lonavla',
+              onFocusGained: widget.onFocusGained,
+              onLocationSelected: widget.onLocationSelected,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+            onPressed: widget.onRemove,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// _LocationSearchView — stateless; all lifecycle is in child StatefulWidgets
+// =============================================================================
+class _LocationSearchView extends StatelessWidget {
+  final String fromText;
+  final String toText;
+  final List<_StopoverData> stopovers;
+  final List<GlobalKey<_StopoverRowState>> stopoverKeys;
+  final List<Map<String, String>> recentSearches;
+  final String? focusedField;
+
+  final VoidCallback onDone;
+  final VoidCallback onAddStop;
+  final void Function(int) onRemoveStop;
+  final void Function(String field) onFieldFocused;
+  final void Function(String text, Position pos) onFromSelected;
+  final void Function(String text, Position pos) onToSelected;
+  final void Function(int index, String text, Position pos) onStopoverSelected;
+  final void Function(String city) onRecentSearch;
+
+  const _LocationSearchView({
+    Key? key,
+    required this.fromText,
+    required this.toText,
+    required this.stopovers,
+    required this.stopoverKeys,
+    required this.recentSearches,
+    required this.focusedField,
+    required this.onDone,
+    required this.onAddStop,
+    required this.onRemoveStop,
+    required this.onFieldFocused,
+    required this.onFromSelected,
+    required this.onToSelected,
+    required this.onStopoverSelected,
+    required this.onRecentSearch,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Container(
+        color: Colors.white,
+        height: MediaQuery.of(context).size.height,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
+                // FROM — fresh controller+focusnode every mount
+                _PlacesField(
+                  initialText: fromText,
+                  labelText: 'Traveling From',
+                  hintText: 'Eg. Mumbai',
+                  onFocusGained: () => onFieldFocused('from'),
+                  onLocationSelected: onFromSelected,
+                ),
+                const SizedBox(height: 16),
+                // TO — fresh controller+focusnode every mount
+                _PlacesField(
+                  initialText: toText,
+                  labelText: 'Traveling To',
+                  hintText: 'Eg. Delhi',
+                  onFocusGained: () => onFieldFocused('to'),
+                  onLocationSelected: onToSelected,
+                ),
+                const SizedBox(height: 10),
+                for (int i = 0; i < stopovers.length; i++)
+                  _StopoverRow(
+                    key: stopoverKeys[i],
+                    index: i,
+                    initialText: stopovers[i].text,
+                    onRemove: () => onRemoveStop(i),
+                    onFocusGained: () => onFieldFocused('stopover_$i'),
+                    onLocationSelected: (text, pos) =>
+                        onStopoverSelected(i, text, pos),
+                  ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onAddStop,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add Stops'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                ),
+                const Divider(height: 30),
+                const Text('RECENT SEARCHES',
+                    style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 10),
+                ListView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: recentSearches.map((s) {
+                    return ListTile(
+                      leading: const Icon(Icons.history),
+                      title: Text(s['city']!),
+                      subtitle: Text(s['country']!),
+                      onTap: () => onRecentSearch(s['city']!),
+                    );
+                  }).toList(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {},
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: BorderSide(color: Colors.grey.shade400),
+                          ),
+                          child: const Text('View Route on Map'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: onDone,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text('Done'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// SendPage — holds only plain data (strings, positions). Zero controllers/nodes.
+// =============================================================================
 class SendPage extends StatefulWidget {
   const SendPage({Key? key}) : super(key: key);
 
@@ -22,43 +364,42 @@ class SendPage extends StatefulWidget {
 }
 
 class _SendPageState extends State<SendPage> {
-  // Location and Trip Details
-  final TextEditingController fromController = TextEditingController();
-  final TextEditingController toController = TextEditingController();
-  final List<TextEditingController> stopoverControllers = [];
+  // ── Location data (plain strings + positions, NO controllers) ────────────
+  String _fromText = '';
+  String _toText = '';
   Position? originPosition;
   Position? destinationPosition;
-  final List<Position?> stopoverPositions = [];
 
-  // Date and Time Controllers
+  // Stopovers: plain data only
+  final List<_StopoverData> _stopovers = [];
+  final List<GlobalKey<_StopoverRowState>> _stopoverKeys = [];
+
+  // ── Date / Time ───────────────────────────────────────────────────────────
+  // These controllers are safe because they are NEVER passed to
+  // GooglePlacesAutoCompleteTextFormField — no addListener() risk.
   final TextEditingController departureController = TextEditingController();
   final TextEditingController deliveryController = TextEditingController();
   String? _departureDate, _departureTime;
   String? _selectedDate, _selectedTime;
 
-  // Vehicle
+  // ── Vehicle ───────────────────────────────────────────────────────────────
   String? selectedVehicle;
   final List<String> vehicleOptions = [
     'Car', 'Bike', 'Pickup Truck', 'Truck', 'Bus', 'Train', 'Plane'
   ];
 
-  // Services
+  // ── Services ──────────────────────────────────────────────────────────────
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
   String? currentUserId;
 
-  // UI State
-  bool isLoading = true; // Start with loading true
+  // ── UI State ──────────────────────────────────────────────────────────────
+  bool isLoading = true;
   bool isSearching = false;
   bool _isLocationViewFocused = false;
-  String? _focusedField; // 'from', 'to', or 'stopover_i'
+  String? _focusedField;
 
-  // Focus Nodes
-  final FocusNode _fromFocusNode = FocusNode();
-  final FocusNode _toFocusNode = FocusNode();
-  final List<FocusNode> _stopoverFocusNodes = [];
-
-  // Recent Searches
+  // ── Recent Searches ───────────────────────────────────────────────────────
   final List<Map<String, String>> _recentSearches = [
     {'city': 'Delhi', 'country': 'India'},
     {'city': 'Mumbai', 'country': 'India'},
@@ -66,154 +407,165 @@ class _SendPageState extends State<SendPage> {
     {'city': 'Kolkata', 'country': 'India'},
   ];
 
+  // ──────────────────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     _initializeUserAndData();
-    _addFocusListeners();
   }
 
   @override
   void dispose() {
-    // Dispose all controllers and focus nodes
-    fromController.dispose();
-    toController.dispose();
     departureController.dispose();
     deliveryController.dispose();
-    _fromFocusNode.dispose();
-    _toFocusNode.dispose();
-    for (var controller in stopoverControllers) {
-      controller.dispose();
-    }
-    for (var focusNode in _stopoverFocusNodes) {
-      focusNode.dispose();
-    }
+    // No other controllers or focus nodes to dispose —
+    // they all live inside widget States and are cleaned up automatically.
     super.dispose();
-  }
-
-  void _addFocusListeners() {
-    _fromFocusNode.addListener(() {
-      if (_fromFocusNode.hasFocus) {
-        setState(() {
-          _isLocationViewFocused = true;
-          _focusedField = 'from';
-        });
-      }
-    });
-    _toFocusNode.addListener(() {
-      if (_toFocusNode.hasFocus) {
-        setState(() {
-          _isLocationViewFocused = true;
-          _focusedField = 'to';
-        });
-      }
-    });
   }
 
   Future<void> _initializeUserAndData() async {
     setState(() => isLoading = true);
-    await _initializeUser();
-    // Any other async data loading can happen here
+    try {
+      currentUserId = await AuthService.getUserId();
+      if (currentUserId == null) _showSnackBar('Please log in', Colors.red);
+    } catch (e) {
+      _showSnackBar('Error: $e', Colors.red);
+    }
     setState(() => isLoading = false);
   }
 
-  Future<void> _initializeUser() async {
-    try {
-      currentUserId = await AuthService.getUserId();
-      if (currentUserId == null) {
-        _showSnackBar('Please log in to continue', Colors.red);
-      }
-    } catch (e) {
-      _showSnackBar('Error loading user data: $e', Colors.red);
-    }
-  }
+  // ── Stopover management ───────────────────────────────────────────────────
 
   void _addStopoverField() {
+    final key = GlobalKey<_StopoverRowState>();
     setState(() {
-      final newController = TextEditingController();
-      final newFocusNode = FocusNode();
-      newFocusNode.addListener(() {
-        if (newFocusNode.hasFocus) {
-          setState(() {
-            _isLocationViewFocused = true;
-            _focusedField = 'stopover_${stopoverControllers.length}';
-          });
-        }
-      });
-      stopoverControllers.add(newController);
-      _stopoverFocusNodes.add(newFocusNode);
-      stopoverPositions.add(null);
+      _stopovers.add(_StopoverData());
+      _stopoverKeys.add(key);
+      _isLocationViewFocused = true;
+      _focusedField = 'stopover_${_stopovers.length - 1}';
     });
-    // Focus the newly added field
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      FocusScope.of(context).requestFocus(_stopoverFocusNodes.last);
+      if (mounted) key.currentState?.requestFocus();
     });
   }
 
   void _removeStopoverField(int index) {
+    // No disposal needed — _StopoverRow/_PlacesField States handle their own
     setState(() {
-      stopoverControllers[index].dispose();
-      _stopoverFocusNodes[index].dispose();
-      stopoverControllers.removeAt(index);
-      _stopoverFocusNodes.removeAt(index);
-      stopoverPositions.removeAt(index);
+      _stopovers.removeAt(index);
+      _stopoverKeys.removeAt(index);
+      if (_focusedField == 'stopover_$index') _focusedField = null;
     });
   }
-  
-  void _onDoneEditingLocation() {
+
+  // ── Location overlay control ──────────────────────────────────────────────
+
+  void _showLocationView(String field) {
+    setState(() {
+      _isLocationViewFocused = true;
+      _focusedField = field;
+    });
+  }
+
+  void _hideLocationView() {
     setState(() {
       _isLocationViewFocused = false;
       _focusedField = null;
     });
     FocusScope.of(context).unfocus();
   }
-  
-  // Method to handle back press
+
   Future<bool> _onWillPop() async {
     if (_isLocationViewFocused) {
-      setState(() {
-        _isLocationViewFocused = false;
-        _focusedField = null;
-      });
-      FocusScope.of(context).unfocus();
-      return false; // Do not pop the route
+      _hideLocationView();
+      return false;
     }
-    return true; // Pop the route
+    return true;
   }
 
+  // ── Recent search handler ─────────────────────────────────────────────────
+
+  void _onRecentSearch(String city) {
+    final field = _focusedField;
+    setState(() {
+      if (field == 'from') {
+        _fromText = city;
+      } else if (field == 'to') {
+        _toText = city;
+      } else if (field != null && field.startsWith('stopover_')) {
+        final idx = int.tryParse(field.split('_').last);
+        if (idx != null && idx < _stopovers.length) {
+          _stopovers[idx].text = city;
+        }
+      }
+    });
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        backgroundColor: Color(0xFFF5F5F5),
+        backgroundColor: const Color(0xFFF5F5F5),
         body: SafeArea(
           child: isLoading
               ? const Center(child: CircularProgressIndicator())
               : Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: Stack(
                   children: [
-                    _buildHeader(),
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          // Always visible main content
-                          AnimatedOpacity(
-                            opacity: _isLocationViewFocused ? 0.0 : 1.0,
-                            duration: const Duration(milliseconds: 300),
-                            child: IgnorePointer(
-                              ignoring: _isLocationViewFocused,
-                              child: _buildMainForm(),
-                            ),
-                          ),
-                          // Location view that slides/fades in
-                          if (_isLocationViewFocused)
-                            _buildLocationView(),
-                        ],
+                    // Main form always in tree, hidden while overlay shows
+                    AnimatedOpacity(
+                      opacity: _isLocationViewFocused ? 0.0 : 1.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: IgnorePointer(
+                        ignoring: _isLocationViewFocused,
+                        child: _buildMainForm(),
                       ),
                     ),
+                    // Location overlay: mounts fresh every time.
+                    // _PlacesField creates new controller+focusnode on each mount.
+                    // _PlacesField disposes them automatically on unmount.
+                    // No stale/disposed objects can ever reach GooglePlaces.
+                    if (_isLocationViewFocused)
+                      _LocationSearchView(
+                        fromText: _fromText,
+                        toText: _toText,
+                        stopovers: _stopovers,
+                        stopoverKeys: _stopoverKeys,
+                        recentSearches: _recentSearches,
+                        focusedField: _focusedField,
+                        onDone: _hideLocationView,
+                        onAddStop: _addStopoverField,
+                        onRemoveStop: _removeStopoverField,
+                        onFieldFocused: (f) =>
+                            setState(() => _focusedField = f),
+                        onFromSelected: (text, pos) => setState(() {
+                          _fromText = text;
+                          originPosition = pos;
+                        }),
+                        onToSelected: (text, pos) => setState(() {
+                          _toText = text;
+                          destinationPosition = pos;
+                        }),
+                        onStopoverSelected: (i, text, pos) =>
+                            setState(() {
+                              if (i < _stopovers.length) {
+                                _stopovers[i].text = text;
+                                _stopovers[i].position = pos;
+                              }
+                            }),
+                        onRecentSearch: _onRecentSearch,
+                      ),
                   ],
                 ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -227,166 +579,24 @@ class _SendPageState extends State<SendPage> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black87),
-            onPressed: () {
-              if (_isLocationViewFocused) {
-                _onDoneEditingLocation();
-              } else {
-                Navigator.pop(context);
-              }
-            },
+            onPressed: () => _isLocationViewFocused
+                ? _hideLocationView()
+                : Navigator.pop(context),
           ),
           const Text(
             'Travel Details',
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87),
           ),
-          SizedBox(width: 48) // Placeholder for alignment
+          const SizedBox(width: 48),
         ],
       ),
     );
   }
 
-  Widget _buildLocationView() {
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Container(
-        color: Colors.white,
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
-                  _buildLocationTextField(
-                      controller: fromController,
-                      focusNode: _fromFocusNode,
-                      hintText: 'Eg. Mumbai',
-                      labelText: 'Traveling From'),
-                  const SizedBox(height: 16),
-                  _buildLocationTextField(
-                      controller: toController,
-                      focusNode: _toFocusNode,
-                      hintText: 'Eg. Delhi',
-                      labelText: 'Traveling To'),
-                  const SizedBox(height: 10),
-                  ..._buildStopoverFields(),
-                  
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: _addStopoverField,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Add Stops'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                    ),
-                  ),
-                  
-                  const Divider(height: 30),
-                  
-                  // Suggestions/Recents
-                  const Text('RECENT SEARCHES', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  const SizedBox(height: 10),
-                  ListView(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(), // The parent is already scrollable
-                    children: _recentSearches.map((search) {
-                      return ListTile(
-                        leading: const Icon(Icons.history),
-                        title: Text(search['city']!),
-                        subtitle: Text(search['country']!),
-                        onTap: () {
-                          // Handle selection
-                          _handleRecentSearchSelection(search['city']!);
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  
-                  // Action Buttons at bottom
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {}, // Implement View Route
-                            child: const Text('View Route on Map'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              side: BorderSide(color: Colors.grey.shade400),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _onDoneEditingLocation,
-                            child: const Text('Done'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-void _handleRecentSearchSelection(String city) {
-  final field = _focusedField;
-  if (field == 'from') {
-    fromController.text = city;
-  } else if (field == 'to') {
-    toController.text = city;
-  } else if (field != null && field.startsWith('stopover_')) {
-    final index = int.parse(field.split('_').last);
-    if (index < stopoverControllers.length) {
-      stopoverControllers[index].text = city;
-    }
-  }
-}
-  
-  List<Widget> _buildStopoverFields() {
-    return List<Widget>.generate(stopoverControllers.length, (index) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 16.0),
-        child: Row(
-          children: [
-            Expanded(
-              child: _buildLocationTextField(
-                controller: stopoverControllers[index],
-                focusNode: _stopoverFocusNodes[index],
-                hintText: 'Eg. Lonavla',
-                labelText: 'Stopover ${index + 1}',
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-              onPressed: () => _removeStopoverField(index),
-            )
-          ],
-        ),
-      );
-    });
-  }
+  // ── Main form (read-only display) ─────────────────────────────────────────
 
   Widget _buildMainForm() {
     return SingleChildScrollView(
@@ -396,30 +606,51 @@ void _handleRecentSearchSelection(String city) {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
-          _buildReadOnlyLocationField('Traveling From', fromController.text, _fromFocusNode),
+          _buildReadOnlyField(
+            label: 'Traveling From',
+            value: _fromText,
+            onTap: () => _showLocationView('from'),
+          ),
           const SizedBox(height: 16),
-          _buildReadOnlyLocationField('Traveling To', toController.text, _toFocusNode),
-          ..._buildReadOnlyStopoverFields(),
+          _buildReadOnlyField(
+            label: 'Traveling To',
+            value: _toText,
+            onTap: () => _showLocationView('to'),
+          ),
+          for (int i = 0; i < _stopovers.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: _buildReadOnlyField(
+                label: 'Stopover ${i + 1}',
+                value: _stopovers[i].text,
+                onTap: () => _showLocationView('stopover_$i'),
+              ),
+            ),
           const SizedBox(height: 24),
-          _buildDateTimeField(departureController, 'Departure Date & Time', _selectDepartureDateTime),
+          _buildDateTimeField(departureController, 'Departure Date & Time',
+              _selectDepartureDateTime),
           const SizedBox(height: 16),
-          _buildDateTimeField(deliveryController, 'Delivery Date & Time', _selectDeliveryDateTime),
+          _buildDateTimeField(deliveryController, 'Delivery Date & Time',
+              _selectDeliveryDateTime),
           const SizedBox(height: 16),
           _buildVehicleDropdown(),
           const SizedBox(height: 30),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: isSearching ? null : () {/* _searchAvailableOrders(); */},
-              child: isSearching
-                  ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white))
-                  : const Text('Search Orders'),
+              onPressed: isSearching ? null : () {/* search logic */},
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                textStyle: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold),
               ),
+              child: isSearching
+                  ? const CircularProgressIndicator(
+                  valueColor:
+                  AlwaysStoppedAnimation<Color>(Colors.white))
+                  : const Text('Search Orders'),
             ),
           ),
           const SizedBox(height: 20),
@@ -427,131 +658,47 @@ void _handleRecentSearchSelection(String city) {
       ),
     );
   }
-  
-  Widget _buildReadOnlyLocationField(String label, String value, FocusNode focusNode) {
+
+  Widget _buildReadOnlyField({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         InkWell(
-          onTap: () {
-            setState(() {
-              _isLocationViewFocused = true;
-              if (focusNode == _fromFocusNode) _focusedField = 'from';
-              if (focusNode == _toFocusNode) _focusedField = 'to';
-            });
-            focusNode.requestFocus();
-          },
+          onTap: onTap,
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.grey.shade300),
             ),
-            child: Text(value.isEmpty ? 'Eg. Mumbai' : value, style: TextStyle(color: value.isEmpty ? Colors.grey: Colors.black)),
+            child: Text(
+              value.isEmpty ? 'Tap to enter location' : value,
+              style: TextStyle(
+                  color: value.isEmpty ? Colors.grey : Colors.black),
+            ),
           ),
         ),
       ],
     );
   }
-  
-  List<Widget> _buildReadOnlyStopoverFields() {
-    return List.generate(stopoverControllers.length, (index) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 16.0),
-        child: _buildReadOnlyLocationField('Stopover ${index + 1}', stopoverControllers[index].text, _stopoverFocusNodes[index]),
-      );
-    });
-  }
 
-  void _handleLocationSelection(prediction) {
-    if (prediction.lat == null || prediction.lng == null) return;
+  // ── Date / Time ───────────────────────────────────────────────────────────
 
-    final position = Position(
-      latitude: double.parse(prediction.lat.toString()),
-      longitude: double.parse(prediction.lng.toString()),
-      timestamp: DateTime.now(),
-      accuracy: 0.0,
-      altitude: 0.0,
-      altitudeAccuracy: 0.0,
-      heading: 0.0,
-      headingAccuracy: 0.0,
-      speed: 0.0,
-      speedAccuracy: 0.0,
-    );
-    final address = prediction.description ?? '';
-
-    setState(() {
-      final field = _focusedField;
-      if (field == 'from') {
-        fromController.text = address;
-        originPosition = position;
-      } else if (field == 'to') {
-        toController.text = address;
-        destinationPosition = position;
-      } else if (field != null && field.startsWith('stopover_')) {
-        final index = int.parse(field.split('_').last);
-        if (index < stopoverControllers.length) {
-          stopoverControllers[index].text = address;
-          stopoverPositions[index] = position;
-        }
-      }
-    });
-  }
-
-  Widget _buildLocationTextField({
-    required TextEditingController controller,
-    required FocusNode focusNode,
-    required String hintText,
-    required String labelText,
-  }) {
+  Widget _buildDateTimeField(
+      TextEditingController controller,
+      String label,
+      Future<void> Function(BuildContext) onTap,
+      ) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(labelText, style: const TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        GooglePlacesAutoCompleteTextFormField(
-          textEditingController: controller,
-          focusNode: focusNode,
-          config: const GoogleApiConfig(
-            apiKey: 'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
-            countries: ['in'],
-            fetchPlaceDetailsWithCoordinates: true,
-            debounceTime: 400,
-          ),
-          onPredictionWithCoordinatesReceived: (prediction) {
-             _handleLocationSelection(prediction);
-          },
-          onSuggestionClicked: (prediction) {
-            controller.text = prediction.description ?? '';
-            controller.selection = TextSelection.fromPosition(
-              TextPosition(offset: prediction.description?.length ?? 0),
-            );
-          },
-          decoration: InputDecoration(
-            hintText: hintText,
-            prefixIcon: const Icon(Icons.location_on_outlined),
-            filled: true,
-            fillColor: Colors.grey.shade200,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
-             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.primary),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDateTimeField(TextEditingController controller, String label, Function(BuildContext) onTap) {
-      return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -560,7 +707,8 @@ void _handleRecentSearchSelection(String city) {
           onTap: () => onTap(context),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
@@ -568,9 +716,18 @@ void _handleRecentSearchSelection(String city) {
             ),
             child: Row(
               children: [
-                 Icon(Icons.calendar_today_outlined, color: Colors.grey.shade600),
-                 const SizedBox(width: 8),
-                 Text(controller.text.isEmpty ? 'dd/mm/yyyy HH:MM' : controller.text, style: TextStyle(color: controller.text.isEmpty ? Colors.grey: Colors.black)),
+                Icon(Icons.calendar_today_outlined,
+                    color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Text(
+                  controller.text.isEmpty
+                      ? 'dd/mm/yyyy HH:MM'
+                      : controller.text,
+                  style: TextStyle(
+                      color: controller.text.isEmpty
+                          ? Colors.grey
+                          : Colors.black),
+                ),
               ],
             ),
           ),
@@ -580,52 +737,53 @@ void _handleRecentSearchSelection(String city) {
   }
 
   Future<void> _selectDepartureDateTime(BuildContext context) async {
-    DateTime? pickedDate = await showDatePicker(
+    final date = await showDatePicker(
         context: context,
         initialDate: DateTime.now(),
         firstDate: DateTime.now(),
         lastDate: DateTime(2101));
-    if (pickedDate != null) {
-      TimeOfDay? pickedTime =
-          await showTimePicker(context: context, initialTime: TimeOfDay.now());
-      if (pickedTime != null) {
-        final dateTime = DateTime(pickedDate.year, pickedDate.month,
-            pickedDate.day, pickedTime.hour, pickedTime.minute);
-        setState(() {
-          departureController.text = DateFormat('dd MMM yyyy, hh:mm a').format(dateTime);
-          _departureDate = DateFormat('yyyy-MM-dd').format(dateTime);
-          _departureTime = DateFormat('HH:mm:ss').format(dateTime);
-        });
-      }
-    }
+    if (date == null || !mounted) return;
+    final time =
+    await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (time == null) return;
+    final dt =
+    DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    setState(() {
+      departureController.text =
+          DateFormat('dd MMM yyyy, hh:mm a').format(dt);
+      _departureDate = DateFormat('yyyy-MM-dd').format(dt);
+      _departureTime = DateFormat('HH:mm:ss').format(dt);
+    });
   }
 
   Future<void> _selectDeliveryDateTime(BuildContext context) async {
-    DateTime? pickedDate = await showDatePicker(
+    final date = await showDatePicker(
         context: context,
         initialDate: DateTime.now(),
         firstDate: DateTime.now(),
         lastDate: DateTime(2101));
-    if (pickedDate != null) {
-      TimeOfDay? pickedTime =
-          await showTimePicker(context: context, initialTime: TimeOfDay.now());
-      if (pickedTime != null) {
-        final dateTime = DateTime(pickedDate.year, pickedDate.month,
-            pickedDate.day, pickedTime.hour, pickedTime.minute);
-        setState(() {
-          deliveryController.text = DateFormat('dd MMM yyyy, hh:mm a').format(dateTime);
-          _selectedDate = DateFormat('yyyy-MM-dd').format(dateTime);
-          _selectedTime = DateFormat('HH:mm:ss').format(dateTime);
-        });
-      }
-    }
+    if (date == null || !mounted) return;
+    final time =
+    await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (time == null) return;
+    final dt =
+    DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    setState(() {
+      deliveryController.text =
+          DateFormat('dd MMM yyyy, hh:mm a').format(dt);
+      _selectedDate = DateFormat('yyyy-MM-dd').format(dt);
+      _selectedTime = DateFormat('HH:mm:ss').format(dt);
+    });
   }
 
- Widget _buildVehicleDropdown() {
+  // ── Vehicle ───────────────────────────────────────────────────────────────
+
+  Widget _buildVehicleDropdown() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Travel Transport', style: TextStyle(fontWeight: FontWeight.w600)),
+        const Text('Travel Transport',
+            style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: selectedVehicle,
@@ -638,32 +796,25 @@ void _handleRecentSearchSelection(String city) {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
-             enabledBorder: OutlineInputBorder(
+            enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade300),
             ),
           ),
-          items: vehicleOptions.map((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
-            );
-          }).toList(),
-          onChanged: (newValue) {
-            setState(() {
-              selectedVehicle = newValue;
-            });
-          },
+          items: vehicleOptions
+              .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+              .toList(),
+          onChanged: (v) => setState(() => selectedVehicle = v),
         ),
       ],
     );
   }
 
+  // ── Utility ───────────────────────────────────────────────────────────────
+
   void _showSnackBar(String message, Color color) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: color,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: color));
   }
 }

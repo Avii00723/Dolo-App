@@ -804,16 +804,16 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                   const SizedBox(height: 24),
 
                   // Trust Score Widget - Detailed View
-                  if (trustScoreData != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      child: TrustScoreWidget(
-                        trustScore: trustScoreData,
-                        showBreakdown: true,
-                        isCompact: false,
-                      ),
-                    ),
-                  const SizedBox(height: 24),
+                  // if (trustScoreData != null)
+                  //   Padding(
+                  //     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  //     child: TrustScoreWidget(
+                  //       trustScore: trustScoreData,
+                  //       showBreakdown: true,
+                  //       isCompact: false,
+                  //     ),
+                  //   ),
+                  // const SizedBox(height: 24),
 
                   // Profile Completion Section
                   if (trustScoreData != null && trustScoreData!.completionPercentage < 100)
