@@ -186,13 +186,16 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   }
 
   List<TripRequest> get _filteredRequests {
+    List<TripRequest> baseList;
     if (_selectedFilter == 'All') {
-      return [..._receivedRequests, ..._sentRequests];
+      baseList = [..._receivedRequests, ..._sentRequests];
     } else if (_selectedFilter == 'Request Sent') {
-      return _sentRequests;
+      baseList = _sentRequests;
     } else {
-      return _receivedRequests;
+      baseList = _receivedRequests;
     }
+    // Filter out accepted requests
+    return baseList.where((r) => r.status.toLowerCase() != 'accepted').toList();
   }
 
   @override
@@ -239,7 +242,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                   child: _buildTab(
                     'Requests',
                     _tabController.index == 1,
-                    _sentRequests.length + _receivedRequests.length,
+                    _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length + 
+                    _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length,
                         () {
                       _tabController.animateTo(1);
                       setState(() {});
@@ -259,10 +263,11 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                 scrollDirection: Axis.horizontal,
                 children: _filters.map((filter) {
                   final count = filter == 'All'
-                      ? _sentRequests.length + _receivedRequests.length
+                      ? _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length + 
+                        _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length
                       : filter == 'Request Sent'
-                      ? _sentRequests.length
-                      : _receivedRequests.length;
+                      ? _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length
+                      : _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length;
 
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),

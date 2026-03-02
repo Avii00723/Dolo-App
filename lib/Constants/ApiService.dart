@@ -21,7 +21,7 @@ class ApiResponse<T> {
   final String? error;
   final int? statusCode;
   final String? endpoint;
-  final bool userNotFound; // ✅ NEW: Flag for user not found
+  final bool userNotFound; // Flag for user not found
 
   ApiResponse.success(this.data, {this.statusCode, this.endpoint})
       : success = true,
@@ -49,7 +49,7 @@ class ApiService {
     return '$cleanBase$cleanEndpoint';
   }
 
-  // ✅ Helper method to check if response indicates user doesn't exist
+  // Helper method to check if response indicates user doesn't exist
   bool _isUserNotFoundError(int statusCode, dynamic responseBody) {
     if (statusCode == 404) return true;
 
@@ -230,15 +230,21 @@ class ApiService {
       ) {
     String url = buildUrl(endpoint);
     if (params != null && params.isNotEmpty) {
-      final queryString = params.entries
-          .map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value.toString())}')
-          .join('&');
-      url += '?$queryString';
+      final List<String> queryParts = [];
+      params.forEach((key, value) {
+        if (value is Iterable) {
+          for (var item in value) {
+            queryParts.add('${Uri.encodeQueryComponent(key)}=${Uri.encodeQueryComponent(item.toString())}');
+          }
+        } else {
+          queryParts.add('${Uri.encodeQueryComponent(key)}=${Uri.encodeQueryComponent(value.toString())}');
+        }
+      });
+      url += '?${queryParts.join('&')}';
     }
     return url;
   }
 
-  // ✅ MODIFIED: Enhanced response processing with user existence checking
   ApiResponse<T> _processResponse<T>(
       http.Response response,
       String endpoint,
@@ -271,7 +277,6 @@ class ApiService {
     } else {
       print('❌ ERROR - Status: $statusCode');
 
-      // ✅ Check if user doesn't exist
       final userNotFound = _isUserNotFoundError(statusCode, responseBody);
 
       final errorMsg = responseBody is Map && responseBody['message'] != null
@@ -283,7 +288,6 @@ class ApiService {
         print('❌ Error Details: $responseBody');
       }
 
-      // Specific error handling based on status code
       switch (statusCode) {
         case 400:
           print('⚠️ BAD REQUEST - Check if all required fields are present and valid');
@@ -311,7 +315,7 @@ class ApiService {
         errorMsg,
         statusCode: statusCode,
         endpoint: endpoint,
-        userNotFound: userNotFound, 
+        userNotFound: userNotFound,
       );
     }
   }

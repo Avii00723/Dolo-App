@@ -7,9 +7,11 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import '../../Controllers/OrderService.dart';
 import '../../Controllers/AuthService.dart';
+import '../../Controllers/ProfileService.dart';
 import '../LocationinputField.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Models/OrderModel.dart';
+import '../../Models/LoginModel.dart';
 import '../LoginScreens/kyc_screen.dart';
 import '../../Widgets/ModernInputField.dart';
 
@@ -27,6 +29,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   final int _totalSteps = 3;
 
   final OrderService _orderService = OrderService();
+  final ProfileService _profileService = ProfileService();
 
   final TextEditingController pickupCityController = TextEditingController();
   final TextEditingController dropCityController = TextEditingController();
@@ -39,6 +42,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
   Position? originPosition;
   Position? destinationPosition;
+  
+  DateTime? _pickupDateTime;
+  DateTime? _deliveryDateTime;
 
   OrderMainCategory? _selectedMainCategory;
   String? _selectedWeightRange;
@@ -50,6 +56,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   bool _isCreatingOrder = false;
 
   String? userId;
+  UserProfile? _userProfile;
   bool _isLoadingUser = true;
 
   final List<String> _transportModes = [
@@ -79,8 +86,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         return;
       }
 
+      final profile = await _profileService.getUserProfile(fetchedUserId);
+
       setState(() {
         userId = fetchedUserId;
+        _userProfile = profile;
         _isLoadingUser = false;
       });
     } catch (e) {
@@ -144,11 +154,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           _showSnackBar('Please enter drop city', Colors.orange);
           return false;
         }
-        if (pickupDateController.text.trim().isEmpty) {
+        if (pickupDateController.text.trim().isEmpty || _pickupDateTime == null) {
           _showSnackBar('Please select pickup date & time', Colors.orange);
           return false;
         }
-        if (deliveryDateController.text.trim().isEmpty) {
+        if (deliveryDateController.text.trim().isEmpty || _deliveryDateTime == null) {
           _showSnackBar('Please select delivery date & time', Colors.orange);
           return false;
         }
@@ -188,14 +198,17 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
       final orderRequest = OrderCreateRequest(
         userHashedId: userId!,
+        itemDescription: _selectedMainCategory!.name,
         origin: pickupCityController.text.trim(),
         originLatitude: originPosition?.latitude ?? 0.0,
         originLongitude: originPosition?.longitude ?? 0.0,
         destination: dropCityController.text.trim(),
         destinationLatitude: destinationPosition?.latitude ?? 0.0,
         destinationLongitude: destinationPosition?.longitude ?? 0.0,
-        deliveryDate: _formatDateForApi(deliveryDateController.text.trim()),
-        deliveryTime: '12:00:00',
+        pickupDate: _formatDateForApi(_pickupDateTime!),
+        pickupTime: _formatTimeForApi(_pickupDateTime!),
+        deliveryDate: _formatDateForApi(_deliveryDateTime!),
+        deliveryTime: _formatTimeForApi(_deliveryDateTime!),
         weight: weightString,
         actualWeight: null,
         category: apiCategory,
@@ -252,23 +265,19 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-  String _formatDateForApi(String dateString) {
-    try {
-      final parts = dateString.split('/');
-      if (parts.length == 3) {
-        return '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
-      }
-    } catch (e) {
-      print('Error formatting date: $e');
-    }
-    return dateString;
+  String _formatDateForApi(DateTime dt) {
+    return "${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}";
+  }
+
+  String _formatTimeForApi(DateTime dt) {
+    return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:00";
   }
 
   bool _validateAllFields() {
     if (pickupCityController.text.trim().isEmpty ||
         dropCityController.text.trim().isEmpty ||
-        pickupDateController.text.trim().isEmpty ||
-        deliveryDateController.text.trim().isEmpty ||
+        _pickupDateTime == null ||
+        _deliveryDateTime == null ||
         _selectedWeightRange == null ||
         _selectedMainCategory == null) {
       _showSnackBar('Please fill all required fields', Colors.red);
@@ -290,6 +299,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       _selectedImages.clear();
       originPosition = null;
       destinationPosition = null;
+      _pickupDateTime = null;
+      _deliveryDateTime = null;
       _selectedMainCategory = null;
       _selectedWeightRange = null;
       _selectedTransportModes = [];
@@ -350,16 +361,25 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
   void _navigateToKycScreen() async {
     if (userId == null) return;
+    
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => KycUploadScreen(userId: userId!)),
+      MaterialPageRoute(
+        builder: (context) => KycUploadScreen(
+          userId: userId!,
+          fullName: _userProfile?.name,
+          email: _userProfile?.email,
+          phone: _userProfile?.phone != null ? '+91 ${_userProfile?.phone}' : null,
+        ),
+      ),
     );
+
     if (result == true) {
       _showSnackBar('KYC document uploaded successfully!', Colors.green);
     }
   }
 
-  Future<void> _selectDateTime(TextEditingController controller) async {
+  Future<void> _selectDateTime(TextEditingController controller, bool isPickup) async {
     final date = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -374,7 +394,13 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       );
 
       if (time != null) {
+        final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
         setState(() {
+          if (isPickup) {
+            _pickupDateTime = dt;
+          } else {
+            _deliveryDateTime = dt;
+          }
           controller.text = '${date.day}/${date.month}/${date.year} · ${time.format(context)}';
         });
       }
@@ -638,7 +664,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             hint: 'dd/mm/yyyy · HH:MM',
             icon: Icons.calendar_today,
             readOnly: true,
-            onTap: () => _selectDateTime(pickupDateController),
+            onTap: () => _selectDateTime(pickupDateController, true),
           ),
           const SizedBox(height: 20),
           _buildInputField(
@@ -647,7 +673,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             hint: 'dd/mm/yyyy · HH:MM',
             icon: Icons.calendar_today,
             readOnly: true,
-            onTap: () => _selectDateTime(deliveryDateController),
+            onTap: () => _selectDateTime(deliveryDateController, false),
           ),
           const SizedBox(height: 20),
           Container(

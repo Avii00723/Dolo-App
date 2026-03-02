@@ -6,10 +6,16 @@ import '../home/homepage.dart';
 
 class KycUploadScreen extends StatefulWidget {
   final String userId;
+  final String? fullName;
+  final String? email;
+  final String? phone;
 
   const KycUploadScreen({
     Key? key,
     required this.userId,
+    this.fullName,
+    this.email,
+    this.phone,
   }) : super(key: key);
 
   @override
@@ -21,11 +27,11 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
   final PageController _pageController = PageController();
 
   // Form controllers
-  final TextEditingController _fullNameController = TextEditingController();
+  late final TextEditingController _fullNameController;
   final TextEditingController _homeCityController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+  late final TextEditingController _phoneController;
   final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
+  late final TextEditingController _emailController;
 
   int _currentStep = 0;
   String? _selectedDocumentType;
@@ -34,6 +40,14 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
   String? _fileExtension;
   bool _isUploading = false;
   double _uploadProgress = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fullNameController = TextEditingController(text: widget.fullName);
+    _phoneController = TextEditingController(text: widget.phone);
+    _emailController = TextEditingController(text: widget.email);
+  }
 
   @override
   void dispose() {
@@ -156,43 +170,54 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 32),
+            Icon(Icons.check_circle, color: Colors.green, size: 28),
             const SizedBox(width: 12),
-            const Text('KYC Uploaded Successfully'),
+            const Expanded(
+              child: Text(
+                'KYC Uploaded Successfully',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Status: ${response.kycStatus}'),
-            const SizedBox(height: 8),
-            Text(
-              response.message,
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green[200]!),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Status: ${response.kycStatus}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.green[700], size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Your KYC document has been submitted for verification.',
-                      style: TextStyle(fontSize: 12),
+              const SizedBox(height: 8),
+              Text(
+                response.message,
+                style: const TextStyle(fontSize: 14, color: Colors.black87),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green[200]!),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.green[700], size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Your KYC document has been submitted for verification.',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           ElevatedButton(
@@ -423,7 +448,7 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
             controller: _phoneController,
             keyboardType: TextInputType.phone,
             decoration: InputDecoration(
-              hintText: '+ 91 8767350358',
+              hintText: 'Enter your phone number',
               hintStyle: TextStyle(color: Colors.grey[400]),
               filled: true,
               fillColor: Colors.grey[50],

@@ -115,7 +115,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -255,9 +255,9 @@ class ModernTravellerOrderCard extends StatelessWidget {
             height: 12,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isActive ? Colors.grey[600] : Colors.transparent,
+              color: isActive ? (Colors.grey[600] ?? Colors.grey) : Colors.transparent,
               border: Border.all(
-                color: isActive ? Colors.grey[600]! : Colors.grey[400]!,
+                color: (isActive ? Colors.grey[600] : Colors.grey[400]) ?? Colors.grey,
                 width: 1.5,
               ),
             ),
@@ -272,7 +272,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
-                    color: isActive ? Colors.grey[600]! : Colors.grey[300]!,
+                    color: (isActive ? Colors.grey[600] : Colors.grey[300]) ?? Colors.grey,
                     width: 1.5,
                   ),
                 ),
@@ -879,7 +879,7 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                     shape: BoxShape.circle,
                     color: isActive ? Colors.black87 : Colors.transparent,
                     border: Border.all(
-                      color: isActive ? Colors.black87 : Colors.grey[400]!,
+                      color: isActive ? Colors.black87 : (Colors.grey[400] ?? Colors.grey),
                       width: 2,
                     ),
                   ),
@@ -888,7 +888,7 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                   Container(
                     width: 2,
                     height: 36,
-                    color: isActive ? Colors.grey[400] : Colors.grey[200],
+                    color: isActive ? (Colors.grey[400] ?? Colors.grey) : (Colors.grey[200] ?? Colors.grey),
                   ),
               ],
             ),
@@ -920,14 +920,14 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                              color: isActive ? Colors.black87 : Colors.grey[400],
+                              color: isActive ? Colors.black87 : (Colors.grey[400] ?? Colors.grey),
                             ),
                           ),
                           Text(
                             steps[i].$2,
                             style: TextStyle(
                               fontSize: 11,
-                              color: isActive ? Colors.grey[600] : Colors.grey[400],
+                              color: isActive ? (Colors.grey[600] ?? Colors.grey) : (Colors.grey[400] ?? Colors.grey),
                             ),
                           ),
                         ],

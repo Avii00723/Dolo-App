@@ -14,20 +14,44 @@ class AuthService {
   static const String _userIdKey = 'user_id';
   static const String _phoneKey = 'user_phone';
   static const String _isLoggedInKey = 'is_logged_in';
+  static const String _isProfileCompletedKey = 'is_profile_completed';
 
   // Save user session after successful login/signup
   static Future<void> saveUserSession({
     required String userId,
     required String phone,
+    bool isProfileCompleted = false,
   }) async {
     try {
       await _storage.write(key: _userIdKey, value: userId);
       await _storage.write(key: _phoneKey, value: phone);
       await _storage.write(key: _isLoggedInKey, value: 'true');
-      print('✅ User session saved securely: userId=$userId, phone=$phone');
+      await _storage.write(key: _isProfileCompletedKey, value: isProfileCompleted.toString());
+      print('✅ User session saved securely: userId=$userId, phone=$phone, isProfileCompleted=$isProfileCompleted');
     } catch (e) {
       print('❌ Error saving user session: $e');
       rethrow;
+    }
+  }
+
+  // Set profile completion status
+  static Future<void> setProfileCompleted(bool completed) async {
+    try {
+      await _storage.write(key: _isProfileCompletedKey, value: completed.toString());
+      print('✅ Profile completion status updated: $completed');
+    } catch (e) {
+      print('❌ Error setting profile completion: $e');
+    }
+  }
+
+  // Check if profile is completed
+  static Future<bool> isProfileCompleted() async {
+    try {
+      final value = await _storage.read(key: _isProfileCompletedKey);
+      return value == 'true';
+    } catch (e) {
+      print('❌ Error checking profile completion: $e');
+      return false;
     }
   }
 
@@ -52,7 +76,7 @@ class AuthService {
     }
   }
 
-  // Check if user is logged in
+  // Check if user is logged in (OTP verified)
   static Future<bool> isLoggedIn() async {
     try {
       final isLoggedInString = await _storage.read(key: _isLoggedInKey);
@@ -70,6 +94,7 @@ class AuthService {
       await _storage.delete(key: _userIdKey);
       await _storage.delete(key: _phoneKey);
       await _storage.delete(key: _isLoggedInKey);
+      await _storage.delete(key: _isProfileCompletedKey);
       print('✅ User session cleared securely');
     } catch (e) {
       print('❌ Error clearing user session: $e');
@@ -94,12 +119,14 @@ class AuthService {
       final userId = await getUserId();
       final phone = await getPhone();
       final isLoggedIn = await AuthService.isLoggedIn();
+      final isProfileCompleted = await AuthService.isProfileCompleted();
 
       if (userId != null && isLoggedIn) {
         return {
           'userId': userId,
           'phone': phone,
           'isLoggedIn': isLoggedIn,
+          'isProfileCompleted': isProfileCompleted,
         };
       }
       return null;

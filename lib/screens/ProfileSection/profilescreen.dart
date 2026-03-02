@@ -9,6 +9,7 @@ import '../../Models/TrustScoreModel.dart';
 import '../../widgets/TrustScoreWidget.dart';
 import '../LoginScreens/LoginSignupScreen.dart';
 import '../LoginScreens/signup_page.dart';
+import '../LoginScreens/kyc_screen.dart';
 import 'ProfileDetailPage.dart';
 import '../../Models/LoginModel.dart';
 import '../../widgets/NotificationBellIcon.dart';
@@ -827,6 +828,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                           BoxShadow(
                             color: Colors.black.withOpacity(0.05),
                             blurRadius: 10,
+
                             offset: const Offset(0, 4),
                           ),
                         ],
@@ -931,7 +933,23 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                                   icon: Icons.verified_user_outlined,
                                   isCompleted: _isKycCompleted(),
                                   onTap: () {
-                                    _showSuccessSnackBar('KYC verification coming soon!');
+                                    if (userId != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => KycUploadScreen(
+                                            userId: userId!,
+                                            fullName: userProfile?.name,
+                                            email: userProfile?.email,
+                                            phone: userProfile?.phone != null ? '+91 ${userProfile?.phone}' : null,
+                                          ),
+                                        ),
+                                      ).then((result) {
+                                        if (result == true) {
+                                          _loadUserData();
+                                        }
+                                      });
+                                    }
                                   },
                                 ),
                               ],

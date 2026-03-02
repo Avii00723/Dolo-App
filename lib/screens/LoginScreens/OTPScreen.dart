@@ -56,19 +56,23 @@ class _OTPScreenState extends State<OTPScreen> {
       final verifyResponse = await _loginService.verifyOtp(widget.phoneNumber, otp);
 
       if (verifyResponse != null) {
+        // Check if profile is already complete based on API response
+        bool isProfileCompleted = verifyResponse.nextScreen != 'SIGNUP';
+
         await AuthService.saveUserSession(
           userId: verifyResponse.userId,
           phone: widget.phoneNumber,
+          isProfileCompleted: isProfileCompleted,
         );
 
         debugPrint('✅ UserId saved to secure storage: ${verifyResponse.userId}');
         debugPrint('📋 Next screen from API: ${verifyResponse.nextScreen}');
+        debugPrint('👤 Profile Completed: $isProfileCompleted');
 
         await DeviceTokenService.initialize();
 
         if (mounted) {
-          // ✅ FIXED: Check nextScreen field instead of showProfilePrompt
-          if (verifyResponse.nextScreen == 'SIGNUP') {
+          if (!isProfileCompleted) {
             debugPrint('✅ Profile incomplete - navigating to SignupScreen');
             Navigator.pushAndRemoveUntil(
               context,

@@ -97,14 +97,17 @@ class _SignupScreenState extends State<SignupScreen> {
         return;
       }
 
+      final firstName = _firstNameController.text.trim();
+      final lastName = _lastNameController.text.trim();
+      final fullName = lastName.isNotEmpty ? '$firstName $lastName' : firstName;
+      final email = _emailController.text.trim();
+
       // Create signup request
       final signupRequest = SignupRequest(
         userId: userId,
-        name: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim().isNotEmpty
-            ? _lastNameController.text.trim()
-            : null,
-        email: _emailController.text.trim(),
+        name: firstName,
+        lastName: lastName.isNotEmpty ? lastName : null,
+        email: email,
         dob: _dobController.text.trim().isNotEmpty
             ? _dobController.text.trim()
             : null,
@@ -123,12 +126,13 @@ class _SignupScreenState extends State<SignupScreen> {
       debugPrint('✅ Signup completed successfully');
       debugPrint('Next Screen: ${signupResult.nextScreen}');
 
-      // Save user session to secure storage
+      // Save user session to secure storage with profile completed flag
       final phone = await AuthService.getPhone();
       if (phone != null) {
         await AuthService.saveUserSession(
           userId: userId,
           phone: phone,
+          isProfileCompleted: true, // Mark profile as completed
         );
         debugPrint('✅ User session confirmed in secure storage');
       }
@@ -137,11 +141,16 @@ class _SignupScreenState extends State<SignupScreen> {
       await Future.delayed(const Duration(seconds: 1));
 
       if (mounted) {
-        // Navigate to KYC screen with userId
-        Navigator.push(
+        // Navigate to KYC screen with userId and pre-filled data
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => KycUploadScreen(userId: userId!),
+            builder: (context) => KycUploadScreen(
+              userId: userId!,
+              fullName: fullName,
+              email: email,
+              phone: phone != null ? '+91 $phone' : null,
+            ),
           ),
         );
       }

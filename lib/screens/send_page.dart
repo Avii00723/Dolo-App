@@ -501,6 +501,125 @@ class _SendPageState extends State<SendPage> {
     });
   }
 
+  // ── Search Logic ─────────────────────────────────────────────────────────
+
+  Future<void> _handleSearch() async {
+    if (_fromText.isEmpty || _toText.isEmpty) {
+      _showSnackBar('Please select origin and destination', Colors.orange);
+      return;
+    }
+
+    if (originPosition == null) {
+      _showSnackBar('Origin location not properly selected', Colors.orange);
+      return;
+    }
+
+    if (_departureDate == null || _departureTime == null) {
+      _showSnackBar('Please select departure date and time', Colors.orange);
+      return;
+    }
+
+    if (_selectedDate == null || _selectedTime == null) {
+      _showSnackBar('Please select delivery date and time', Colors.orange);
+      return;
+    }
+
+    if (selectedVehicle == null) {
+      _showSnackBar('Please select a vehicle', Colors.orange);
+      return;
+    }
+
+    if (currentUserId == null) {
+      _showSnackBar('User not found. Please log in.', Colors.red);
+      return;
+    }
+
+    setState(() => isSearching = true);
+
+    try {
+      final stopoversStr = _stopovers
+          .where((s) => s.text.isNotEmpty)
+          .map((s) => s.text)
+          .toList();
+
+      final orders = await _orderService.searchOrders(
+        origin: _fromText,
+        destination: _toText,
+        departureDate: _departureDate!,
+        departureTime: _departureTime!,
+        pickupDate: _departureDate!, // Using departure as pickup for now
+        pickupTime: _departureTime!,
+        deliveryDate: _selectedDate!,
+        deliveryTime: _selectedTime!,
+        originLatitude: originPosition!.latitude,
+        originLongitude: originPosition!.longitude,
+        vehicle: selectedVehicle!,
+        userId: currentUserId!,
+        stopovers: stopoversStr.isNotEmpty ? stopoversStr : null,
+      );
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SearchResultsPage(
+            orders: orders,
+            fromLocation: _fromText,
+            toLocation: _toText,
+            date: departureController.text,
+            searchedVehicle: selectedVehicle!,
+            departureDate: _departureDate!,
+            departureTime: _departureTime!,
+            deliveryDate: _selectedDate!,
+            deliveryTime: _selectedTime!,
+            currentUserId: currentUserId!,
+            tripRequestService: _tripRequestService,
+            onSendRequest: (order) => _handleSendRequest(order),
+          ),
+        ),
+      );
+    } catch (e) {
+      _showSnackBar('Search failed: $e', Colors.red);
+    } finally {
+      if (mounted) setState(() => isSearching = false);
+    }
+  }
+
+  Future<void> _handleSendRequest(Order order) async {
+    if (currentUserId == null) {
+      _showSnackBar('User not found. Please log in.', Colors.red);
+      return;
+    }
+
+    try {
+      // API expects TripRequestSendRequest fields
+      final request = TripRequestSendRequest(
+        travelerId: currentUserId!,
+        orderId: order.id,
+        travelDate: '${_selectedDate}T$_selectedTime', // Updated to ISO format
+        vehicleInfo: selectedVehicle ?? 'Car',
+        source: _fromText,
+        destination: _toText,
+        departureDatetime: '${_departureDate}T$_departureTime', // Updated to ISO format
+        comments: '',
+        vehicleType: selectedVehicle ?? 'Car',
+      );
+
+      final response = await _tripRequestService.sendTripRequest(request);
+
+      if (response != null) {
+        if (!mounted) return;
+        _showSnackBar('Trip request sent successfully!', Colors.green);
+        Navigator.pop(context); // Go back from search results
+      } else {
+        _showSnackBar('Failed to send trip request', Colors.red);
+      }
+    } catch (e) {
+      _showSnackBar('Error sending request: $e', Colors.red);
+    }
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -638,7 +757,7 @@ class _SendPageState extends State<SendPage> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: isSearching ? null : () {/* search logic */},
+              onPressed: isSearching ? null : _handleSearch,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -647,9 +766,14 @@ class _SendPageState extends State<SendPage> {
                     fontSize: 16, fontWeight: FontWeight.bold),
               ),
               child: isSearching
-                  ? const CircularProgressIndicator(
-                  valueColor:
-                  AlwaysStoppedAnimation<Color>(Colors.white))
+                  ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor:
+                    AlwaysStoppedAnimation<Color>(Colors.white)),
+              )
                   : const Text('Search Orders'),
             ),
           ),

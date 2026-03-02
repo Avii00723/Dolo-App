@@ -156,20 +156,18 @@ class LocationSearchScreen extends StatefulWidget {
 
 class _LocationSearchScreenState extends State<LocationSearchScreen> {
   late TextEditingController _searchController;
-  late FocusNode _searchFocusNode;
   bool isLoadingCurrentLocation = false;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
-    _searchFocusNode = FocusNode();
   }
 
   @override
   void dispose() {
-    _searchFocusNode.dispose();
-    _searchController.dispose();
+    // Note: Removed _searchController.dispose() to avoid assertion errors 
+    // caused by conflicts with GooglePlacesAutoCompleteTextFormField's internal cleanup.
     super.dispose();
   }
 
@@ -377,7 +375,6 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                             ),
                             child: GooglePlacesAutoCompleteTextFormField(
                               textEditingController: _searchController,
-                              focusNode: _searchFocusNode,
                               config: const GoogleApiConfig(
                                 apiKey:
                                 'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
@@ -440,19 +437,22 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                     size: 22,
                                   ),
                                 ),
-                                suffixIcon: _searchController.text.isNotEmpty
-                                    ? IconButton(
-                                  icon: Icon(Icons.clear,
-                                      color: Colors.grey[600]),
-                                  onPressed: () {
-                                    if (mounted) {
-                                      setState(() {
-                                        _searchController.clear();
-                                      });
-                                    }
+                                suffixIcon: AnimatedBuilder(
+                                  animation: _searchController,
+                                  builder: (context, child) {
+                                    return _searchController.text.isNotEmpty
+                                        ? IconButton(
+                                      icon: Icon(Icons.clear,
+                                          color: Colors.grey[600]),
+                                      onPressed: () {
+                                        if (mounted) {
+                                          _searchController.clear();
+                                        }
+                                      },
+                                    )
+                                        : const SizedBox.shrink();
                                   },
-                                )
-                                    : null,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
                                   borderSide: BorderSide(

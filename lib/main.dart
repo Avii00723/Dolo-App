@@ -2,6 +2,7 @@ import 'package:dolo/screens/LoginScreens/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:dolo/screens/home/homepage.dart';
 import 'package:dolo/screens/LoginScreens/LoginSignupScreen.dart';
+import 'package:dolo/screens/LoginScreens/signup_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'Controllers/AuthService.dart';
