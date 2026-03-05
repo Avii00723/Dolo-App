@@ -7,7 +7,6 @@ import '../../Controllers/OrderService.dart';
 import '../../Controllers/TripRequestService.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ratingservice.dart';
-import '../../Models/RatingModel.dart';
 import '../Inbox Section/indoxscreen.dart';
 import '../../Models/OrderModel.dart' as OrderModels;
 import '../../Models/TripRequestModel.dart';
@@ -29,10 +28,10 @@ class OrderDisplay {
   final String status;
   final String? profileImageUrl;
   final String? matchedTravellerId;
-  final double? originLatitude;
-  final double? originLongitude;
-  final double? destinationLatitude;
-  final double? destinationLongitude;
+  final double originLatitude;
+  final double originLongitude;
+  final double destinationLatitude;
+  final double destinationLongitude;
   final String? orderType;
   final double? estimatedDistance;
   final int? expectedPrice;
@@ -59,10 +58,10 @@ class OrderDisplay {
     required this.status,
     this.profileImageUrl,
     this.matchedTravellerId,
-    this.originLatitude,
-    this.originLongitude,
-    this.destinationLatitude,
-    this.destinationLongitude,
+    this.originLatitude = 0.0,
+    this.originLongitude = 0.0,
+    this.destinationLatitude = 0.0,
+    this.destinationLongitude = 0.0,
     this.orderType,
     this.estimatedDistance,
     this.expectedPrice,
@@ -104,7 +103,7 @@ class TripRequestDisplay {
 class YourOrdersPage extends StatefulWidget {
   final int initialTabIndex;
 
-  const YourOrdersPage({Key? key, this.initialTabIndex = 0}) : super(key: key);
+  const YourOrdersPage({super.key, this.initialTabIndex = 0});
 
   @override
   State<YourOrdersPage> createState() => _YourOrdersPageState();
@@ -125,7 +124,6 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   Map<String, List<TripRequestDisplay>> tripRequestsByOrder = {};
   bool isLoadingMyOrders = false;
   bool isLoadingMyRequests = false;
-  final RatingService _ratingService = RatingService();
 
   @override
   void initState() {
@@ -218,10 +216,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           destinationLongitude: order.destinationLongitude,
           orderType: 'send',
           estimatedDistance: order.distanceKm,
-          expectedPrice: order.expectedPrice ??
-              (order.calculatedPrice != null
-                  ? order.calculatedPrice!.toInt()
-                  : null),
+          expectedPrice: order.expectedPrice ?? order.calculatedPrice?.toInt(),
           notes: order.specialInstructions,
           imageUrl: order.imageUrl,
           category: order.category,
@@ -264,7 +259,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             id: request.id,
             orderId: request.orderId,
             travellerId: request.travelerId,
-            travellerName: 'Traveler ${request.travelerId}',
+            travellerName: request.travelerName ?? 'Traveler ${request.travelerId}',
             vehicleInfo: request.vehicleInfo,
             departureDatetime: request.departureDatetime,
             travelDate: request.travelDate,
@@ -285,7 +280,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         });
       }
     } catch (e) {
-      print('❌ Error loading trip requests: $e');
+      debugPrint('❌ Error loading trip requests: $e');
     }
   }
 
@@ -306,8 +301,10 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         displayOrders.add(OrderDisplay(
           id: request.orderId,
           userId: request.orderId,
-          userName: 'Order Creator',
-          senderInitial: 'O',
+          userName: request.counterpartName ?? 'Order Creator',
+          senderInitial: (request.counterpartName != null && request.counterpartName!.isNotEmpty) 
+              ? request.counterpartName![0].toUpperCase() 
+              : 'O',
           origin: request.source,
           destination: request.destination,
           date: request.travelDate,
@@ -338,40 +335,189 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
-  // ── ACTION HANDLERS (unchanged from original) ──
+  // ── ACTION HANDLERS ──
 
   Future<void> _acceptTripRequest(
       TripRequestDisplay request, String orderId) async {
-    // Keep original implementation
+    if (currentUserId == null) return;
+    try {
+      final acceptReq = TripRequestAcceptRequest(
+        orderCreatorId: currentUserId!,
+        tripRequestId: request.id,
+        negotiatedPrice: 0, // In UI, you might want to ask for this
+      );
+      
+      final response = await _tripRequestService.acceptTripRequest(acceptReq);
+      if (response != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message), backgroundColor: Colors.green),
+        );
+        _loadAllData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _declineTripRequest(
       TripRequestDisplay request, String orderId) async {
-    // Keep original implementation
+    if (currentUserId == null) return;
+    try {
+      final declineReq = TripRequestDeclineRequest(
+        orderCreatorHashedId: currentUserId!,
+        tripRequestId: request.id,
+      );
+      
+      final response = await _tripRequestService.declineTripRequest(declineReq);
+      if (response != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message), backgroundColor: Colors.orange),
+        );
+        _loadAllData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _withdrawTripRequest(String tripRequestId) async {
-    // Keep original implementation
+    if (currentUserId == null) return;
+    try {
+      final withdrawReq = TripRequestWithdrawRequest(
+        travelerHashedId: currentUserId!,
+        tripRequestHashedId: tripRequestId,
+      );
+      
+      final response = await _tripRequestService.withdrawTripRequest(withdrawReq);
+      if (response != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.message), backgroundColor: Colors.orange),
+        );
+        _loadAllData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _deleteTripRequest(String tripRequestId) async {
-    // Keep original implementation
+    try {
+      final success = await _tripRequestService.deleteTripRequest(tripRequestId);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trip request deleted'), backgroundColor: Colors.blue),
+        );
+        _loadAllData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _updateOrder(OrderDisplay updatedOrder) async {
-    // Keep original implementation
+    if (currentUserId == null) return;
+    try {
+      final updateReq = OrderModels.OrderUpdateRequest(
+        userHashedId: currentUserId!,
+        itemDescription: updatedOrder.itemDescription,
+        origin: updatedOrder.origin,
+        originLatitude: updatedOrder.originLatitude,
+        originLongitude: updatedOrder.originLongitude,
+        destination: updatedOrder.destination,
+        destinationLatitude: updatedOrder.destinationLatitude,
+        destinationLongitude: updatedOrder.destinationLongitude,
+        deliveryDate: updatedOrder.date,
+        weight: updatedOrder.weight,
+        specialInstructions: updatedOrder.notes,
+      );
+      
+      final response = await _orderService.updateOrder(updatedOrder.id, updateReq);
+      if (response != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order updated successfully'), backgroundColor: Colors.green),
+        );
+        _loadAllData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating order: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _deleteOrder(String orderId) async {
-    // Keep original implementation
+    if (currentUserId == null) return;
+    try {
+      final success = await _orderService.deleteOrder(orderId, currentUserId!);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order deleted'), backgroundColor: Colors.blue),
+        );
+        _loadAllData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting order: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _markOrderReceived(OrderDisplay order) async {
-    // Keep original implementation
+    if (currentUserId == null) return;
+    try {
+      final success = await _orderService.completeOrder(order.id, currentUserId!);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order marked as received'), backgroundColor: Colors.green),
+        );
+        _loadAllData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _completeOrder(OrderDisplay order) async {
-    // Keep original implementation — shows rating dialog then completes
+    if (currentUserId == null) return;
+    try {
+      final success = await _orderService.completeOrder(order.id, currentUserId!);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order completed successfully'), backgroundColor: Colors.green),
+        );
+        _loadAllData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   void _openInbox() {
@@ -563,7 +709,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

@@ -150,55 +150,59 @@ class ModernSenderOrderCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Origin → Destination
+                        // Origin (Line 1)
+                        Text(
+                          order.origin,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         Row(
                           children: [
-                            Text(
-                              order.origin,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.black,
+                            const Text(
+                              '↓ ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 6),
+                            // Destination (Line 2)
+                            Expanded(
                               child: Text(
-                                '- - - →',
-                                style: TextStyle(
+                                order.destination,
+                                style: const TextStyle(
                                   fontSize: 14,
-                                  color: Colors.black54,
-                                  letterSpacing: 1,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black,
                                 ),
-                              ),
-                            ),
-                            Text(
-                              order.destination,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.black,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         // Dates row
                         Row(
                           children: [
                             Text(
                               _formatDisplayDate(order.date),
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 color: Colors.grey[600],
                               ),
                             ),
                             if (order.deliveryTime != null) ...[
-                              const SizedBox(width: 16),
+                              const SizedBox(width: 12),
                               Text(
                                 _formatDisplayDate(order.deliveryTime!),
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   color: Colors.grey[600],
                                 ),
                               ),
@@ -211,7 +215,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   // Status Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: _getStatusBgColor(order.status),
                       borderRadius: BorderRadius.circular(20),
@@ -219,7 +223,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                     child: Text(
                       _getStatusLabel(order.status),
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: _getStatusTextColor(order.status),
                       ),
@@ -235,7 +239,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                 Text(
                   'Traveler',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: Colors.grey[500],
                     fontWeight: FontWeight.w500,
                   ),
@@ -244,41 +248,45 @@ class ModernSenderOrderCard extends StatelessWidget {
                 Row(
                   children: [
                     CircleAvatar(
-                      radius: 20,
+                      radius: 18,
                       backgroundColor: Colors.grey[300],
                       backgroundImage: order.profileImageUrl != null
                           ? NetworkImage(order.profileImageUrl!)
                           : null,
                       child: order.profileImageUrl == null
-                          ? Icon(Icons.person, color: Colors.grey[600], size: 22)
+                          ? Icon(Icons.person, color: Colors.grey[600], size: 20)
                           : null,
                     ),
                     const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          order.userName != 'You' ? order.userName : 'Matched Traveler',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              'Verified',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[500],
-                              ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.userName != 'You' ? order.userName : 'Matched Traveler',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
                             ),
-                            const SizedBox(width: 4),
-                            Icon(Icons.check, size: 14, color: Colors.grey[500]),
-                          ],
-                        ),
-                      ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                'Verified',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.check, size: 12, color: Colors.grey[500]),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -286,7 +294,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                 Text(
                   'Traveler',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: Colors.grey[500],
                     fontWeight: FontWeight.w500,
                   ),
@@ -307,7 +315,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                       Text(
                         '${tripRequests!.length} Request${tripRequests!.length > 1 ? 's' : ''} — tap to review',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Colors.orange[700],
                         ),
@@ -336,8 +344,8 @@ class ModernSenderOrderCard extends StatelessWidget {
           final step = i ~/ 2;
           final isActive = step <= activeStep;
           return Container(
-            width: 12,
-            height: 12,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isActive ? Colors.grey[600] : Colors.transparent,

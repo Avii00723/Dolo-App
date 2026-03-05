@@ -880,7 +880,7 @@ class ModernRequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isReceived ? request.travelerId : request.orderId,
+                      request.counterpartName ?? (isReceived ? request.travelerId : request.orderId),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,

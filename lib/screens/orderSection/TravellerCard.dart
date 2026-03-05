@@ -115,7 +115,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -136,41 +136,46 @@ class ModernTravellerOrderCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Origin (Line 1)
+                        Text(
+                          order.origin,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         Row(
                           children: [
-                            Text(
-                              order.origin,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.black,
+                            const Text(
+                              '↓ ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 6),
+                            // Destination (Line 2)
+                            Expanded(
                               child: Text(
-                                '- - - →',
-                                style: TextStyle(
+                                order.destination,
+                                style: const TextStyle(
                                   fontSize: 14,
-                                  color: Colors.black54,
-                                  letterSpacing: 1,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black,
                                 ),
-                              ),
-                            ),
-                            Text(
-                              order.destination,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.black,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
                           _formatDisplayDate(order.date),
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                         ),
                       ],
                     ),
@@ -178,7 +183,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   // Status Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: _getStatusBgColor(order.requestStatus ?? order.status),
                       borderRadius: BorderRadius.circular(20),
@@ -186,7 +191,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
                     child: Text(
                       _getStatusLabel(order.requestStatus ?? order.status),
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: _getStatusTextColor(order.requestStatus ?? order.status),
                       ),
@@ -201,7 +206,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
               Text(
                 'Order Creator',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: Colors.grey[500],
                   fontWeight: FontWeight.w500,
                 ),
@@ -215,18 +220,23 @@ class ModernTravellerOrderCard extends StatelessWidget {
                     child: Text(
                       order.senderInitial,
                       style: const TextStyle(
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    order.userName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                  Expanded(
+                    child: Text(
+                      order.userName,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -251,8 +261,8 @@ class ModernTravellerOrderCard extends StatelessWidget {
           final step = i ~/ 2;
           final isActive = step <= activeStep;
           return Container(
-            width: 12,
-            height: 12,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isActive ? Colors.grey[600] : Colors.transparent,
