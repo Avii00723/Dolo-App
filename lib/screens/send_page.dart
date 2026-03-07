@@ -381,6 +381,9 @@ class _SendPageState extends State<SendPage> {
   final TextEditingController deliveryController = TextEditingController();
   String? _departureDate, _departureTime;
   String? _selectedDate, _selectedTime;
+  
+  DateTime? _departureDateTime;
+  DateTime? _deliveryDateTime;
 
   // ── Vehicle ───────────────────────────────────────────────────────────────
   String? selectedVehicle;
@@ -514,13 +517,19 @@ class _SendPageState extends State<SendPage> {
       return;
     }
 
-    if (_departureDate == null || _departureTime == null) {
+    if (_departureDate == null || _departureTime == null || _departureDateTime == null) {
       _showSnackBar('Please select departure date and time', Colors.orange);
       return;
     }
 
-    if (_selectedDate == null || _selectedTime == null) {
+    if (_selectedDate == null || _selectedTime == null || _deliveryDateTime == null) {
       _showSnackBar('Please select delivery date and time', Colors.orange);
+      return;
+    }
+    
+    // Date Validation: Starting date should not be greater than ending date
+    if (_deliveryDateTime!.isBefore(_departureDateTime!)) {
+      _showSnackBar('Delivery date cannot be before departure date', Colors.red);
       return;
     }
 
@@ -873,6 +882,7 @@ class _SendPageState extends State<SendPage> {
     final dt =
     DateTime(date.year, date.month, date.day, time.hour, time.minute);
     setState(() {
+      _departureDateTime = dt;
       departureController.text =
           DateFormat('dd MMM yyyy, hh:mm a').format(dt);
       _departureDate = DateFormat('yyyy-MM-dd').format(dt);
@@ -893,6 +903,7 @@ class _SendPageState extends State<SendPage> {
     final dt =
     DateTime(date.year, date.month, date.day, time.hour, time.minute);
     setState(() {
+      _deliveryDateTime = dt;
       deliveryController.text =
           DateFormat('dd MMM yyyy, hh:mm a').format(dt);
       _selectedDate = DateFormat('yyyy-MM-dd').format(dt);

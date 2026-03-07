@@ -13,6 +13,7 @@ import '../../Models/TripRequestModel.dart';
 import '../../screens/orderSection/OrderCard.dart';
 import '../../widgets/NotificationBellIcon.dart';
 import 'TravellerCard.dart';
+import '../CustomRouteMapScreen.dart';
 
 class OrderDisplay {
   final String id;
@@ -337,6 +338,22 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
   // ── ACTION HANDLERS ──
 
+  void _viewRoute(OrderDisplay order) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomRouteMapScreen(
+          originCity: order.origin,
+          destinationCity: order.destination,
+          originLatitude: order.originLatitude,
+          originLongitude: order.originLongitude,
+          destinationLatitude: order.destinationLatitude,
+          destinationLongitude: order.destinationLongitude,
+        ),
+      ),
+    );
+  }
+
   Future<void> _acceptTripRequest(
       TripRequestDisplay request, String orderId) async {
     if (currentUserId == null) return;
@@ -647,7 +664,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             tripRequests: requests,
             onAcceptRequest: _acceptTripRequest,
             onDeclineRequest: _declineTripRequest,
-            onTrackOrder: () {},
+            onTrackOrder: () => _viewRoute(order),
             onMarkReceived: () => _markOrderReceived(order),
             onCompleteOrder: () => _completeOrder(order),
             onUpdateOrder: _updateOrder,
@@ -678,9 +695,10 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: myRequestedOrders.length,
         itemBuilder: (context, index) {
+          final order = myRequestedOrders[index];
           return ModernTravellerOrderCard(
-            order: myRequestedOrders[index],
-            onTrackOrder: () {},
+            order: order,
+            onTrackOrder: () => _viewRoute(order),
             onWithdrawRequest: _withdrawTripRequest,
             onDeleteRequest: _deleteTripRequest,
           );
@@ -709,7 +727,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: Colors.black.withOpacity(0.06),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

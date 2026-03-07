@@ -12,21 +12,20 @@ class Order {
   final double destinationLatitude;
   final double destinationLongitude;
   final String deliveryDate;
-  final String? deliveryTime; // Delivery time (HH:mm:ss format)
-  final String
-      weight; // Weight as string: "less than 5kg", "5-10kg", "more than 10kg"
-  final int? expectedPrice; // Optional, not always returned by API
+  final String? deliveryTime;
+  final String weight; // API values: "below 2kg", "2-5kg", "5-10kg", "more than 10kg"
+  final int? expectedPrice;
   final String imageUrl;
   final String specialInstructions;
   final String status;
-  final String? category;
+  final String? category; // API values: "technology", "documents", "clothing", "fragile", "food", "other"
   final String? subcategory;
   final double? distanceKm;
   final double? calculatedPrice;
   final String? createdAt;
   final String transportMode;
-  final List<String>? preferenceTransport; // Preferred transport modes
-  final bool? isUrgent; // Urgent delivery flag
+  final List<String>? preferenceTransport;
+  final bool? isUrgent;
 
   Order({
     required this.id,
@@ -76,7 +75,6 @@ class Order {
       }
     }
 
-    // Parse ID with fallback and logging
     final parsedId = json['orderId']?.toString() ??
         json['hashed_id']?.toString() ??
         json['id']?.toString() ??
@@ -85,17 +83,18 @@ class Order {
     String deliveryDate = '';
     String? deliveryTime;
 
-    // Try to parse delivery_datetime first (preferred format)
-    if (json['delivery_datetime'] != null && json['delivery_datetime'].toString().isNotEmpty) {
+    if (json['delivery_datetime'] != null &&
+        json['delivery_datetime'].toString().isNotEmpty) {
       try {
         String datetime = json['delivery_datetime'].toString();
-        datetime = datetime.replaceAll('.000Z', '').replaceAll('Z', '').trim();
+        datetime =
+            datetime.replaceAll('.000Z', '').replaceAll('Z', '').trim();
 
         if (datetime.contains('T')) {
           final parts = datetime.split('T');
-          deliveryDate = parts[0].trim(); // YYYY-MM-DD
+          deliveryDate = parts[0].trim();
           if (parts.length > 1 && parts[1].isNotEmpty) {
-            deliveryTime = parts[1].trim(); // HH:mm:ss
+            deliveryTime = parts[1].trim();
           }
         } else {
           deliveryDate = datetime;
@@ -105,12 +104,12 @@ class Order {
       }
     }
 
-    // Fallback to separate fields
     if (deliveryDate.isEmpty && json['delivery_date'] != null) {
       deliveryDate = json['delivery_date'].toString().trim();
     }
 
-    if ((deliveryTime == null || deliveryTime.isEmpty) && json['delivery_time'] != null) {
+    if ((deliveryTime == null || deliveryTime.isEmpty) &&
+        json['delivery_time'] != null) {
       deliveryTime = json['delivery_time'].toString().trim();
     }
 
@@ -228,102 +227,241 @@ class OrderSubCategory {
   });
 }
 
+// UPDATED: All apiValues now match API enum exactly:
+// technology, documents, clothing, fragile, food, other
+// "furniture" is not a valid API category — mapped to "other"
 final List<OrderMainCategory> orderCategories = [
   OrderMainCategory(
     name: 'Electronics',
-    apiValue: 'technology',
+    apiValue: 'technology', // ✅ valid API value
     icon: '⚡',
     color: const Color(0xFF2196F3),
     subCategories: [
-      OrderSubCategory(name: 'Refrigerator', apiValue: 'Electronics', description: 'Fridge or freezer', icon: '🧊'),
-      OrderSubCategory(name: 'Television', apiValue: 'Electronics', description: 'TV or monitor', icon: '📺'),
-      OrderSubCategory(name: 'Washing Machine', apiValue: 'Electronics', description: 'Washer or dryer', icon: '🧺'),
-      OrderSubCategory(name: 'Air Conditioner', apiValue: 'Electronics', description: 'AC unit', icon: '❄️'),
-      OrderSubCategory(name: 'Microwave', apiValue: 'Electronics', description: 'Microwave oven', icon: '🔥'),
-      OrderSubCategory(name: 'Laptop', apiValue: 'Electronics', description: 'Computer or laptop', icon: '💻'),
-      OrderSubCategory(name: 'Other Electronics', apiValue: 'Electronics', description: 'Other electronic items', icon: '📱'),
+      OrderSubCategory(
+          name: 'Refrigerator',
+          apiValue: 'technology',
+          description: 'Fridge or freezer',
+          icon: '🧊'),
+      OrderSubCategory(
+          name: 'Television',
+          apiValue: 'technology',
+          description: 'TV or monitor',
+          icon: '📺'),
+      OrderSubCategory(
+          name: 'Washing Machine',
+          apiValue: 'technology',
+          description: 'Washer or dryer',
+          icon: '🧺'),
+      OrderSubCategory(
+          name: 'Air Conditioner',
+          apiValue: 'technology',
+          description: 'AC unit',
+          icon: '❄️'),
+      OrderSubCategory(
+          name: 'Microwave',
+          apiValue: 'technology',
+          description: 'Microwave oven',
+          icon: '🔥'),
+      OrderSubCategory(
+          name: 'Laptop',
+          apiValue: 'technology',
+          description: 'Computer or laptop',
+          icon: '💻'),
+      OrderSubCategory(
+          name: 'Other Electronics',
+          apiValue: 'technology',
+          description: 'Other electronic items',
+          icon: '📱'),
     ],
   ),
   OrderMainCategory(
     name: 'Furniture',
-    apiValue: 'furniture',
+    apiValue: 'other', // ✅ "furniture" not in API — mapped to "other"
     icon: '🛋️',
     color: const Color(0xFF795548),
     subCategories: [
-      OrderSubCategory(name: 'Sofa', apiValue: 'Furniture', description: 'Couch or sofa set', icon: '🛋️'),
-      OrderSubCategory(name: 'Bed', apiValue: 'Furniture', description: 'Bed or mattress', icon: '🛏️'),
-      OrderSubCategory(name: 'Table', apiValue: 'Furniture', description: 'Dining or coffee table', icon: '🪑'),
-      OrderSubCategory(name: 'Chair', apiValue: 'Furniture', description: 'Chair or stool', icon: '💺'),
-      OrderSubCategory(name: 'Wardrobe', apiValue: 'Furniture', description: 'Closet or wardrobe', icon: '🚪'),
-      OrderSubCategory(name: 'Other Furniture', apiValue: 'Furniture', description: 'Other furniture items', icon: '🪑'),
+      OrderSubCategory(
+          name: 'Sofa',
+          apiValue: 'other',
+          description: 'Couch or sofa set',
+          icon: '🛋️'),
+      OrderSubCategory(
+          name: 'Bed',
+          apiValue: 'other',
+          description: 'Bed or mattress',
+          icon: '🛏️'),
+      OrderSubCategory(
+          name: 'Table',
+          apiValue: 'other',
+          description: 'Dining or coffee table',
+          icon: '🪑'),
+      OrderSubCategory(
+          name: 'Chair',
+          apiValue: 'other',
+          description: 'Chair or stool',
+          icon: '💺'),
+      OrderSubCategory(
+          name: 'Wardrobe',
+          apiValue: 'other',
+          description: 'Closet or wardrobe',
+          icon: '🚪'),
+      OrderSubCategory(
+          name: 'Other Furniture',
+          apiValue: 'other',
+          description: 'Other furniture items',
+          icon: '🪑'),
     ],
   ),
   OrderMainCategory(
     name: 'Documents',
-    apiValue: 'documents',
+    apiValue: 'documents', // ✅ valid API value
     icon: '📄',
     color: const Color(0xFF4CAF50),
     subCategories: [
-      OrderSubCategory(name: 'Legal Papers', apiValue: 'Documents', description: 'Contracts, agreements', icon: '📃'),
-      OrderSubCategory(name: 'Certificates', apiValue: 'Documents', description: 'Educational, medical docs', icon: '🎓'),
-      OrderSubCategory(name: 'Files & Folders', apiValue: 'Documents', description: 'Office documents', icon: '📁'),
-      OrderSubCategory(name: 'Books', apiValue: 'Documents', description: 'Books or magazines', icon: '📚'),
-      OrderSubCategory(name: 'Other Documents', apiValue: 'Documents', description: 'Other paper items', icon: '📄'),
+      OrderSubCategory(
+          name: 'Legal Papers',
+          apiValue: 'documents',
+          description: 'Contracts, agreements',
+          icon: '📃'),
+      OrderSubCategory(
+          name: 'Certificates',
+          apiValue: 'documents',
+          description: 'Educational, medical docs',
+          icon: '🎓'),
+      OrderSubCategory(
+          name: 'Files & Folders',
+          apiValue: 'documents',
+          description: 'Office documents',
+          icon: '📁'),
+      OrderSubCategory(
+          name: 'Books',
+          apiValue: 'documents',
+          description: 'Books or magazines',
+          icon: '📚'),
+      OrderSubCategory(
+          name: 'Other Documents',
+          apiValue: 'documents',
+          description: 'Other paper items',
+          icon: '📄'),
     ],
   ),
   OrderMainCategory(
     name: 'Fragile Items',
-    apiValue: 'fragile',
+    apiValue: 'fragile', // ✅ valid API value
     icon: '📦',
     color: const Color(0xFFE91E63),
     subCategories: [
-      OrderSubCategory(name: 'Glassware', apiValue: 'Others', description: 'Glass items, mirrors', icon: '🍷'),
-      OrderSubCategory(name: 'Ceramics', apiValue: 'Others', description: 'Pottery, vases', icon: '🏺'),
-      OrderSubCategory(name: 'Artwork', apiValue: 'Others', description: 'Paintings, sculptures', icon: '🎨'),
-      OrderSubCategory(name: 'Antiques', apiValue: 'Others', description: 'Vintage collectibles', icon: '🛍️'),
-      OrderSubCategory(name: 'Other Fragile', apiValue: 'Others', description: 'Other delicate items', icon: '⚠️'),
+      OrderSubCategory(
+          name: 'Glassware',
+          apiValue: 'fragile',
+          description: 'Glass items, mirrors',
+          icon: '🍷'),
+      OrderSubCategory(
+          name: 'Ceramics',
+          apiValue: 'fragile',
+          description: 'Pottery, vases',
+          icon: '🏺'),
+      OrderSubCategory(
+          name: 'Artwork',
+          apiValue: 'fragile',
+          description: 'Paintings, sculptures',
+          icon: '🎨'),
+      OrderSubCategory(
+          name: 'Antiques',
+          apiValue: 'fragile',
+          description: 'Vintage collectibles',
+          icon: '🛍️'),
+      OrderSubCategory(
+          name: 'Other Fragile',
+          apiValue: 'fragile',
+          description: 'Other delicate items',
+          icon: '⚠️'),
     ],
   ),
   OrderMainCategory(
     name: 'Clothing',
-    apiValue: 'clothing',
+    apiValue: 'clothing', // ✅ valid API value
     icon: '👕',
     color: const Color(0xFF9C27B0),
     subCategories: [
-      OrderSubCategory(name: 'Clothes', apiValue: 'Others', description: 'Shirts, pants, dresses', icon: '👕'),
-      OrderSubCategory(name: 'Shoes', apiValue: 'Others', description: 'Footwear', icon: '👟'),
-      OrderSubCategory(name: 'Accessories', apiValue: 'Others', description: 'Bags, belts, jewelry', icon: '👜'),
-      OrderSubCategory(name: 'Textiles', apiValue: 'Others', description: 'Fabrics, linens', icon: '🧵'),
+      OrderSubCategory(
+          name: 'Clothes',
+          apiValue: 'clothing',
+          description: 'Shirts, pants, dresses',
+          icon: '👕'),
+      OrderSubCategory(
+          name: 'Shoes',
+          apiValue: 'clothing',
+          description: 'Footwear',
+          icon: '👟'),
+      OrderSubCategory(
+          name: 'Accessories',
+          apiValue: 'clothing',
+          description: 'Bags, belts, jewelry',
+          icon: '👜'),
+      OrderSubCategory(
+          name: 'Textiles',
+          apiValue: 'clothing',
+          description: 'Fabrics, linens',
+          icon: '🧵'),
     ],
   ),
   OrderMainCategory(
     name: 'Food Items',
-    apiValue: 'food',
+    apiValue: 'food', // ✅ valid API value
     icon: '🍱',
     color: const Color(0xFFFF9800),
     subCategories: [
-      OrderSubCategory(name: 'Perishable Food', apiValue: 'Others', description: 'Fresh food items', icon: '🥗'),
-      OrderSubCategory(name: 'Packaged Food', apiValue: 'Others', description: 'Sealed packages', icon: '📦'),
-      OrderSubCategory(name: 'Beverages', apiValue: 'Others', description: 'Drinks and liquids', icon: '🥤'),
+      OrderSubCategory(
+          name: 'Perishable Food',
+          apiValue: 'food',
+          description: 'Fresh food items',
+          icon: '🥗'),
+      OrderSubCategory(
+          name: 'Packaged Food',
+          apiValue: 'food',
+          description: 'Sealed packages',
+          icon: '📦'),
+      OrderSubCategory(
+          name: 'Beverages',
+          apiValue: 'food',
+          description: 'Drinks and liquids',
+          icon: '🥤'),
     ],
   ),
   OrderMainCategory(
     name: 'Others',
-    apiValue: 'other',
+    apiValue: 'other', // ✅ valid API value
     icon: '📦',
     color: const Color(0xFF9E9E9E),
     subCategories: [
-      OrderSubCategory(name: 'Sports Equipment', apiValue: 'Others', description: 'Sports gear', icon: '⚽'),
-      OrderSubCategory(name: 'Kitchen Items', apiValue: 'Others', description: 'Utensils, cookware', icon: '🍳'),
-      OrderSubCategory(name: 'Plants', apiValue: 'Others', description: 'Indoor or outdoor plants', icon: '🪴'),
-      OrderSubCategory(name: 'Miscellaneous', apiValue: 'Others', description: 'Other items', icon: '📦'),
+      OrderSubCategory(
+          name: 'Sports Equipment',
+          apiValue: 'other',
+          description: 'Sports gear',
+          icon: '⚽'),
+      OrderSubCategory(
+          name: 'Kitchen Items',
+          apiValue: 'other',
+          description: 'Utensils, cookware',
+          icon: '🍳'),
+      OrderSubCategory(
+          name: 'Plants',
+          apiValue: 'other',
+          description: 'Indoor or outdoor plants',
+          icon: '🪴'),
+      OrderSubCategory(
+          name: 'Miscellaneous',
+          apiValue: 'other',
+          description: 'Other items',
+          icon: '📦'),
     ],
   ),
 ];
 
 class OrderCreateRequest {
   final String userHashedId;
-  final String itemDescription; // Added
+  final String itemDescription;
   final String origin;
   final double originLatitude;
   final double originLongitude;
@@ -386,9 +524,12 @@ class OrderCreateRequest {
     };
 
     if (actualWeight != null) map['actual_weight'] = actualWeight!;
-    if (customCategory != null && customCategory!.isNotEmpty) map['customCategory'] = customCategory!;
-    if (preferenceTransport != null && preferenceTransport!.isNotEmpty) map['preference_transport'] = preferenceTransport!;
-    if (specialInstructions != null && specialInstructions!.isNotEmpty) map['special_instructions'] = specialInstructions!;
+    if (customCategory != null && customCategory!.isNotEmpty)
+      map['customCategory'] = customCategory!;
+    if (preferenceTransport != null && preferenceTransport!.isNotEmpty)
+      map['preference_transport'] = preferenceTransport!;
+    if (specialInstructions != null && specialInstructions!.isNotEmpty)
+      map['special_instructions'] = specialInstructions!;
 
     return map;
   }
@@ -431,7 +572,7 @@ class OrderCreateResponse {
 
 class OrderUpdateRequest {
   final String userHashedId;
-  final String itemDescription; // Added
+  final String itemDescription;
   final String origin;
   final double originLatitude;
   final double originLongitude;
@@ -439,7 +580,7 @@ class OrderUpdateRequest {
   final double destinationLatitude;
   final double destinationLongitude;
   final String deliveryDate;
-  final String weight; // Changed from double to String for consistency
+  final String weight;
   final String? category;
   final String? subcategory;
   final String? imageUrl;
@@ -479,7 +620,8 @@ class OrderUpdateRequest {
     if (category != null) map['category'] = category!;
     if (subcategory != null) map['subcategory'] = subcategory!;
     if (imageUrl != null && imageUrl!.isNotEmpty) map['image_url'] = imageUrl!;
-    if (specialInstructions != null && specialInstructions!.isNotEmpty) map['special_instructions'] = specialInstructions!;
+    if (specialInstructions != null && specialInstructions!.isNotEmpty)
+      map['special_instructions'] = specialInstructions!;
 
     return map;
   }
@@ -517,19 +659,28 @@ enum OrderStatus {
 
   String get displayName {
     switch (this) {
-      case OrderStatus.pending: return 'Pending';
-      case OrderStatus.accepted: return 'Accepted';
-      case OrderStatus.booked: return 'Booked';
-      case OrderStatus.delivered: return 'Delivered';
+      case OrderStatus.pending:
+        return 'Pending';
+      case OrderStatus.accepted:
+        return 'Accepted';
+      case OrderStatus.booked:
+        return 'Booked';
+      case OrderStatus.delivered:
+        return 'Delivered';
     }
   }
 
   Color get statusColor {
     switch (this) {
-      case OrderStatus.pending: return Colors.orange;
-      case OrderStatus.accepted: return Colors.blue;
-      case OrderStatus.booked: return Colors.purple;
-      case OrderStatus.delivered: return Colors.green;
+      case OrderStatus.pending:
+        return Colors.orange;
+      case OrderStatus.accepted:
+        return Colors.blue;
+      case OrderStatus.booked:
+        return Colors.purple;
+      case OrderStatus.delivered:
+        return Colors.green;
+
     }
   }
 }

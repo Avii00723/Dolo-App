@@ -36,13 +36,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   final TextEditingController pickupDateController = TextEditingController();
   final TextEditingController deliveryDateController = TextEditingController();
   final TextEditingController weightController = TextEditingController();
+  final TextEditingController actualWeightController = TextEditingController(); // NEW: Controller for exact weight
   final TextEditingController packageTypeController = TextEditingController();
   final TextEditingController transportController = TextEditingController();
   final TextEditingController restrictionsController = TextEditingController();
 
   Position? originPosition;
   Position? destinationPosition;
-  
+
   DateTime? _pickupDateTime;
   DateTime? _deliveryDateTime;
 
@@ -111,6 +112,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     pickupDateController.dispose();
     deliveryDateController.dispose();
     weightController.dispose();
+    actualWeightController.dispose();
     packageTypeController.dispose();
     transportController.dispose();
     restrictionsController.dispose();
@@ -162,10 +164,19 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           _showSnackBar('Please select delivery date & time', Colors.orange);
           return false;
         }
+        if (_deliveryDateTime!.isBefore(_pickupDateTime!)) {
+          _showSnackBar('Delivery date cannot be before pickup date', Colors.red);
+          return false;
+        }
         return true;
       case 1:
         if (_selectedWeightRange == null) {
           _showSnackBar('Please select package weight', Colors.orange);
+          return false;
+        }
+        // VALIDATION: If >10kg selected, must provide actual weight
+        if (_selectedWeightRange == 'more than 10kg' && actualWeightController.text.trim().isEmpty) {
+          _showSnackBar('Please enter actual weight for packages over 10kg', Colors.orange);
           return false;
         }
         if (_selectedMainCategory == null) {
@@ -194,7 +205,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       });
 
       String apiCategory = _selectedMainCategory!.apiValue;
-      String weightString = _getWeightStringForApi(_selectedWeightRange!);
+      String weightString = _selectedWeightRange!;
+      double? actualWeight = double.tryParse(actualWeightController.text.trim());
 
       final orderRequest = OrderCreateRequest(
         userHashedId: userId!,
@@ -210,13 +222,15 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         deliveryDate: _formatDateForApi(_deliveryDateTime!),
         deliveryTime: _formatTimeForApi(_deliveryDateTime!),
         weight: weightString,
-        actualWeight: null,
+        actualWeight: actualWeight,
         category: apiCategory,
         customCategory: null,
         preferenceTransport: _selectedTransportModes.isNotEmpty ? _selectedTransportModes : null,
         isUrgent: _isUrgent,
         images: _selectedImages,
-        specialInstructions: restrictionsController.text.trim().isEmpty ? null : restrictionsController.text.trim(),
+        specialInstructions: restrictionsController.text.trim().isEmpty
+            ? null
+            : restrictionsController.text.trim(),
       );
 
       final response = await _orderService.createOrder(orderRequest);
@@ -245,23 +259,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       if (e.toString().contains('KYC') || e.toString().contains('403')) {
         _showKycRequiredDialog();
       } else {
-        _showSnackBar('Failed to create order: ${e.toString().replaceAll('Exception: ', '')}', Colors.red);
+        _showSnackBar(
+            'Failed to create order: ${e.toString().replaceAll('Exception: ', '')}',
+            Colors.red);
       }
-    }
-  }
-
-  String _getWeightStringForApi(String range) {
-    switch (range) {
-      case 'Below 2 kg':
-        return 'below 2kg';
-      case '2–5 kg':
-        return '2-5kg';
-      case '5–10 kg':
-        return '5-10kg';
-      case 'More than 10 kg':
-        return 'more than 10kg';
-      default:
-        return '5-10kg';
     }
   }
 
@@ -283,6 +284,16 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       _showSnackBar('Please fill all required fields', Colors.red);
       return false;
     }
+    
+    if (_selectedWeightRange == 'more than 10kg' && actualWeightController.text.trim().isEmpty) {
+      _showSnackBar('Please enter actual weight for packages over 10kg', Colors.red);
+      return false;
+    }
+
+    if (_deliveryDateTime!.isBefore(_pickupDateTime!)) {
+      _showSnackBar('Delivery date cannot be before pickup date', Colors.red);
+      return false;
+    }
     return true;
   }
 
@@ -292,6 +303,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     pickupDateController.clear();
     deliveryDateController.clear();
     weightController.clear();
+    actualWeightController.clear();
     packageTypeController.clear();
     transportController.clear();
     restrictionsController.clear();
@@ -341,7 +353,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('KYC Verification Required'),
-        content: const Text('To create orders, you need to complete your KYC verification.'),
+        content: const Text(
+            'To create orders, you need to complete your KYC verification.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -361,7 +374,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
   void _navigateToKycScreen() async {
     if (userId == null) return;
-    
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -369,7 +382,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           userId: userId!,
           fullName: _userProfile?.name,
           email: _userProfile?.email,
-          phone: _userProfile?.phone != null ? '+91 ${_userProfile?.phone}' : null,
+          phone: _userProfile?.phone != null
+              ? '+91 ${_userProfile?.phone}'
+              : null,
         ),
       ),
     );
@@ -379,7 +394,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
   }
 
-  Future<void> _selectDateTime(TextEditingController controller, bool isPickup) async {
+  Future<void> _selectDateTime(
+      TextEditingController controller, bool isPickup) async {
     final date = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -394,14 +410,16 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       );
 
       if (time != null) {
-        final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+        final dt =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
         setState(() {
           if (isPickup) {
             _pickupDateTime = dt;
           } else {
             _deliveryDateTime = dt;
           }
-          controller.text = '${date.day}/${date.month}/${date.year} · ${time.format(context)}';
+          controller.text =
+          '${date.day}/${date.month}/${date.year} · ${time.format(context)}';
         });
       }
     }
@@ -499,7 +517,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         ),
         title: const Text(
           'Create Order',
-          style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600),
         ),
         centerTitle: false,
       ),
@@ -513,7 +532,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               children: [
                 Text(
                   _getStepTitle(),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -522,7 +542,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                       child: LinearProgressIndicator(
                         value: (_currentStep + 1) / _totalSteps,
                         backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[800]!),
+                        valueColor:
+                        AlwaysStoppedAnimation<Color>(Colors.grey[800]!),
                         minHeight: 4,
                       ),
                     ),
@@ -575,17 +596,21 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 child: ElevatedButton(
                   onPressed: _isCreatingOrder
                       ? null
-                      : (_currentStep == _totalSteps - 1 ? _createOrder : _nextStep),
+                      : (_currentStep == _totalSteps - 1
+                      ? _createOrder
+                      : _nextStep),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey[850],
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                     elevation: 0,
                   ),
                   child: _isCreatingOrder
                       ? const SizedBox(
                     height: 20,
                     width: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2),
                   )
                       : Text(
                     _currentStep == _totalSteps - 1 ? 'POST' : 'NEXT',
@@ -623,7 +648,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // UPDATED: Use EnhancedLocationInputField for Pickup
           _buildLocationInputWrapper(
             label: 'Pickup City',
             child: EnhancedLocationInputField(
@@ -640,8 +664,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // UPDATED: Use EnhancedLocationInputField for Drop
           _buildLocationInputWrapper(
             label: 'Drop City',
             child: EnhancedLocationInputField(
@@ -687,12 +709,13 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               children: [
                 Checkbox(
                   value: _isUrgent,
-                  onChanged: (value) => setState(() => _isUrgent = value ?? false),
+                  onChanged: (value) =>
+                      setState(() => _isUrgent = value ?? false),
                   activeColor: Colors.grey[800],
                 ),
                 Expanded(
                   child: Text(
-                    'Mark this order as urgent for priority handling',
+                    'Mark this order as urgent (additional charges may apply)',
                     style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                   ),
                 ),
@@ -704,7 +727,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
   }
 
-  // Helper widget to wrap location input and maintain consistent label styling
   Widget _buildLocationInputWrapper({
     required String label,
     required Widget child,
@@ -712,7 +734,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        Text(label,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         child,
       ],
@@ -727,12 +750,30 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         children: [
           _buildDropdownField(
             label: 'Package Weight (kg)',
-            hint: 'Eg. Below 2 kg',
+            hint: 'Eg. 5-10kg',
             icon: Icons.scale,
             value: _selectedWeightRange,
-            items: ['Below 2 kg', '2–5 kg', '5–10 kg', 'More than 10 kg'],
+            items: ['below 2kg', '2-5kg', '5-10kg', 'more than 10kg'],
             onChanged: (value) => setState(() => _selectedWeightRange = value),
           ),
+          // NEW: Actual weight input field — only shows if ">10kg" selected
+          if (_selectedWeightRange == 'more than 10kg') ...[
+            const SizedBox(height: 16),
+            _buildInputField(
+              label: 'Exact Weight (in kg)',
+              controller: actualWeightController,
+              hint: 'e.g., 12.5',
+              icon: Icons.add_circle_outline,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 4, left: 4),
+              child: Text(
+                'Required for packages above 10kg',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           _buildCategoryDropdown(),
           const SizedBox(height: 20),
@@ -740,9 +781,12 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             label: 'Preferred Transport',
             hint: 'Eg. Car',
             icon: Icons.directions_car,
-            value: _selectedTransportModes.isNotEmpty ? _selectedTransportModes.first : null,
+            value: _selectedTransportModes.isNotEmpty
+                ? _selectedTransportModes.first
+                : null,
             items: _transportModes,
-            onChanged: (value) => setState(() => _selectedTransportModes = value != null ? [value] : []),
+            onChanged: (value) => setState(
+                    () => _selectedTransportModes = value != null ? [value] : []),
           ),
         ],
       ),
@@ -755,7 +799,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Package Photo', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+          const Text('Package Photo',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 12),
           GestureDetector(
             onTap: _pickImage,
@@ -765,7 +810,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               decoration: BoxDecoration(
                 color: Colors.grey[50],
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!, width: 1.5, style: BorderStyle.solid),
+                border: Border.all(
+                    color: Colors.grey[300]!,
+                    width: 1.5,
+                    style: BorderStyle.solid),
               ),
               child: _selectedImages.isEmpty
                   ? Column(
@@ -778,16 +826,22 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.add_photo_alternate_outlined, size: 28, color: Colors.grey[400]),
+                    child: Icon(Icons.add_photo_alternate_outlined,
+                        size: 28, color: Colors.grey[400]),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Upload File', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                  Text('Tap to add photo', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                  const Text('Upload File',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text('Tap to add photo',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey[500])),
                 ],
               )
                   : GridView.builder(
                 padding: const EdgeInsets.all(12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
@@ -796,7 +850,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 itemBuilder: (context, index) {
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.file(_selectedImages[index], fit: BoxFit.cover),
+                    child: Image.file(_selectedImages[index],
+                        fit: BoxFit.cover),
                   );
                 },
               ),
@@ -804,9 +859,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           ),
           const SizedBox(height: 20),
           _buildInputField(
-            label: 'Restrictions & Requirements',
+            label: 'Remarks',
             controller: restrictionsController,
-            hint: 'Eg. no liquid, no fragile items',
+            hint: 'take parcel carefully',
             icon: Icons.info_outline,
             maxLines: 3,
           ),
@@ -823,17 +878,20 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     bool readOnly = false,
     VoidCallback? onTap,
     int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        Text(label,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
           readOnly: readOnly,
           onTap: onTap,
           maxLines: maxLines,
+          keyboardType: keyboardType,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
@@ -852,7 +910,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey[400]!),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
         ),
       ],
@@ -870,7 +929,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        Text(label,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: value,
@@ -878,7 +938,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             children: [
               Icon(icon, size: 20, color: Colors.grey[600]),
               const SizedBox(width: 12),
-              Text(hint, style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+              Text(hint,
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14)),
             ],
           ),
           decoration: InputDecoration(
@@ -892,7 +953,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey[200]!),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           items: items.map((item) {
             return DropdownMenuItem(
@@ -910,7 +972,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Package Type', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        const Text('Package Type',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         DropdownButtonFormField<OrderMainCategory>(
           value: _selectedMainCategory,
@@ -918,7 +981,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             children: [
               Icon(Icons.category, size: 20, color: Colors.grey[600]),
               const SizedBox(width: 12),
-              Text('Eg. Furniture', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+              Text('Eg. Fragile',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14)),
             ],
           ),
           decoration: InputDecoration(
@@ -932,7 +996,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey[200]!),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           items: orderCategories.map((category) {
             return DropdownMenuItem(
