@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
@@ -16,7 +15,6 @@ import '../../Controllers/ChatService.dart';
 import '../../Controllers/SocketService.dart';
 import '../../Controllers/tutorial_service.dart';
 import '../../widgets/tutorial_helper.dart';
-import '../../widgets/NotificationBellIcon.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 import '../UserProfileScreen.dart';
@@ -27,11 +25,11 @@ class ChatScreen extends StatefulWidget {
   final String? otherUserName;
 
   const ChatScreen({
-    Key? key,
+    super.key,
     required this.chatId,
     required this.orderId,
     this.otherUserName,
-  }) : super(key: key);
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -54,7 +52,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isRefreshing = false;
   List<File> _selectedImages = [];
   bool _isUploadingImages = false;
-  Set<int> _unseenMessageIds = {};
+  final Set<int> _unseenMessageIds = {};
 
   // WebSocket typing indicator states
   bool _isOtherUserTyping = false;
@@ -83,14 +81,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      print('📱 App resumed - refreshing messages...');
+      debugPrint('📱 App resumed - refreshing messages...');
       _loadMessages(silent: true);
       if (_autoRefreshTimer?.isActive != true) {
         _startAutoRefresh();
       }
       _markVisibleMessagesAsSeen();
     } else if (state == AppLifecycleState.paused) {
-      print('📱 App paused - stopping auto-refresh...');
+      debugPrint('📱 App paused - stopping auto-refresh...');
       _autoRefreshTimer?.cancel();
     }
   }
@@ -105,11 +103,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _autoRefreshTimer?.cancel();
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (mounted && !_isRefreshing) {
-        print('🔄 Auto-refreshing messages at ${DateTime.now()}');
+        debugPrint('🔄 Auto-refreshing messages at ${DateTime.now()}');
         _loadMessages(silent: true);
       }
     });
-    print('✅ Auto-refresh timer started (every 5 seconds)');
+    debugPrint('✅ Auto-refresh timer started (every 5 seconds)');
   }
 
   Future<void> _initializeChat() async {
@@ -122,7 +120,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
 
-    print('🔐 Current User ID: $_currentUserId');
+    debugPrint('🔐 Current User ID: $_currentUserId');
     await _loadMessages();
   }
 
@@ -134,17 +132,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _socketService.joinRoom(widget.chatId);
 
         _socketService.onReceiveMessage((data) {
-          print('📬 Received message via WebSocket: $data');
+          debugPrint('📬 Received message via WebSocket: $data');
           _loadMessages(silent: true);
         });
 
         _socketService.onUserTyping((data) {
           final typingUserId = data['userId'] as String?;
-          print('🔍 ChatScreen - Typing event received: userId=$typingUserId, currentUserId=$_currentUserId, mounted=$mounted');
+          debugPrint('🔍 ChatScreen - Typing event received: userId=$typingUserId, currentUserId=$_currentUserId, mounted=$mounted');
 
           if (typingUserId != null && typingUserId != _currentUserId) {
             if (mounted) {
-              print('✅ ChatScreen - Showing typing indicator for user: $typingUserId');
+              debugPrint('✅ ChatScreen - Showing typing indicator for user: $typingUserId');
               setState(() {
                 _isOtherUserTyping = true;
               });
@@ -152,7 +150,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               _typingIndicatorTimer?.cancel();
               _typingIndicatorTimer = Timer(const Duration(seconds: 3), () {
                 if (mounted) {
-                  print('⏰ ChatScreen - Hiding typing indicator (timeout)');
+                  debugPrint('⏰ ChatScreen - Hiding typing indicator (timeout)');
                   setState(() {
                     _isOtherUserTyping = false;
                   });
@@ -162,10 +160,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           }
         });
 
-        print('✅ WebSocket initialized and listening');
+        debugPrint('✅ WebSocket initialized and listening');
       }
     } catch (e) {
-      print('❌ Error initializing WebSocket: $e');
+      debugPrint('❌ Error initializing WebSocket: $e');
     }
   }
 
@@ -370,8 +368,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
 
         if (!silent) {
-          print('✅ Loaded ${messages.length} messages from API');
-          print('📊 Unseen messages: ${_unseenMessageIds.length}');
+          debugPrint('✅ Loaded ${messages.length} messages from API');
+          debugPrint('📊 Unseen messages: ${_unseenMessageIds.length}');
         }
       } else {
         if (!silent) {
@@ -384,7 +382,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             };
           });
         }
-        print('⚠️ Failed to load messages: ${result['error']}');
+        debugPrint('⚠️ Failed to load messages: ${result['error']}');
       }
     } catch (e) {
       if (!mounted) {
@@ -402,7 +400,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           };
         });
       }
-      print('❌ Exception loading messages: $e');
+      debugPrint('❌ Exception loading messages: $e');
     } finally {
       _isRefreshing = false;
     }
@@ -433,7 +431,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final chatIdInt = int.tryParse(widget.chatId);
       if (chatIdInt == null || _currentUserId == null) return;
     } catch (e) {
-      print('❌ Error marking messages as seen: $e');
+      debugPrint('❌ Error marking messages as seen: $e');
     }
   }
 
@@ -451,7 +449,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      print('❌ Error picking images: $e');
+      debugPrint('❌ Error picking images: $e');
       _showSnackBar('Failed to pick images: $e', Colors.red);
     }
   }
@@ -471,7 +469,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      print('❌ Error taking photo: $e');
+      debugPrint('❌ Error taking photo: $e');
       _showSnackBar('Failed to take photo: $e', Colors.red);
     }
   }
@@ -537,8 +535,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     icon: const Icon(Icons.photo_library),
                     label: const Text('Gallery'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[100],
-                      foregroundColor: Colors.grey[700],
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
                   ),
@@ -584,9 +582,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -599,7 +597,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
       body: Column(
         children: [
@@ -616,7 +614,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       elevation: 0.5,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       systemOverlayStyle: SystemUiOverlayStyle.dark,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -808,7 +806,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: Theme.of(context).colorScheme.primary.withValues(alpha:0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(
@@ -909,10 +907,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -927,9 +925,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 key: _messageInputKey,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: Theme.of(context).dividerColor),
                 ),
                 child: Row(
                   children: [
@@ -971,14 +969,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 gradient: LinearGradient(
                   colors: _isUploadingImages
                       ? [Colors.grey, Colors.grey]
-                      : [const Color(0xFF6B4FE8), const Color(0xFF8B6FFF)],
+                      : [const Color(0xFF2B6390), const Color(0xFF3E83AE)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF6B4FE8).withOpacity(0.3),
+                    color: const Color(0xFF6B4FE8).withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -1028,7 +1026,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -1112,7 +1110,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         shape: BoxShape.circle,
         gradient: LinearGradient(
           colors: isMe
-              ? [const Color(0xFF6B4FE8), const Color(0xFF8B6FFF)]
+              ? [const Color(0xFF2B6390), const Color(0xFF3E83AE)]
               : [Colors.grey.shade400, Colors.grey.shade500],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -1158,18 +1156,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
 
       if (result['success'] == true) {
-        print('✅ Message sent successfully');
+        debugPrint('✅ Message sent successfully');
         await _loadMessages(silent: true);
       } else {
         _showSnackBar(
           result['error'] ?? 'Failed to send message',
           Colors.red,
         );
-        print('❌ Failed to send message: ${result['error']}');
+        debugPrint('❌ Failed to send message: ${result['error']}');
       }
     } catch (e) {
       _showSnackBar('Error: $e', Colors.red);
-      print('❌ Exception sending message: $e');
+      debugPrint('❌ Exception sending message: $e');
     } finally {
       setState(() {
         _isUploadingImages = false;
@@ -1245,7 +1243,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         fullUrl = '${ApiConstants.imagebaseUrl}$imageUrl';
       }
 
-      print('📥 Downloading from: $fullUrl');
+      debugPrint('📥 Downloading from: $fullUrl');
 
       final response = await http.get(Uri.parse(fullUrl));
 
@@ -1292,12 +1290,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
       if (savedPath != null) {
         _showSnackBar('Image saved successfully', Colors.green);
-        print('✅ Image saved to: $savedPath');
+        debugPrint('✅ Image saved to: $savedPath');
       } else {
         _showSnackBar('Failed to save image', Colors.red);
       }
     } catch (e) {
-      print('❌ Error downloading image: $e');
+      debugPrint('❌ Error downloading image: $e');
       _showSnackBar('Error downloading image: $e', Colors.red);
     }
   }
@@ -1343,7 +1341,7 @@ class EnhancedMessageBubble extends StatelessWidget {
   final VoidCallback? onAvatarTap; // NEW: Added callback for avatar tap
 
   const EnhancedMessageBubble({
-    Key? key,
+    super.key,
     required this.message,
     required this.isMe,
     required this.currentUserId,
@@ -1352,7 +1350,7 @@ class EnhancedMessageBubble extends StatelessWidget {
     required this.onLaunchUrl,
     required this.onDownloadImage,
     this.onAvatarTap, // NEW: Optional callback
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1380,7 +1378,7 @@ class EnhancedMessageBubble extends StatelessWidget {
               ),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isMe ? Colors.white : Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -1389,7 +1387,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1458,7 +1456,7 @@ class EnhancedMessageBubble extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: LinearGradient(
           colors: isMe
-              ? [const Color(0xFF6B4FE8), const Color(0xFF8B6FFF)]
+              ? [const Color(0xFF2B6390), const Color(0xFF3E83AE)]
               : [Colors.grey.shade400, Colors.grey.shade500],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

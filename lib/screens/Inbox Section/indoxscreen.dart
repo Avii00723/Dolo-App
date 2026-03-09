@@ -201,10 +201,10 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: const Text(
           'Inbox',
           style: TextStyle(
@@ -222,7 +222,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
             margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(25),
             ),
             child: Row(
@@ -242,8 +242,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                   child: _buildTab(
                     'Requests',
                     _tabController.index == 1,
-                    _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length + 
-                    _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length,
+                    _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length +
+                        _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length,
                         () {
                       _tabController.animateTo(1);
                       setState(() {});
@@ -263,8 +263,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                 scrollDirection: Axis.horizontal,
                 children: _filters.map((filter) {
                   final count = filter == 'All'
-                      ? _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length + 
-                        _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length
+                      ? _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length +
+                      _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length
                       : filter == 'Request Sent'
                       ? _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length
                       : _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length;
@@ -299,7 +299,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
+          color: isSelected ? Theme.of(context).cardColor : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           boxShadow: isSelected
               ? [
@@ -319,7 +319,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.black87 : Colors.grey,
+                color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.45),
               ),
             ),
             const SizedBox(width: 6),
@@ -327,7 +327,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? Colors.grey.shade200
+                    ? Theme.of(context).colorScheme.primary.withValues(alpha:0.1)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -336,7 +336,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.black87 : Colors.grey,
+                  color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.4),
                 ),
               ),
             ),
@@ -357,7 +357,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.grey.shade200 : Colors.transparent,
+          color: isSelected ? Theme.of(context).colorScheme.primary.withValues(alpha:0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: Colors.grey.shade300,
@@ -372,14 +372,14 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: isSelected ? Colors.black87 : Colors.grey.shade600,
+                color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.5),
               ),
             ),
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white : Colors.grey.shade100,
+                color: isSelected ? Theme.of(context).cardColor : Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -856,7 +856,7 @@ class ModernRequestCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isReceived ? const Color(0xFFD4F4DD) : const Color(0xFFE0F2FE),

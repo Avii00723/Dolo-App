@@ -1,4 +1,3 @@
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -108,19 +107,19 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: Row(
             children: [
@@ -129,10 +128,10 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
               Expanded(
                 child: Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -267,19 +266,19 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: Row(
             children: [
@@ -288,10 +287,10 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
               Expanded(
                 child: Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -318,10 +317,10 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
           children: [
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             if (isRequired)
@@ -334,18 +333,18 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: TextField(
             controller: controller,
             keyboardType: keyboardType,
             maxLines: maxLines,
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
+            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35), fontSize: 13),
               prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
               border: InputBorder.none,
               contentPadding:
@@ -360,7 +359,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
@@ -441,7 +440,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
                                 'By ${widget.order.userName}',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.grey[600],
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                 ),
                               ),
                             ],
@@ -468,16 +467,16 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
                   // Divider
                   Container(
                     height: 1,
-                    color: Colors.grey[300],
+                    color: Theme.of(context).dividerColor,
                   ),
                   const SizedBox(height: 24),
 
-                  const Text(
+                  Text(
                     'Your Trip Details',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -499,10 +498,10 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.07),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.blue.shade200,
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -517,7 +516,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
                                     : widget.order.transportMode.toLowerCase() == 'bus'
                                     ? Icons.directions_bus
                                     : Icons.flight,
-                                color: Colors.blue.shade700,
+                                color: Theme.of(context).colorScheme.primary,
                                 size: 20,
                               ),
                               const SizedBox(width: 10),
@@ -527,7 +526,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.grey[700],
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                   ),
                                 ),
                               ),
@@ -537,7 +536,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.orange.shade100,
+                                  color: Colors.orange.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -556,34 +555,34 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
                             _getPnrHint(widget.order.transportMode),
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                               height: 1.4,
                             ),
                           ),
                           const SizedBox(height: 12),
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Theme.of(context).cardColor,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.grey.shade300),
+                              border: Border.all(color: Theme.of(context).dividerColor),
                             ),
                             child: TextField(
                               controller: pnrController,
                               keyboardType: TextInputType.text,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.black87,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                               decoration: InputDecoration(
                                 hintText: _getPnrPlaceholder(
                                     widget.order.transportMode),
                                 hintStyle: TextStyle(
-                                  color: Colors.grey[400],
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
                                   fontSize: 13,
                                 ),
                                 prefixIcon: Icon(
                                   Icons.confirmation_number,
-                                  color: Colors.blue.shade700,
+                                  color: Theme.of(context).colorScheme.primary,
                                   size: 20,
                                 ),
                                 border: InputBorder.none,
@@ -631,7 +630,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -649,19 +648,19 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(
-                          color: Colors.grey.shade400,
+                          color: Theme.of(context).dividerColor,
                           width: 1.5,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Cancel',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),

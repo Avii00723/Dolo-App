@@ -8,11 +8,8 @@ import '../../Models/TripRequestModel.dart';
 import '../Controllers/OrderService.dart';
 import '../Controllers/TripRequestService.dart';
 import '../Controllers/AuthService.dart';
-import 'LocationinputField.dart';
-import 'CustomRoutePreviewScreen.dart';
 import 'orderSection/SearchResultPage.dart';
-import 'orderSection/YourOrders.dart';
-import '../widgets/NotificationBellIcon.dart';
+import 'CustomRouteMapScreen.dart';
 
 // =============================================================================
 // DESIGN PRINCIPLE:
@@ -47,13 +44,13 @@ class _PlacesField extends StatefulWidget {
   final void Function(String text, Position position) onLocationSelected;
 
   const _PlacesField({
-    Key? key,
+    super.key,
     required this.initialText,
     required this.labelText,
     required this.hintText,
     this.onFocusGained,
     required this.onLocationSelected,
-  }) : super(key: key);
+  });
 
   @override
   State<_PlacesField> createState() => _PlacesFieldState();
@@ -136,7 +133,7 @@ class _PlacesFieldState extends State<_PlacesField> {
             hintText: widget.hintText,
             prefixIcon: const Icon(Icons.location_on_outlined),
             filled: true,
-            fillColor: Colors.grey.shade200,
+            fillColor: Theme.of(context).colorScheme.surface,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
@@ -163,13 +160,13 @@ class _StopoverRow extends StatefulWidget {
   final void Function(String text, Position position) onLocationSelected;
 
   const _StopoverRow({
-    Key? key,
+    super.key,
     required this.index,
     required this.initialText,
     required this.onRemove,
     required this.onFocusGained,
     required this.onLocationSelected,
-  }) : super(key: key);
+  });
 
   @override
   State<_StopoverRow> createState() => _StopoverRowState();
@@ -219,6 +216,7 @@ class _LocationSearchView extends StatelessWidget {
 
   final VoidCallback onDone;
   final VoidCallback onAddStop;
+  final VoidCallback onViewRoute; // Added callback
   final void Function(int) onRemoveStop;
   final void Function(String field) onFieldFocused;
   final void Function(String text, Position pos) onFromSelected;
@@ -227,7 +225,7 @@ class _LocationSearchView extends StatelessWidget {
   final void Function(String city) onRecentSearch;
 
   const _LocationSearchView({
-    Key? key,
+    super.key,
     required this.fromText,
     required this.toText,
     required this.stopovers,
@@ -236,20 +234,21 @@ class _LocationSearchView extends StatelessWidget {
     required this.focusedField,
     required this.onDone,
     required this.onAddStop,
+    required this.onViewRoute, // Added parameter
     required this.onRemoveStop,
     required this.onFieldFocused,
     required this.onFromSelected,
     required this.onToSelected,
     required this.onStopoverSelected,
     required this.onRecentSearch,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Container(
-        color: Colors.white,
+        color: Theme.of(context).scaffoldBackgroundColor,
         height: MediaQuery.of(context).size.height,
         child: SingleChildScrollView(
           child: Padding(
@@ -321,7 +320,7 @@ class _LocationSearchView extends StatelessWidget {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () {},
+                          onPressed: onViewRoute, // Fixed: Wired to callback
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             side: BorderSide(color: Colors.grey.shade400),
@@ -357,10 +356,10 @@ class _LocationSearchView extends StatelessWidget {
 // SendPage — holds only plain data (strings, positions). Zero controllers/nodes.
 // =============================================================================
 class SendPage extends StatefulWidget {
-  const SendPage({Key? key}) : super(key: key);
+  const SendPage({super.key});
 
   @override
-  _SendPageState createState() => _SendPageState();
+  State<SendPage> createState() => _SendPageState();
 }
 
 class _SendPageState extends State<SendPage> {
@@ -381,7 +380,7 @@ class _SendPageState extends State<SendPage> {
   final TextEditingController deliveryController = TextEditingController();
   String? _departureDate, _departureTime;
   String? _selectedDate, _selectedTime;
-  
+
   DateTime? _departureDateTime;
   DateTime? _deliveryDateTime;
 
@@ -478,12 +477,11 @@ class _SendPageState extends State<SendPage> {
     FocusScope.of(context).unfocus();
   }
 
-  Future<bool> _onWillPop() async {
+  void _onPopInvoked(bool didPop) {
+    if (didPop) return;
     if (_isLocationViewFocused) {
       _hideLocationView();
-      return false;
     }
-    return true;
   }
 
   // ── Recent search handler ─────────────────────────────────────────────────
@@ -526,7 +524,7 @@ class _SendPageState extends State<SendPage> {
       _showSnackBar('Please select delivery date and time', Colors.orange);
       return;
     }
-    
+
     // Date Validation: Starting date should not be greater than ending date
     if (_deliveryDateTime!.isBefore(_departureDateTime!)) {
       _showSnackBar('Delivery date cannot be before departure date', Colors.red);
@@ -595,6 +593,37 @@ class _SendPageState extends State<SendPage> {
     }
   }
 
+  void _viewRouteOnMap() {
+    if (_fromText.isEmpty || _toText.isEmpty || originPosition == null || destinationPosition == null) {
+      _showSnackBar('Please select origin and destination first', Colors.orange);
+      return;
+    }
+
+    final List<Map<String, dynamic>> stopoversData = _stopovers
+        .where((s) => s.text.isNotEmpty && s.position != null)
+        .map((s) => {
+      'city': s.text,
+      'latitude': s.position!.latitude,
+      'longitude': s.position!.longitude,
+    })
+        .toList();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomRouteMapScreen(
+          originCity: _fromText,
+          destinationCity: _toText,
+          originLatitude: originPosition!.latitude,
+          originLongitude: originPosition!.longitude,
+          destinationLatitude: destinationPosition!.latitude,
+          destinationLongitude: destinationPosition!.longitude,
+          stopovers: stopoversData.isNotEmpty ? stopoversData : null,
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleSendRequest(Order order) async {
     if (currentUserId == null) {
       _showSnackBar('User not found. Please log in.', Colors.red);
@@ -633,10 +662,11 @@ class _SendPageState extends State<SendPage> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: !_isLocationViewFocused,
+      onPopInvoked: _onPopInvoked,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F5F5),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -669,6 +699,7 @@ class _SendPageState extends State<SendPage> {
                         focusedField: _focusedField,
                         onDone: _hideLocationView,
                         onAddStop: _addStopoverField,
+                        onViewRoute: _viewRouteOnMap, // Fixed: Pass navigation callback
                         onRemoveStop: _removeStopoverField,
                         onFieldFocused: (f) =>
                             setState(() => _focusedField = f),
@@ -711,12 +742,12 @@ class _SendPageState extends State<SendPage> {
                 ? _hideLocationView()
                 : Navigator.pop(context),
           ),
-          const Text(
+          Text(
             'Travel Details',
             style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87),
+                color: Theme.of(context).colorScheme.onSurface),
           ),
           const SizedBox(width: 48),
         ],
@@ -809,9 +840,9 @@ class _SendPageState extends State<SendPage> {
             padding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Text(
               value.isEmpty ? 'Tap to enter location' : value,
@@ -843,9 +874,9 @@ class _SendPageState extends State<SendPage> {
             padding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Row(
               children: [
@@ -875,7 +906,7 @@ class _SendPageState extends State<SendPage> {
         initialDate: DateTime.now(),
         firstDate: DateTime.now(),
         lastDate: DateTime(2101));
-    if (date == null || !mounted) return;
+    if (date == null || !context.mounted) return;
     final time =
     await showTimePicker(context: context, initialTime: TimeOfDay.now());
     if (time == null) return;
@@ -896,7 +927,7 @@ class _SendPageState extends State<SendPage> {
         initialDate: DateTime.now(),
         firstDate: DateTime.now(),
         lastDate: DateTime(2101));
-    if (date == null || !mounted) return;
+    if (date == null || !context.mounted) return;
     final time =
     await showTimePicker(context: context, initialTime: TimeOfDay.now());
     if (time == null) return;
@@ -921,19 +952,19 @@ class _SendPageState extends State<SendPage> {
             style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: selectedVehicle,
+          initialValue: selectedVehicle,
           hint: const Text('Eg. Car'),
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.directions_car_outlined),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: Theme.of(context).cardColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
           ),
           items: vehicleOptions

@@ -127,7 +127,7 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false, // 🔥 KEY FIX
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
       body: TabBarView(
         physics: const NeverScrollableScrollPhysics(),
@@ -138,10 +138,9 @@ class _HomePageWithNavState extends State<HomePageWithNav>
       // 🔒 FIXED BOTTOM NAVIGATION
       bottomNavigationBar: SafeArea(
         child: Container(
-          padding: EdgeInsets.fromLTRB(2, 0, 2, 4),
-          // margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
@@ -166,9 +165,9 @@ class _HomePageWithNavState extends State<HomePageWithNav>
             tabIconColor: Colors.grey,
             tabIconSize: 24.0,
             tabIconSelectedSize: 24.0,
-            tabSelectedColor: const Color(0xFF2C3E50),
+            tabSelectedColor: Theme.of(context).primaryColor,
             tabIconSelectedColor: Colors.white,
-            tabBarColor: Colors.white,
+            tabBarColor: Theme.of(context).cardColor,
             textStyle: TextStyle(
               fontSize: 11,
               color: Colors.grey[700],

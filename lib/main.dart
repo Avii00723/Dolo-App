@@ -5,10 +5,13 @@ import 'package:dolo/screens/LoginScreens/LoginSignupScreen.dart';
 import 'package:dolo/screens/LoginScreens/signup_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:provider/provider.dart';
 import 'Controllers/AuthService.dart';
 import 'Controllers/DeviceTokenService.dart';
 import 'firebase_options.dart';
 import 'splash_screen.dart';
+import 'theme/theme_provider.dart';
+import 'theme/app_theme.dart';
 
 // Background message handler (must be top-level function)
 @pragma('vm:entry-point')
@@ -26,7 +29,12 @@ void main() async {
   // Set up background message handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -34,12 +42,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       title: 'DOLO',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF001127)),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: const AuthWrapper(),
       routes: {
         '/home': (context) => const HomePageWithNav(),
@@ -106,7 +115,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     // Show loading screen while checking auth status
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: const Color(0xFF001127),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -115,24 +124,23 @@ class _AuthWrapperState extends State<AuthWrapper> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Theme.of(context).primaryColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.local_shipping,
                   size: 60,
-                  color: Colors.white,
+                  color: Theme.of(context).primaryColor,
                 ),
               ),
               const SizedBox(height: 24),
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
               ),
               const SizedBox(height: 16),
               const Text(
                 'Loading...',
                 style: TextStyle(
-                  color: Colors.white,
                   fontSize: 16,
                 ),
               ),
@@ -153,11 +161,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
         );
       });
       // Show loading while navigating
-      return const Scaffold(
-        backgroundColor: Color(0xFF001127),
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
           ),
         ),
       );

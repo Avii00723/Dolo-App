@@ -17,21 +17,22 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
   int _currentStep = 0;
   String? _userName;
 
+  // ── Carousel items — colors adapt to theme inside build ──
   final List<Map<String, dynamic>> _carouselItems = [
     {
       'title': 'Fast Delivery',
       'description': 'Get your parcels delivered quickly',
-      'color': Colors.blue.shade100,
+      'iconData': Icons.local_shipping_outlined,
     },
     {
       'title': 'Track Orders',
       'description': 'Monitor your shipments in real-time',
-      'color': Colors.green.shade100,
+      'iconData': Icons.track_changes_outlined,
     },
     {
       'title': 'Secure Payment',
       'description': 'Safe and encrypted transactions',
-      'color': Colors.orange.shade100,
+      'iconData': Icons.lock_outline,
     },
   ];
 
@@ -79,50 +80,33 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            _buildHeader(),
-
-            // Main Content
+            _buildHeader(theme, colorScheme),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 20),
-
-                    // Greeting
-                    _buildGreeting(),
-
+                    _buildGreeting(theme, colorScheme),
                     const SizedBox(height: 20),
-
-                    // Carousel
-                    _buildCarousel(),
-
+                    _buildCarousel(theme, colorScheme, isDark),
                     const SizedBox(height: 24),
-
-                    // Action Buttons
-                    _buildActionButtons(),
-
+                    _buildActionButtons(theme, colorScheme),
                     const SizedBox(height: 24),
-
-                    // Track Orders Button
-                    _buildTrackOrdersButton(),
-
+                    _buildTrackOrdersButton(theme, colorScheme),
                     const SizedBox(height: 32),
-
-                    // How it works section
-                    _buildHowItWorksSection(),
-
+                    _buildHowItWorksSection(theme, colorScheme),
                     const SizedBox(height: 32),
-
-                    // Logo and Tagline
-                    _buildFooter(),
-
+                    _buildFooter(theme, colorScheme),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -134,10 +118,14 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  // ────────────────────────────────────────────────────────────────
+  // Header
+  // ────────────────────────────────────────────────────────────────
+  Widget _buildHeader(ThemeData theme, ColorScheme colorScheme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      color: Colors.white,
+      // Use card colour so it lifts slightly from scaffold in both modes
+      color: theme.cardColor,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -145,15 +133,15 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
+              color: colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Text(
+            child: Text(
               'LOGO',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.black54,
+                color: colorScheme.primary,
                 letterSpacing: 1,
               ),
             ),
@@ -162,10 +150,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           // Icons
           Row(
             children: [
-              // 🔔 Notification Icon
+              // Notification
               IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                color: Colors.black87,
+                icon: Icon(Icons.notifications_outlined,
+                    color: colorScheme.onSurface),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -175,10 +163,9 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   );
                 },
               ),
+              const SizedBox(width: 4),
 
-              const SizedBox(width: 8),
-
-              // 👤 Profile Avatar
+              // Profile avatar
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -192,23 +179,29 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor: Colors.grey.shade700,
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                        size: 20,
+                      backgroundColor: colorScheme.primary,
+                      child: Text(
+                        _userName != null && _userName!.isNotEmpty
+                            ? _userName![0].toUpperCase()
+                            : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     Positioned(
                       right: 0,
                       bottom: 0,
                       child: Container(
-                        width: 12,
-                        height: 12,
+                        width: 10,
+                        height: 10,
                         decoration: BoxDecoration(
                           color: Colors.green,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(
+                              color: theme.cardColor, width: 1.5),
                         ),
                       ),
                     ),
@@ -222,26 +215,39 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     );
   }
 
-  Widget _buildGreeting() {
+  // ────────────────────────────────────────────────────────────────
+  // Greeting
+  // ────────────────────────────────────────────────────────────────
+  Widget _buildGreeting(ThemeData theme, ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Hello, ${_userName ?? 'there'}',
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+            'Hello, ${_userName ?? 'there'} 👋',
+            style: theme.textTheme.displayMedium?.copyWith(fontSize: 26) ??
+                TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Where are you delivering today?',
+            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCarousel() {
+  // ────────────────────────────────────────────────────────────────
+  // Carousel
+  // ────────────────────────────────────────────────────────────────
+  Widget _buildCarousel(
+      ThemeData theme, ColorScheme colorScheme, bool isDark) {
     return Column(
       children: [
         CarouselSlider(
@@ -257,33 +263,66 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               });
             },
           ),
-          items: _carouselItems.map((item) {
+          items: _carouselItems.asMap().entries.map((entry) {
+            final item = entry.value;
+            // Rotate through brand palette
+            final gradients = [
+              [colorScheme.primary.withValues(alpha: isDark ? 0.35 : 0.12),
+                colorScheme.secondary.withValues(alpha: isDark ? 0.2 : 0.06)],
+              [colorScheme.secondary.withValues(alpha: isDark ? 0.35 : 0.15),
+                colorScheme.primary.withValues(alpha: isDark ? 0.15 : 0.05)],
+              [colorScheme.tertiary.withValues(alpha: isDark ? 0.35 : 0.2),
+                colorScheme.primary.withValues(alpha: isDark ? 0.15 : 0.05)],
+            ];
+            final grad = gradients[entry.key % gradients.length];
+
             return Container(
               width: double.infinity,
               margin: const EdgeInsets.symmetric(horizontal: 5),
               decoration: BoxDecoration(
-                color: item['color'],
+                gradient: LinearGradient(
+                  colors: grad,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.primary.withValues(alpha: 0.15),
+                ),
               ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
                   children: [
-                    Text(
-                      item['title'],
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['title'],
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            item['description'],
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: colorScheme.onSurface
+                                  .withValues(alpha: 0.65),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      item['description'],
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade700,
-                      ),
+                    Icon(
+                      item['iconData'] as IconData,
+                      size: 48,
+                      color: colorScheme.primary.withValues(alpha: 0.5),
                     ),
                   ],
                 ),
@@ -292,18 +331,21 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           }).toList(),
         ),
         const SizedBox(height: 12),
+        // Dots
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: _carouselItems.asMap().entries.map((entry) {
-            return Container(
-              width: _currentCarouselIndex == entry.key ? 24 : 8,
+            final isActive = _currentCarouselIndex == entry.key;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: isActive ? 24 : 8,
               height: 8,
               margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
-                color: _currentCarouselIndex == entry.key
-                    ? Colors.grey.shade700
-                    : Colors.grey.shade300,
+                color: isActive
+                    ? colorScheme.primary
+                    : colorScheme.onSurface.withValues(alpha: 0.2),
               ),
             );
           }).toList(),
@@ -312,24 +354,31 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
+  // ────────────────────────────────────────────────────────────────
+  // Action Buttons
+  // ────────────────────────────────────────────────────────────────
+  Widget _buildActionButtons(ThemeData theme, ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
           Expanded(
             child: _buildActionButton(
+              theme, colorScheme,
               'Send Parcel',
               Icons.send_outlined,
-              () {},
+              isPrimary: true,
+              onTap: () {},
             ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: _buildActionButton(
+              theme, colorScheme,
               'Find Parcel',
               Icons.search,
-              () {},
+              isPrimary: false,
+              onTap: () {},
             ),
           ),
         ],
@@ -337,26 +386,53 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     );
   }
 
-  Widget _buildActionButton(String label, IconData icon, VoidCallback onTap) {
+  Widget _buildActionButton(
+      ThemeData theme,
+      ColorScheme colorScheme,
+      String label,
+      IconData icon, {
+        required bool isPrimary,
+        required VoidCallback onTap,
+      }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         height: 100,
         decoration: BoxDecoration(
-          color: Colors.grey.shade300,
-          borderRadius: BorderRadius.circular(12),
+          color: isPrimary
+              ? colorScheme.primary
+              : colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: isPrimary
+              ? null
+              : Border.all(color: theme.dividerColor),
+          boxShadow: isPrimary
+              ? [
+            BoxShadow(
+              color: colorScheme.primary.withValues(alpha: 0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            )
+          ]
+              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 32, color: Colors.black54),
+            Icon(icon,
+                size: 30,
+                color: isPrimary
+                    ? Colors.white
+                    : colorScheme.primary),
             const SizedBox(height: 8),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                color: isPrimary
+                    ? Colors.white
+                    : colorScheme.onSurface,
               ),
             ),
           ],
@@ -365,7 +441,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     );
   }
 
-  Widget _buildTrackOrdersButton() {
+  // ────────────────────────────────────────────────────────────────
+  // Track Orders
+  // ────────────────────────────────────────────────────────────────
+  Widget _buildTrackOrdersButton(ThemeData theme, ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
@@ -374,39 +453,52 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           width: double.infinity,
           height: 56,
           decoration: BoxDecoration(
-            color: Colors.grey.shade300,
+            color: colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.dividerColor),
           ),
-          child: const Center(
-            child: Text(
-              'Track Orders',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.my_location_outlined,
+                  size: 20, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Track Orders',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHowItWorksSection() {
+  // ────────────────────────────────────────────────────────────────
+  // How It Works
+  // ────────────────────────────────────────────────────────────────
+  Widget _buildHowItWorksSection(ThemeData theme, ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'How it works',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+            style: theme.textTheme.titleLarge ??
+                TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
           ),
           const SizedBox(height: 16),
+
+          // Step circles
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: _howItWorksSteps.map((step) {
@@ -414,26 +506,42 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               final isActive = index == _currentStep;
 
               return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _currentStep = index;
-                  });
-                },
-                child: Container(
+                onTap: () => setState(() => _currentStep = index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color:
-                        isActive ? Colors.grey.shade600 : Colors.grey.shade400,
+                    color: isActive
+                        ? colorScheme.primary
+                        : colorScheme.surface,
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isActive
+                          ? colorScheme.primary
+                          : theme.dividerColor,
+                      width: 1.5,
+                    ),
+                    boxShadow: isActive
+                        ? [
+                      BoxShadow(
+                        color: colorScheme.primary
+                            .withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      )
+                    ]
+                        : null,
                   ),
                   child: Center(
                     child: Text(
                       step['step']!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: isActive
+                            ? Colors.white
+                            : colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -441,15 +549,18 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               );
             }).toList(),
           ),
+
           const SizedBox(height: 20),
+
+          // Step description card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: const Color.fromRGBO(0, 0, 0, 0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -460,10 +571,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               children: [
                 Text(
                   _howItWorksSteps[_currentStep]['title']!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -471,7 +582,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   _howItWorksSteps[_currentStep]['description']!,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey.shade600,
+                    color: colorScheme.onSurface.withValues(alpha: 0.55),
                   ),
                 ),
               ],
@@ -482,38 +593,42 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     );
   }
 
-  Widget _buildFooter() {
+  // ────────────────────────────────────────────────────────────────
+  // Footer
+  // ────────────────────────────────────────────────────────────────
+  Widget _buildFooter(ThemeData theme, ColorScheme colorScheme) {
     return Center(
       child: Column(
         children: [
-          // Logo placeholder
+          // Logo box
           Container(
-            width: 120,
-            height: 40,
+            padding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(8),
+              color: colorScheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Center(
-              child: Text(
-                'doloo',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black54,
-                ),
+            child: Text(
+              'dolo',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: colorScheme.primary,
+                letterSpacing: 1.5,
               ),
             ),
           ),
-          const SizedBox(height: 16),
 
-          // Illustration
+          const SizedBox(height: 20),
+
+          // Illustration grid
           Container(
             width: 200,
             height: 120,
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
+              color: colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.dividerColor),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -522,11 +637,14 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     Icon(Icons.location_on_outlined,
-                        size: 32, color: Colors.grey.shade500),
+                        size: 32,
+                        color: colorScheme.primary.withValues(alpha: 0.5)),
                     Icon(Icons.local_shipping_outlined,
-                        size: 32, color: Colors.grey.shade500),
+                        size: 32,
+                        color: colorScheme.primary.withValues(alpha: 0.5)),
                     Icon(Icons.delivery_dining_outlined,
-                        size: 32, color: Colors.grey.shade500),
+                        size: 32,
+                        color: colorScheme.primary.withValues(alpha: 0.5)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -534,38 +652,38 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     Icon(Icons.directions_car_outlined,
-                        size: 32, color: Colors.grey.shade500),
+                        size: 32,
+                        color: colorScheme.secondary.withValues(alpha: 0.5)),
                     Icon(Icons.inventory_2_outlined,
-                        size: 32, color: Colors.grey.shade500),
+                        size: 32,
+                        color: colorScheme.secondary.withValues(alpha: 0.5)),
                     Icon(Icons.location_pin,
-                        size: 32, color: Colors.grey.shade500),
+                        size: 32,
+                        color: colorScheme.secondary.withValues(alpha: 0.5)),
                   ],
                 ),
               ],
             ),
           ),
+
           const SizedBox(height: 16),
 
           // Tagline
-          Column(
-            children: [
-              Text(
-                'Smarter Logistics.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade500,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              Text(
-                'Connected Community.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade500,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
+          Text(
+            'Smarter Logistics.',
+            style: TextStyle(
+              fontSize: 14,
+              color: colorScheme.onSurface.withValues(alpha: 0.45),
+              letterSpacing: 0.5,
+            ),
+          ),
+          Text(
+            'Connected Community.',
+            style: TextStyle(
+              fontSize: 14,
+              color: colorScheme.onSurface.withValues(alpha: 0.45),
+              letterSpacing: 0.5,
+            ),
           ),
         ],
       ),

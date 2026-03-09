@@ -303,8 +303,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           id: request.orderId,
           userId: request.orderId,
           userName: request.counterpartName ?? 'Order Creator',
-          senderInitial: (request.counterpartName != null && request.counterpartName!.isNotEmpty) 
-              ? request.counterpartName![0].toUpperCase() 
+          senderInitial: (request.counterpartName != null && request.counterpartName!.isNotEmpty)
+              ? request.counterpartName![0].toUpperCase()
               : 'O',
           origin: request.source,
           destination: request.destination,
@@ -363,7 +363,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         tripRequestId: request.id,
         negotiatedPrice: 0, // In UI, you might want to ask for this
       );
-      
+
       final response = await _tripRequestService.acceptTripRequest(acceptReq);
       if (response != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -388,7 +388,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         orderCreatorHashedId: currentUserId!,
         tripRequestId: request.id,
       );
-      
+
       final response = await _tripRequestService.declineTripRequest(declineReq);
       if (response != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -412,7 +412,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         travelerHashedId: currentUserId!,
         tripRequestHashedId: tripRequestId,
       );
-      
+
       final response = await _tripRequestService.withdrawTripRequest(withdrawReq);
       if (response != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -463,7 +463,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         weight: updatedOrder.weight,
         specialInstructions: updatedOrder.notes,
       );
-      
+
       final response = await _orderService.updateOrder(updatedOrder.id, updateReq);
       if (response != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -553,9 +553,9 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F0),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F5F0),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         title: const Text(
           'Your Orders',
@@ -571,11 +571,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             onNotificationHandled: () => _loadAllData(),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black54),
+            icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.6)),
             onPressed: () => _loadAllData(),
           ),
           IconButton(
-            icon: const Icon(Icons.inbox_outlined, color: Colors.black54),
+            icon: Icon(Icons.inbox_outlined, color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.6)),
             onPressed: _openInbox,
           ),
         ],
@@ -587,7 +587,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFE8E3D5),
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(30),
               ),
               padding: const EdgeInsets.all(4),
@@ -620,7 +620,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFD4C88A) : Colors.transparent,
+            color: isSelected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(26),
           ),
           child: Text(
@@ -629,7 +629,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             style: TextStyle(
               fontSize: 14,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              color: isSelected ? Colors.black87 : Colors.black54,
+              color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
         ),
@@ -733,7 +733,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
                   ),
                 ],
               ),
-              child: Icon(icon, size: 40, color: Colors.grey[400]),
+              child: Icon(icon, size: 40, color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.3)),
             ),
             const SizedBox(height: 24),
             Text(
@@ -748,7 +748,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.5)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 28),
@@ -757,7 +757,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Refresh'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black87,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
                 padding:
                 const EdgeInsets.symmetric(horizontal: 28, vertical: 13),

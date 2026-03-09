@@ -13,9 +13,12 @@ class Order {
   final double destinationLongitude;
   final String deliveryDate;
   final String? deliveryTime;
+  final String? departureDate; // Added
+  final String? departureTime; // Added
   final String weight; // API values: "below 2kg", "2-5kg", "5-10kg", "more than 10kg"
   final int? expectedPrice;
   final String imageUrl;
+  final List<String>? imageUrls; // Added for multiple images
   final String specialInstructions;
   final String status;
   final String? category; // API values: "technology", "documents", "clothing", "fragile", "food", "other"
@@ -26,6 +29,8 @@ class Order {
   final String transportMode;
   final List<String>? preferenceTransport;
   final bool? isUrgent;
+  final String? ownerName; // Added
+  final double? ownerRating; // Added
 
   Order({
     required this.id,
@@ -39,9 +44,12 @@ class Order {
     required this.destinationLongitude,
     required this.deliveryDate,
     this.deliveryTime,
+    this.departureDate,
+    this.departureTime,
     required this.weight,
     this.expectedPrice,
     required this.imageUrl,
+    this.imageUrls,
     required this.specialInstructions,
     required this.status,
     this.category,
@@ -52,6 +60,8 @@ class Order {
     this.transportMode = 'Car',
     this.preferenceTransport,
     this.isUrgent,
+    this.ownerName,
+    this.ownerRating,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -82,7 +92,10 @@ class Order {
 
     String deliveryDate = '';
     String? deliveryTime;
+    String? departureDate;
+    String? departureTime;
 
+    // Parse delivery_datetime
     if (json['delivery_datetime'] != null &&
         json['delivery_datetime'].toString().isNotEmpty) {
       try {
@@ -104,6 +117,28 @@ class Order {
       }
     }
 
+    // Parse pickup_datetime (mapped to departureDate/Time)
+    if (json['pickup_datetime'] != null &&
+        json['pickup_datetime'].toString().isNotEmpty) {
+      try {
+        String datetime = json['pickup_datetime'].toString();
+        datetime =
+            datetime.replaceAll('.000Z', '').replaceAll('Z', '').trim();
+
+        if (datetime.contains('T')) {
+          final parts = datetime.split('T');
+          departureDate = parts[0].trim();
+          if (parts.length > 1 && parts[1].isNotEmpty) {
+            departureTime = parts[1].trim();
+          }
+        } else {
+          departureDate = datetime;
+        }
+      } catch (e) {
+        debugPrint('Error parsing pickup_datetime: $e');
+      }
+    }
+
     if (deliveryDate.isEmpty && json['delivery_date'] != null) {
       deliveryDate = json['delivery_date'].toString().trim();
     }
@@ -119,7 +154,7 @@ class Order {
 
     return Order(
       id: parsedId,
-      userName: json['user_name'] ?? '',
+      userName: json['user_name'] ?? json['order_creator_name'] ?? '',
       itemDescription: json['item_description'] ?? 'Package',
       origin: json['origin'] ?? '',
       originLatitude: _parseDouble(json['origin_latitude']),
@@ -129,11 +164,14 @@ class Order {
       destinationLongitude: _parseDouble(json['destination_longitude']),
       deliveryDate: deliveryDate,
       deliveryTime: deliveryTime,
+      departureDate: departureDate,
+      departureTime: departureTime,
       weight: json['weight']?.toString() ?? '0kg',
       expectedPrice: json['expected_price'] != null
           ? _parseInt(json['expected_price'])
           : null,
       imageUrl: json['image_url'] ?? '',
+      imageUrls: json['image_urls'] != null ? List<String>.from(json['image_urls']) : null,
       specialInstructions: json['special_instructions'] ?? '',
       status: json['status'] ?? '',
       category: json['category'],
@@ -148,6 +186,8 @@ class Order {
       transportMode: json['transport_mode'] ?? 'Car',
       preferenceTransport: preferenceTransport,
       isUrgent: isUrgent,
+      ownerName: json['order_creator_name'] ?? json['user_name'],
+      ownerRating: _parseDouble(json['owner_rating'] ?? 0.0),
     );
   }
 
@@ -227,13 +267,10 @@ class OrderSubCategory {
   });
 }
 
-// UPDATED: All apiValues now match API enum exactly:
-// technology, documents, clothing, fragile, food, other
-// "furniture" is not a valid API category — mapped to "other"
 final List<OrderMainCategory> orderCategories = [
   OrderMainCategory(
     name: 'Electronics',
-    apiValue: 'technology', // ✅ valid API value
+    apiValue: 'technology', 
     icon: '⚡',
     color: const Color(0xFF2196F3),
     subCategories: [
@@ -276,7 +313,7 @@ final List<OrderMainCategory> orderCategories = [
   ),
   OrderMainCategory(
     name: 'Furniture',
-    apiValue: 'other', // ✅ "furniture" not in API — mapped to "other"
+    apiValue: 'other', 
     icon: '🛋️',
     color: const Color(0xFF795548),
     subCategories: [
@@ -314,7 +351,7 @@ final List<OrderMainCategory> orderCategories = [
   ),
   OrderMainCategory(
     name: 'Documents',
-    apiValue: 'documents', // ✅ valid API value
+    apiValue: 'documents', 
     icon: '📄',
     color: const Color(0xFF4CAF50),
     subCategories: [
@@ -347,7 +384,7 @@ final List<OrderMainCategory> orderCategories = [
   ),
   OrderMainCategory(
     name: 'Fragile Items',
-    apiValue: 'fragile', // ✅ valid API value
+    apiValue: 'fragile', 
     icon: '📦',
     color: const Color(0xFFE91E63),
     subCategories: [
@@ -380,7 +417,7 @@ final List<OrderMainCategory> orderCategories = [
   ),
   OrderMainCategory(
     name: 'Clothing',
-    apiValue: 'clothing', // ✅ valid API value
+    apiValue: 'clothing', 
     icon: '👕',
     color: const Color(0xFF9C27B0),
     subCategories: [
@@ -408,7 +445,7 @@ final List<OrderMainCategory> orderCategories = [
   ),
   OrderMainCategory(
     name: 'Food Items',
-    apiValue: 'food', // ✅ valid API value
+    apiValue: 'food', 
     icon: '🍱',
     color: const Color(0xFFFF9800),
     subCategories: [
@@ -431,7 +468,7 @@ final List<OrderMainCategory> orderCategories = [
   ),
   OrderMainCategory(
     name: 'Others',
-    apiValue: 'other', // ✅ valid API value
+    apiValue: 'other',
     icon: '📦',
     color: const Color(0xFF9E9E9E),
     subCategories: [

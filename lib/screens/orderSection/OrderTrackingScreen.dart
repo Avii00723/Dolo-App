@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:location/location.dart' as loc;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
@@ -12,10 +11,10 @@ class OrderTrackingScreen extends StatefulWidget {
   final Map<String, dynamic> orderData;
 
   const OrderTrackingScreen({
-    Key? key,
+    super.key,
     required this.orderId,
     required this.orderData,
-  }) : super(key: key);
+  });
 
   @override
   State<OrderTrackingScreen> createState() => _OrderTrackingScreenState();
@@ -23,7 +22,6 @@ class OrderTrackingScreen extends StatefulWidget {
 
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   GoogleMapController? _mapController;
-  final loc.Location _location = loc.Location();
 
   // Location variables
   LatLng? _currentPosition;
@@ -34,13 +32,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   // Tracking state
   String _trackingStatus = 'pending';
   double _progressPercentage = 0.0;
-  double _estimatedDistance = 0.0;
-  String _estimatedTime = '';
   bool _isDelivered = false;
 
   // Map markers and polylines
   Set<Marker> _markers = {};
-  Set<Polyline> _polylines = {};
+  final Set<Polyline> _polylines = {};
 
   // Streams
   StreamSubscription<Position>? _positionStreamSubscription;
@@ -93,7 +89,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       _updateMarkers();
       _calculateRoute();
     } catch (e) {
-      print('Error setting up locations: $e');
+      debugPrint('Error setting up locations: $e');
     }
   }
 
@@ -124,6 +120,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   }
 
   void _updateCurrentPosition(Position position) {
+    if (!mounted) return;
     setState(() {
       _currentPosition = LatLng(position.latitude, position.longitude);
     });
@@ -147,11 +144,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         'status': _trackingStatus,
       }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating delivery location: $e');
+      debugPrint('Error updating delivery location: $e');
     }
   }
 
   void _updateTrackingData(Map<String, dynamic> data) {
+    if (!mounted) return;
     setState(() {
       _trackingStatus = data['status'] ?? 'pending';
 
@@ -208,6 +206,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       ));
     }
 
+    if (!mounted) return;
     setState(() {
       _markers = markers;
     });
@@ -218,23 +217,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       _polylines.add(Polyline(
         polylineId: const PolylineId('route'),
         points: [_pickupLocation!, _dropoffLocation!],
-        color: Colors.blue,
+        color: const Color(0xFF3E83AE),
         width: 3,
         patterns: [PatternItem.dash(30), PatternItem.gap(20)],
       ));
-
-      _estimatedDistance = Geolocator.distanceBetween(
-        _pickupLocation!.latitude,
-        _pickupLocation!.longitude,
-        _dropoffLocation!.latitude,
-        _dropoffLocation!.longitude,
-      ) / 1000;
-
-      final estimatedHours = _estimatedDistance / 30;
-      final minutes = (estimatedHours * 60).round();
-      _estimatedTime = minutes < 60
-          ? '$minutes min'
-          : '${(minutes ~/ 60)}h ${minutes % 60}min';
     }
   }
 
@@ -255,6 +241,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       );
 
       if (totalDistance > 0) {
+        if (!mounted) return;
         setState(() {
           _progressPercentage = (distanceFromPickup / totalDistance).clamp(0.0, 1.0);
         });
@@ -277,6 +264,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   // After OTP is verified
   void _onOtpVerified() {
+    if (!mounted) return;
     setState(() {
       _isDelivered = true;
       _trackingStatus = 'delivered';
@@ -287,7 +275,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
     // Show rating dialog after a short delay
     Future.delayed(const Duration(milliseconds: 500), () {
-      _showRatingDialog();
+      if (mounted) {
+        _showRatingDialog();
+      }
     });
   }
 
@@ -301,7 +291,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         'delivered_at': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error updating order status: $e');
+      debugPrint('Error updating order status: $e');
     }
   }
 
@@ -320,6 +310,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   void _onRatingSubmitted() {
     // Navigate back or show success message
+    if (!mounted) return;
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -363,11 +354,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             bottom: 0,
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, -5),
                   ),
@@ -383,13 +374,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.track_changes, color: Colors.blue),
+                          Icon(Icons.track_changes, color: Theme.of(context).colorScheme.primary),
                           const SizedBox(width: 8),
                           Text(
                             'Order #${widget.orderId.substring(0, 8)}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           const Spacer(),
@@ -426,7 +418,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         statusIcon = Icons.schedule;
         break;
       case 'picked_up':
-        chipColor = Colors.blue;
+        chipColor = Theme.of(context).colorScheme.primary;
         statusText = 'Picked Up';
         statusIcon = Icons.local_shipping;
         break;
@@ -454,9 +446,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: chipColor.withOpacity(0.1),
+        color: chipColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: chipColor.withOpacity(0.3)),
+        border: Border.all(color: chipColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -485,15 +477,15 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Colors.grey[700],
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 8),
         LinearProgressIndicator(
           value: _progressPercentage,
-          backgroundColor: Colors.grey[300],
+          backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
           valueColor: AlwaysStoppedAnimation<Color>(
-            _trackingStatus == 'delivered' ? Colors.green : Colors.blue,
+            _trackingStatus == 'delivered' ? Colors.green : Theme.of(context).colorScheme.primary,
           ),
           minHeight: 6,
         ),
@@ -502,7 +494,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           '${(_progressPercentage * 100).toInt()}% Complete',
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
           ),
         ),
       ],
@@ -524,7 +516,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     'From',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -532,9 +524,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               ),
               Text(
                 widget.orderData['origin'] ?? 'Pickup Location',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -555,7 +548,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     'To',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -563,9 +556,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               ),
               Text(
                 widget.orderData['destination'] ?? 'Delivery Location',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -644,10 +638,10 @@ class OtpVerificationBottomSheet extends StatefulWidget {
   final VoidCallback onVerified;
 
   const OtpVerificationBottomSheet({
-    Key? key,
+    super.key,
     required this.orderId,
     required this.onVerified,
-  }) : super(key: key);
+  });
 
   @override
   State<OtpVerificationBottomSheet> createState() =>
@@ -703,10 +697,12 @@ class _OtpVerificationBottomSheetState
 
         if (storedOtp == _otpValue) {
           // OTP is correct
+          if (!mounted) return;
           Navigator.of(context).pop();
           widget.onVerified();
         } else {
           // OTP is incorrect
+          if (!mounted) return;
           setState(() {
             _errorMessage = 'Invalid OTP. Please try again.';
             _isVerifying = false;
@@ -715,6 +711,7 @@ class _OtpVerificationBottomSheetState
         }
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Error verifying OTP: $e';
         _isVerifying = false;
@@ -767,9 +764,9 @@ class _OtpVerificationBottomSheetState
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -785,18 +782,19 @@ class _OtpVerificationBottomSheetState
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).dividerColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 24),
 
             // Title
-            const Text(
+            Text(
               'Enter OTP',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -806,7 +804,7 @@ class _OtpVerificationBottomSheetState
               'Please enter the OTP to complete delivery',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               textAlign: TextAlign.center,
             ),
@@ -833,18 +831,18 @@ class _OtpVerificationBottomSheetState
                       counterText: '',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
+                        borderSide: BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
+                        borderSide: BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.blue, width: 2),
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[50],
+                      fillColor: Theme.of(context).colorScheme.surface,
                     ),
                     onChanged: (value) {
                       if (value.isNotEmpty && index < 5) {
@@ -883,7 +881,7 @@ class _OtpVerificationBottomSheetState
               child: ElevatedButton(
                 onPressed: _isVerifying ? null : _verifyOtp,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[800],
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -938,11 +936,11 @@ class RatingFeedbackDialog extends StatefulWidget {
   final VoidCallback onSubmitted;
 
   const RatingFeedbackDialog({
-    Key? key,
+    super.key,
     required this.orderId,
     required this.deliveryPersonName,
     required this.onSubmitted,
-  }) : super(key: key);
+  });
 
   @override
   State<RatingFeedbackDialog> createState() => _RatingFeedbackDialogState();
@@ -961,6 +959,7 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
 
   Future<void> _submitRating() async {
     if (_selectedRating == 0) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a rating'),
@@ -997,9 +996,11 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
         'rated_at': FieldValue.serverTimestamp(),
       });
 
+      if (!mounted) return;
       Navigator.of(context).pop();
       widget.onSubmitted();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isSubmitting = false;
       });
@@ -1056,16 +1057,16 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: Text(
                   widget.deliveryPersonName.substring(0, 2).toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black54,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ),
@@ -1076,9 +1077,10 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
             // Question
             Text(
               'How was ${widget.deliveryPersonName}\'s delivery?',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1089,7 +1091,7 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
               'Your feedback helps us improve future orders',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               textAlign: TextAlign.center,
             ),
@@ -1116,7 +1118,7 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
                       size: 40,
                       color: _selectedRating >= starIndex
                           ? Colors.amber
-                          : Colors.grey[400],
+                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25),
                     ),
                   ),
                 );
@@ -1130,7 +1132,7 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Colors.grey[700],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -1143,21 +1145,21 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
               maxLines: 3,
               decoration: InputDecoration(
                 hintText: 'Write a feedback',
-                hintStyle: TextStyle(color: Colors.grey[400]),
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.blue),
+                  borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
                 ),
                 filled: true,
-                fillColor: Colors.grey[50],
+                fillColor: Theme.of(context).colorScheme.surface,
                 contentPadding: const EdgeInsets.all(16),
               ),
             ),
@@ -1171,7 +1173,7 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
               child: ElevatedButton(
                 onPressed: _isSubmitting ? null : _submitRating,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[800],
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

@@ -7,11 +7,11 @@ class UserProfileScreen extends StatefulWidget {
   final String? profileUrl;
 
   const UserProfileScreen({
-    Key? key,
+    super.key,
     required this.userId,
     required this.userName,
     this.profileUrl,
-  }) : super(key: key);
+  });
 
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -45,19 +45,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Chat Profile',
           style: TextStyle(
-            color: Colors.black87,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -86,7 +86,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Widget _buildProfileHeader() {
     return Container(
       width: double.infinity,
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
       child: Column(
         children: [
@@ -99,9 +99,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade700,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: Theme.of(context).cardColor, width: 2),
                   ),
                   child: const Icon(
                     Icons.edit,
@@ -115,10 +115,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           const SizedBox(height: 16),
           Text(
             widget.userName,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -138,7 +138,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       height: 100,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.grey.shade300,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
       ),
       child: widget.profileUrl != null && widget.profileUrl!.isNotEmpty
           ? ClipOval(
@@ -159,7 +159,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       child: Icon(
         Icons.person_outline,
         size: 50,
-        color: Colors.grey.shade600,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
       ),
     );
   }
@@ -178,7 +178,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           '$rating/4 ($reviewCount reviews)',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey.shade600,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
           ),
         ),
       ],
@@ -187,7 +187,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Widget _buildActionButtons() {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
         children: [
@@ -198,8 +198,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 _showSnackBar('Call functionality not implemented yet');
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey.shade200,
-                foregroundColor: Colors.black87,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -224,8 +224,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 _showSnackBar('Search functionality not implemented yet');
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey.shade200,
-                foregroundColor: Colors.black87,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -249,7 +249,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Widget _buildVerifiedInformation() {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,15 +259,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               Icon(
                 Icons.verified_user,
                 size: 20,
-                color: Colors.grey.shade700,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Verified Information',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ],
@@ -298,14 +298,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         Icon(
           isVerified ? Icons.check_circle : Icons.cancel,
           size: 20,
-          color: isVerified ? Colors.green : Colors.grey.shade400,
+          color: isVerified ? Colors.green : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
         ),
         const SizedBox(width: 12),
         Text(
           text,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey.shade700,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
           ),
         ),
       ],
@@ -314,7 +314,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Widget _buildStatistics() {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
@@ -354,24 +354,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         children: [
           Icon(
             icon,
             size: 32,
-            color: Colors.grey.shade600,
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
           ),
           const SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 4),
@@ -379,7 +379,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
             ),
             textAlign: TextAlign.center,
           ),
@@ -445,6 +445,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
