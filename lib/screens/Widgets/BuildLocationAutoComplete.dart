@@ -77,11 +77,11 @@ mixin LocationAutocompleteMixin<T extends StatefulWidget> on State<T>{
             prefixIcon: Icon(icon, color: AppColors.primary),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -120,7 +120,7 @@ mixin LocationAutocompleteMixin<T extends StatefulWidget> on State<T>{
           Text(
             helperText,
             style: TextStyle(
-              color: Colors.grey[600],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               fontSize: 12,
             ),
           ),

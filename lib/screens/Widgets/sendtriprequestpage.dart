@@ -1,6 +1,4 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-
 import '../../Constants/colorconstant.dart';
 import '../../Controllers/TripRequestService.dart';
 import '../../Models/OrderModel.dart';
@@ -18,7 +16,7 @@ class SendTripRequestPage extends StatefulWidget {
   final String deliveryTime;
 
   const SendTripRequestPage({
-    Key? key,
+    super.key,
     required this.order,
     required this.currentUserId,
     required this.tripRequestService,
@@ -27,7 +25,7 @@ class SendTripRequestPage extends StatefulWidget {
     required this.departureTime,
     required this.deliveryDate,
     required this.deliveryTime,
-  }) : super(key: key);
+  });
 
   @override
   State<SendTripRequestPage> createState() => _SendTripRequestPageState();
@@ -223,13 +221,13 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
             : null,
       );
 
-      print('DEBUG: Sending trip request...');
-      print('DEBUG: Traveler ID: ${widget.currentUserId}');
-      print('DEBUG: Order ID: ${widget.order.id}');
-      print('DEBUG: Travel Date (delivery): $deliveryDatetime');
-      print('DEBUG: Departure Datetime: $departureDatetime');
-      print('DEBUG: Vehicle Type: ${widget.order.transportMode}');
-      print('DEBUG: PNR: $pnr');
+      debugPrint('DEBUG: Sending trip request...');
+      debugPrint('DEBUG: Traveler ID: ${widget.currentUserId}');
+      debugPrint('DEBUG: Order ID: ${widget.order.id}');
+      debugPrint('DEBUG: Travel Date (delivery): $deliveryDatetime');
+      debugPrint('DEBUG: Departure Datetime: $departureDatetime');
+      debugPrint('DEBUG: Vehicle Type: ${widget.order.transportMode}');
+      debugPrint('DEBUG: PNR: $pnr');
 
       final response = await widget.tripRequestService.sendTripRequest(tripRequest);
 
@@ -250,7 +248,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
         setState(() {
           isSubmitting = false;
         });
-        print('ERROR: Failed to send trip request: $e');
+        debugPrint('ERROR: Failed to send trip request: $e');
         _showSnackBar('Failed to send request: $e', Colors.red);
       }
     }
@@ -380,330 +378,81 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
           NotificationBellIcon(
             iconColor: Colors.white,
             onNotificationHandled: () {
-              print('🔔 SendPage: Notification handled callback');
+              debugPrint('🔔 SendPage: Notification handled callback');
             },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header card with order info
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primary.withOpacity(0.1),
-                          AppColors.primary.withOpacity(0.05),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.primary.withOpacity(0.2),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.local_shipping,
-                            color: AppColors.primary,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Order #${widget.order.id}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'By ${widget.order.userName}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  _buildReadOnlyField(
-                    label: 'From',
-                    value: widget.order.origin,
-                    icon: Icons.trip_origin,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildReadOnlyField(
-                    label: 'To',
-                    value: widget.order.destination,
-                    icon: Icons.location_on,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Divider
-                  Container(
-                    height: 1,
-                    color: Theme.of(context).dividerColor,
-                  ),
-                  const SizedBox(height: 24),
-
-                  Text(
-                    'Your Trip Details',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _buildEnhancedTextField(
-                    controller: vehicleInfoController,
-                    label: 'Vehicle Information',
-                    hint: 'e.g., Maruti Suzuki Swift, AC',
-                    icon: Icons.directions_car,
-                    isRequired: true,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // PNR/Ticket Section (only for Train, Flight, Bus)
-                  if (widget.order.transportMode.toLowerCase() == 'train' ||
-                      widget.order.transportMode.toLowerCase() == 'flight' ||
-                      widget.order.transportMode.toLowerCase() == 'plane' ||
-                      widget.order.transportMode.toLowerCase() == 'bus') ...[
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.07),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                widget.order.transportMode.toLowerCase() == 'train'
-                                    ? Icons.train
-                                    : widget.order.transportMode.toLowerCase() == 'bus'
-                                    ? Icons.directions_bus
-                                    : Icons.flight,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Ticket/PNR Number',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'OPTIONAL',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.orange.shade700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _getPnrHint(widget.order.transportMode),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).cardColor,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Theme.of(context).dividerColor),
-                            ),
-                            child: TextField(
-                              controller: pnrController,
-                              keyboardType: TextInputType.text,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: _getPnrPlaceholder(
-                                    widget.order.transportMode),
-                                hintStyle: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
-                                  fontSize: 13,
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.confirmation_number,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 20,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding:
-                                const EdgeInsets.symmetric(
-                                  horizontal: 15,
-                                  vertical: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  _buildReadOnlyDateTimeField(
-                    label: 'Departure Date & Time',
-                    value: '${widget.departureDate} ${widget.departureTime}',
-                    icon: Icons.flight_takeoff,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildReadOnlyDateTimeField(
-                    label: 'Delivery Date & Time',
-                    value: '${widget.deliveryDate} ${widget.deliveryTime}',
-                    icon: Icons.schedule,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildEnhancedTextField(
-                    controller: commentsController,
-                    label: 'Comments (Optional)',
-                    hint: 'e.g., Can carry your item securely',
-                    icon: Icons.comment_outlined,
-                    isRequired: false,
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            _buildReadOnlyField(
+              label: 'Traveling From',
+              value: widget.order.origin,
+              icon: Icons.location_on_outlined,
             ),
-          ),
-
-          // Bottom action buttons
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
+            const SizedBox(height: 16),
+            _buildReadOnlyField(
+              label: 'Traveling To',
+              value: widget.order.destination,
+              icon: Icons.place_outlined,
+            ),
+            const SizedBox(height: 16),
+            _buildReadOnlyField(
+              label: 'Vehicle Info',
+              value: widget.order.transportMode,
+              icon: Icons.directions_bus_outlined,
+            ),
+            const SizedBox(height: 16),
+            _buildEnhancedTextField(
+              controller: vehicleInfoController,
+              label: 'Enter Vehicle Info',
+              hint: 'e.g., Bus, Train, Plane',
+              icon: Icons.info_outline,
+              isRequired: true,
+            ),
+            const SizedBox(height: 16),
+            _buildEnhancedTextField(
+              controller: pnrController,
+              label: 'Enter PNR',
+              hint: _getPnrPlaceholder(widget.order.transportMode),
+              icon: Icons.confirmation_number_outlined,
+            ),
+            const SizedBox(height: 16),
+            _buildEnhancedTextField(
+              controller: commentsController,
+              label: 'Enter Comments',
+              hint: 'Enter your comments',
+              icon: Icons.comment_outlined,
+              maxLines: 3,
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: isSubmitting ? null : _submitRequest,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-              ],
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: isSubmitting ? null : () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        side: BorderSide(
-                          color: Theme.of(context).dividerColor,
-                          width: 1.5,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
+                child: isSubmitting
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                  'Send Request',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton.icon(
-                      onPressed: isSubmitting ? null : _submitRequest,
-                      icon: isSubmitting
-                          ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                          : const Icon(Icons.send_rounded, size: 20),
-                      label: Text(
-                        isSubmitting ? 'Sending...' : 'Send Request',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

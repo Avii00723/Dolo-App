@@ -495,7 +495,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -519,7 +519,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     icon: const Icon(Icons.camera_alt),
                     label: const Text('Camera'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
@@ -590,7 +590,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     if (_errorMessage != null && messages.isEmpty) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF5F5F5),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: _buildAppBar(),
         body: _buildErrorState(),
       );
@@ -617,7 +617,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       systemOverlayStyle: SystemUiOverlayStyle.dark,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.black87),
+        icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
         onPressed: () => Navigator.pop(context),
       ),
       title: GestureDetector(
@@ -629,8 +629,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             Expanded(
               child: Text(
                 otherUserData['name'] ?? 'Unknown User',
-                style: const TextStyle(
-                  color: Colors.black87,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
@@ -640,7 +640,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
             Icon(
               Icons.chevron_right,
-              color: Colors.grey.shade400,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
               size: 20,
             ),
           ],
@@ -648,11 +648,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.phone, color: Colors.black87),
+          icon: Icon(Icons.phone, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () {},
         ),
         PopupMenuButton(
-          icon: const Icon(Icons.more_vert, color: Colors.black87),
+          icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurface),
           itemBuilder: (context) => [
             const PopupMenuItem(
               value: 'profile',
@@ -735,13 +735,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: Theme.of(context).colorScheme.surface,
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.chat_bubble_outline,
               size: 40,
-              color: Colors.grey.shade400,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
             ),
           ),
           const SizedBox(height: 16),
@@ -750,7 +750,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
             ),
           ),
         ],
@@ -776,7 +776,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
               ),
             ),
             const SizedBox(height: 24),
@@ -810,14 +810,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(
-            color: Colors.blue.shade600,
+            color: Theme.of(context).colorScheme.primary,
             width: 3,
           ),
         ),
       ),
       child: Row(
         children: [
-          Icon(Icons.reply, color: Colors.blue.shade600, size: 16),
+          Icon(Icons.reply, color: Theme.of(context).colorScheme.primary, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -827,7 +827,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   'Replying to $senderName',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.blue.shade700,
+                    color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -836,7 +836,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   previewText,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.grey.shade700,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -845,7 +845,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.close, color: Colors.grey.shade600, size: 18),
+            icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), size: 18),
             onPressed: _clearReply,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -883,8 +883,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     onTap: () => _removeImage(index),
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -939,7 +939,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         textCapitalization: TextCapitalization.sentences,
                         decoration: InputDecoration(
                           hintText: 'Type a message...',
-                          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+                          hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), fontSize: 15),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -951,7 +951,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     ),
                     IconButton(
                       key: _imagePickerKey,
-                      icon: Icon(Icons.attach_file, color: Colors.grey.shade600, size: 22),
+                      icon: Icon(Icons.attach_file, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), size: 22),
                       onPressed: _showImagePickerOptions,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
@@ -1038,7 +1038,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 Text(
                   'Typing',
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     fontSize: 14,
                   ),
                 ),
@@ -1076,7 +1076,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 width: 5,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
+                  color: value > 0.5 ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
               );
@@ -1086,7 +1086,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               width: 5,
               height: 5,
               decoration: BoxDecoration(
-                color: value > 0.5 ? Colors.grey.shade600 : Colors.grey.shade400,
+                color: value > 0.5 ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
             );
@@ -1111,7 +1111,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         gradient: LinearGradient(
           colors: isMe
               ? [const Color(0xFF2B6390), const Color(0xFF3E83AE)]
-              : [Colors.grey.shade400, Colors.grey.shade500],
+              : [Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2), Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1368,7 +1368,7 @@ class EnhancedMessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMe) ...[
-            _buildAvatar(),
+            _buildAvatar(context),
             const SizedBox(width: 8),
           ],
           Flexible(
@@ -1396,16 +1396,16 @@ class EnhancedMessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (hasReply) _buildReplySection(),
+                  if (hasReply) _buildReplySection(context),
                   if (messageType == 'image' && mediaUrl != null)
-                    _buildImageMessage(mediaUrl),
+                    _buildImageMessage(context, mediaUrl),
                   if (messageText.isNotEmpty)
                     SelectableText(
                       messageText,
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.4,
-                        color: Colors.grey.shade800,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   if (timestamp != null) ...[
@@ -1417,7 +1417,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                           Icon(
                             seen ? Icons.done_all : Icons.done,
                             size: 14,
-                            color: seen ? Colors.blue : Colors.grey.shade400,
+                            color: seen ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                           ),
                           const SizedBox(width: 4),
                         ],
@@ -1425,7 +1425,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                           DateFormat('hh:mm a').format(timestamp),
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade500,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
                           ),
                         ),
                       ],
@@ -1437,7 +1437,7 @@ class EnhancedMessageBubble extends StatelessWidget {
           ),
           if (isMe) ...[
             const SizedBox(width: 8),
-            _buildAvatar(),
+            _buildAvatar(context),
           ],
         ],
       ),
@@ -1445,7 +1445,7 @@ class EnhancedMessageBubble extends StatelessWidget {
   }
 
   // UPDATED: Make avatar tappable
-  Widget _buildAvatar() {
+  Widget _buildAvatar(BuildContext context) {
     final name = message['senderName'] ?? 'U';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
 
@@ -1457,7 +1457,7 @@ class EnhancedMessageBubble extends StatelessWidget {
         gradient: LinearGradient(
           colors: isMe
               ? [const Color(0xFF2B6390), const Color(0xFF3E83AE)]
-              : [Colors.grey.shade400, Colors.grey.shade500],
+              : [Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2), Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1485,7 +1485,7 @@ class EnhancedMessageBubble extends StatelessWidget {
     return avatarWidget;
   }
 
-  Widget _buildReplySection() {
+  Widget _buildReplySection(BuildContext context) {
     final replyData = message['replyData'];
     if (replyData == null) return const SizedBox.shrink();
 
@@ -1496,11 +1496,11 @@ class EnhancedMessageBubble extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border(
           left: BorderSide(
-            color: Colors.grey.shade400,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
             width: 3,
           ),
         ),
@@ -1513,7 +1513,7 @@ class EnhancedMessageBubble extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 4),
@@ -1521,7 +1521,7 @@ class EnhancedMessageBubble extends StatelessWidget {
             replyText.isNotEmpty ? replyText : '📷 Photo',
             style: TextStyle(
               fontSize: 13,
-              color: Colors.grey.shade800,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -1531,7 +1531,7 @@ class EnhancedMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildImageMessage(String mediaUrl) {
+  Widget _buildImageMessage(BuildContext context, String mediaUrl) {
     String fullUrl = mediaUrl;
     if (!mediaUrl.startsWith('http')) {
       fullUrl = '${ApiConstants.imagebaseUrl}$mediaUrl';
@@ -1551,7 +1551,7 @@ class EnhancedMessageBubble extends StatelessWidget {
               return Container(
                 height: 200,
                 width: 200,
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.surface,
                 child: const Center(child: CircularProgressIndicator()),
               );
             },
@@ -1559,9 +1559,9 @@ class EnhancedMessageBubble extends StatelessWidget {
               return Container(
                 height: 200,
                 width: 200,
-                color: Colors.grey[300],
-                child: const Center(
-                  child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                color: Theme.of(context).colorScheme.surface,
+                child: Center(
+                  child: Icon(Icons.broken_image, size: 50, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                 ),
               );
             },
@@ -1590,13 +1590,13 @@ class EnhancedMessageBubble extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 20),
             ListTile(
-              leading: const Icon(Icons.reply, color: Colors.blue),
+              leading: Icon(Icons.reply, color: Theme.of(context).colorScheme.primary),
               title: const Text('Reply'),
               onTap: () {
                 Navigator.pop(context);
@@ -1605,7 +1605,7 @@ class EnhancedMessageBubble extends StatelessWidget {
             ),
             if (messageText.isNotEmpty)
               ListTile(
-                leading: const Icon(Icons.copy, color: Colors.grey),
+                leading: Icon(Icons.copy, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                 title: const Text('Copy Text'),
                 onTap: () {
                   Navigator.pop(context);
@@ -1624,6 +1624,7 @@ class EnhancedMessageBubble extends StatelessWidget {
           ],
         ),
       ),
+
     );
   }
 }

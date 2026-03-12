@@ -145,6 +145,55 @@ class ApiService {
     }
   }
 
+  // Generic Multipart POST request
+  Future<ApiResponse<T>> postMultipart<T>(
+      String endpoint, {
+        Map<String, String>? fields,
+        List<http.MultipartFile>? files,
+        Map<String, String>? headers,
+        T Function(dynamic)? parser,
+      }) async {
+    try {
+      final url = buildUrl(endpoint);
+      final request = http.MultipartRequest('POST', Uri.parse(url));
+
+      if (headers != null) {
+        request.headers.addAll(headers);
+      }
+      // Add Accept header if not present
+      if (!request.headers.containsKey('Accept')) {
+        request.headers['Accept'] = 'application/json';
+      }
+
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+
+      if (files != null) {
+        request.files.addAll(files);
+      }
+
+      print('┌─────────────────────────────────────');
+      print('│ 📡 MULTIPART POST REQUEST');
+      print('├─────────────────────────────────────');
+      print('│ URL: $url');
+      print('│ Fields: $fields');
+      print('│ Files: ${files?.map((f) => f.field).toList()}');
+      print('└─────────────────────────────────────');
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      return _processResponse(response, endpoint, parser);
+    } on SocketException {
+      print('❌ Network error - check your connection');
+      return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
+    } catch (e) {
+      print('❌ MULTIPART POST Exception: $e');
+      return ApiResponse.error('Request failed: $e', endpoint: endpoint);
+    }
+  }
+
   // Generic PUT request
   Future<ApiResponse<T>> put<T>(
       String endpoint, {

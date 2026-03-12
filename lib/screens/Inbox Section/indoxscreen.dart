@@ -205,10 +205,10 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        title: const Text(
+        title: Text(
           'Inbox',
           style: TextStyle(
-            color: Colors.black87,
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
@@ -360,7 +360,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           color: isSelected ? Theme.of(context).colorScheme.primary.withValues(alpha:0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.grey.shade300,
+            color: Theme.of(context).dividerColor,
             width: 1,
           ),
         ),
@@ -387,7 +387,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.black87 : Colors.grey.shade600,
+                  color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -463,11 +463,11 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.login, size: 64, color: Colors.grey.shade400),
+          Icon(Icons.login, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
           const SizedBox(height: 16),
           Text(
             'Please log in to continue',
-            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
           ),
         ],
       ),
@@ -479,20 +479,20 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey.shade300),
+          Icon(Icons.chat_bubble_outline, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(
             'No Chats Available',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Start chatting by accepting trip requests',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
           ),
         ],
       ),
@@ -504,20 +504,20 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.request_page_outlined, size: 64, color: Colors.grey.shade300),
+          Icon(Icons.request_page_outlined, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(
             'No Trip Requests',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'No requests to display',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
           ),
         ],
       ),
@@ -741,8 +741,8 @@ class ModernChatCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 26,
-                  backgroundColor: Colors.grey.shade300,
-                  child: Icon(Icons.person, color: Colors.grey.shade600, size: 28),
+                  backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+                  child: Icon(Icons.person, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45), size: 28),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -754,10 +754,10 @@ class ModernChatCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               otherUserName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -765,9 +765,9 @@ class ModernChatCard extends StatelessWidget {
                           ),
                           Text(
                             _formatTime(lastMessageTime),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
                             ),
                           ),
                         ],
@@ -775,9 +775,9 @@ class ModernChatCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         lastMessage,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -871,8 +871,8 @@ class ModernRequestCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: Colors.grey.shade300,
-                child: Icon(Icons.person, color: Colors.grey.shade600, size: 22),
+                backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+                child: Icon(Icons.person, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45), size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -881,24 +881,24 @@ class ModernRequestCard extends StatelessWidget {
                   children: [
                     Text(
                       request.counterpartName ?? (isReceived ? request.travelerId : request.orderId),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     Text(
                       isReceived ? '↙ Sent you an request' : '↗ You sent an request',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
                       ),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.more_vert, color: Colors.grey),
+                icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
                 onPressed: () {},
               ),
             ],
@@ -908,15 +908,15 @@ class ModernRequestCard extends StatelessWidget {
           // Route information
           Row(
             children: [
-              const Icon(Icons.circle, size: 8, color: Colors.black87),
+              Icon(Icons.circle, size: 8, color: Theme.of(context).colorScheme.onSurface),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${request.source} → ${request.destination}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -927,21 +927,21 @@ class ModernRequestCard extends StatelessWidget {
           // Departure info
           Row(
             children: [
-              const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+              Icon(Icons.calendar_today, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
               const SizedBox(width: 6),
-              const Text(
+              Text(
                 'Departure',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             _formatDate(request.travelDate),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
 

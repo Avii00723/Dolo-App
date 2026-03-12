@@ -45,21 +45,21 @@ class _EnhancedLocationInputFieldState
               readOnly: true,
               decoration: InputDecoration(
                 hintText: widget.hint,
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                prefixIcon: Icon(widget.icon, size: 20, color: Colors.grey[600]),
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35), fontSize: 14),
+                prefixIcon: Icon(widget.icon, size: 20, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                 filled: true,
-                fillColor: Colors.grey[50],
+                fillColor: Theme.of(context).colorScheme.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[200]!),
+                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[200]!),
+                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[400]!),
+                  borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
@@ -166,7 +166,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
 
   @override
   void dispose() {
-    // Note: Removed _searchController.dispose() to avoid assertion errors 
+    // Note: Removed _searchController.dispose() to avoid assertion errors
     // caused by conflicts with GooglePlacesAutoCompleteTextFormField's internal cleanup.
     super.dispose();
   }
@@ -174,7 +174,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -185,7 +185,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                 color: AppColors.primary,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.07),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -331,7 +331,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                         children: [
                           Expanded(
                             child: Divider(
-                              color: Colors.grey[300],
+                              color: Theme.of(context).dividerColor,
                               thickness: 1,
                             ),
                           ),
@@ -340,7 +340,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                             child: Text(
                               'OR SEARCH LOCATION',
                               style: TextStyle(
-                                color: Colors.grey[600],
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.5,
@@ -349,7 +349,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                           ),
                           Expanded(
                             child: Divider(
-                              color: Colors.grey[300],
+                              color: Theme.of(context).dividerColor,
                               thickness: 1,
                             ),
                           ),
@@ -367,7 +367,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                               borderRadius: BorderRadius.circular(30),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.03),
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -424,8 +424,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                               },
                               decoration: InputDecoration(
                                 hintText: 'Search for a location...',
-                                hintStyle: const TextStyle(
-                                  color: Colors.grey,
+                                hintStyle: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                                   fontSize: 16,
                                 ),
                                 prefixIcon: Padding(
@@ -433,7 +433,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                       left: 16, right: 12),
                                   child: Icon(
                                     Icons.search,
-                                    color: Colors.grey[400],
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
                                     size: 22,
                                   ),
                                 ),
@@ -443,7 +443,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                     return _searchController.text.isNotEmpty
                                         ? IconButton(
                                       icon: Icon(Icons.clear,
-                                          color: Colors.grey[600]),
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)),
                                       onPressed: () {
                                         if (mounted) {
                                           _searchController.clear();
@@ -456,12 +456,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
                                   borderSide: BorderSide(
-                                      color: Colors.grey[300]!, width: 2),
+                                      color: Theme.of(context).dividerColor, width: 2),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
                                   borderSide: BorderSide(
-                                      color: Colors.grey[300]!, width: 2),
+                                      color: Theme.of(context).dividerColor, width: 2),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
@@ -469,15 +469,15 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                       color: AppColors.primary, width: 2),
                                 ),
                                 filled: true,
-                                fillColor: Colors.white,
+                                fillColor: Theme.of(context).cardColor,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 20,
                                   vertical: 17,
                                 ),
                               ),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
-                                color: Colors.black87,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -488,15 +488,15 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: Colors.blue[50],
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.07),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.blue[200]!),
+                              border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)),
                             ),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.info_outline,
-                                  color: Colors.blue[700],
+                                  color: Theme.of(context).colorScheme.primary,
                                   size: 24,
                                 ),
                                 const SizedBox(width: 12),
@@ -504,7 +504,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                   child: Text(
                                     'Type to see location suggestions. Select from the dropdown to auto-fill coordinates.',
                                     style: TextStyle(
-                                      color: Colors.blue[700],
+                                      color: Theme.of(context).colorScheme.primary,
                                       fontSize: 13,
                                       height: 1.4,
                                     ),

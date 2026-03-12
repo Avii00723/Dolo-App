@@ -1,3 +1,4 @@
+import 'package:http/http.dart' as http;
 import '../Constants/ApiService.dart';
 import '../Constants/ApiConstants.dart';
 import '../Models/LoginModel.dart';
@@ -31,12 +32,13 @@ class ProfileService {
       return null;
     }
   }
+
   Future<TrustScore?> getUserTrustScore(String userId) async {
     try {
       print('🌐 TrustScore API URL: ${ApiConstants.getUserTrustScore}/$userId');
       final response = await _api.get(
         '${ApiConstants.getUserTrustScore}/$userId',
-        parser: (json) => TrustScore.fromJson(json), // Add this parser
+        parser: (json) => TrustScore.fromJson(json),
       );
 
       print('📡 TrustScore Response: success=${response.success}, data=${response.data}');
@@ -52,7 +54,6 @@ class ProfileService {
       return null;
     }
   }
-
 
   // Update user profile by userId
   Future<bool> updateUserProfile(String userId, Map<String, dynamic> updates) async {
@@ -75,6 +76,30 @@ class ProfileService {
         await AuthService.clearUserSession();
       }
       return false;
+    }
+  }
+
+  // Upload profile photo
+  Future<Map<String, dynamic>?> uploadProfilePhoto(String userId, String filePath) async {
+    try {
+      final file = await http.MultipartFile.fromPath('photo', filePath);
+      
+      final response = await _api.postMultipart(
+        ApiConstants.uploadProfilePhoto,
+        fields: {'userId': userId},
+        files: [file],
+      );
+
+      if (response.success) {
+        print('✅ Profile photo uploaded successfully: ${response.data}');
+        return response.data as Map<String, dynamic>?;
+      } else {
+        print('❌ Failed to upload profile photo: ${response.error}');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Error uploading profile photo: $e');
+      return null;
     }
   }
 }

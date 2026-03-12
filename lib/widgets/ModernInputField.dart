@@ -115,7 +115,7 @@ class _ModernInputFieldState extends State<ModernInputField> {
                   inputFormatters: widget.inputFormatters,
                   style: TextStyle(
                     fontSize: 16,
-                    color: widget.enabled ? Colors.black87 : Colors.grey[600],
+                    color: widget.enabled ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
@@ -123,27 +123,27 @@ class _ModernInputFieldState extends State<ModernInputField> {
                     hintText: '',
                     prefixIcon: widget.prefixIcon != null
                         ? Padding(
-                            padding: const EdgeInsets.only(left: 16, right: 12),
-                            child: Icon(
-                              widget.prefixIcon,
-                              color: _isFocused
-                                  ? AppColors.primary
-                                  : Colors.grey[400],
-                              size: 22,
-                            ),
-                          )
+                      padding: const EdgeInsets.only(left: 16, right: 12),
+                      child: Icon(
+                        widget.prefixIcon,
+                        color: _isFocused
+                            ? AppColors.primary
+                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+                        size: 22,
+                      ),
+                    )
                         : null,
                     suffixIcon: widget.showClearButton && _hasText
                         ? IconButton(
-                            icon: Icon(
-                              Icons.close,
-                              color: Colors.grey[600],
-                              size: 20,
-                            ),
-                            onPressed: () {
-                              widget.controller.clear();
-                            },
-                          )
+                      icon: Icon(
+                        Icons.close,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        widget.controller.clear();
+                      },
+                    )
                         : widget.suffixIcon,
                     filled: true,
                     fillColor: Colors.transparent,
@@ -191,10 +191,10 @@ class _ModernInputFieldState extends State<ModernInputField> {
                     style: TextStyle(
                       fontSize: isLabelFloating ? 13 : 16,
                       color: isLabelFloating
-                          ? (_isFocused ? AppColors.primary : Colors.grey[600])
-                          : Colors.grey[600],
+                          ? (_isFocused ? AppColors.primary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))
+                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
                       fontWeight:
-                          isLabelFloating ? FontWeight.w600 : FontWeight.normal,
+                      isLabelFloating ? FontWeight.w600 : FontWeight.normal,
                     ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
@@ -205,7 +205,7 @@ class _ModernInputFieldState extends State<ModernInputField> {
                       ),
                       decoration: BoxDecoration(
                         color:
-                            isLabelFloating ? Colors.white : Colors.transparent,
+                        isLabelFloating ? Theme.of(context).scaffoldBackgroundColor : Colors.transparent,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -231,7 +231,7 @@ class _ModernInputFieldState extends State<ModernInputField> {
                 '${widget.controller.text.length}/${widget.maxLength}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -273,34 +273,34 @@ class ModernButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           elevation: 0,
-          disabledBackgroundColor: Colors.grey[300],
+          disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
         ),
         child: isLoading
             ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
+          height: 20,
+          width: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        )
             : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 20),
-                    const SizedBox(width: 8),
-                  ],
-                  Text(
-                    text,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 20),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              text,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
               ),
+            ),
+          ],
+        ),
       ),
     );
   }
