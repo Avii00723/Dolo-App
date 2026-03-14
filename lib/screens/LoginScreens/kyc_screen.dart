@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'package:geolocator/geolocator.dart';
 import '../../Controllers/KYCService.dart';
 import '../home/homepage.dart';
+import '../LocationinputField.dart';
+import '../../Widgets/FloatingNotification.dart';
 
 class KycUploadScreen extends StatefulWidget {
   final String userId;
@@ -33,6 +36,7 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
   final TextEditingController _addressController = TextEditingController();
   late final TextEditingController _emailController;
 
+  Position? _homeCityPosition;
   int _currentStep = 0;
   String? _selectedDocumentType;
   File? _selectedFile;
@@ -68,7 +72,12 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
           _phoneController.text.trim().isEmpty ||
           _addressController.text.trim().isEmpty ||
           _emailController.text.trim().isEmpty) {
-        _showSnackBar('Please fill all fields', Colors.orange);
+        FloatingNotification.show(
+          context,
+          isSuccess: false,
+          title: 'Missing Info',
+          subtitle: 'Please fill all fields',
+        );
         return;
       }
 
@@ -82,7 +91,12 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
     } else if (_currentStep == 1) {
       // Validate document selection
       if (_selectedDocumentType == null) {
-        _showSnackBar('Please select a document type', Colors.orange);
+        FloatingNotification.show(
+          context,
+          isSuccess: false,
+          title: 'Selection Required',
+          subtitle: 'Please select a document type',
+        );
         return;
       }
       _pickFile();
@@ -113,14 +127,24 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
       }
     } catch (e) {
       print('Error picking file: $e');
-      _showSnackBar('Error selecting file: $e', Colors.red);
+      FloatingNotification.show(
+        context,
+        isSuccess: false,
+        title: 'Error',
+        subtitle: 'Error selecting file: $e',
+      );
     }
   }
 
   // Upload KYC document
   Future<void> _uploadKyc() async {
     if (_selectedFile == null) {
-      _showSnackBar('Please select a document first', Colors.orange);
+      FloatingNotification.show(
+        context,
+        isSuccess: false,
+        title: 'Missing File',
+        subtitle: 'Please select a document first',
+      );
       return;
     }
 
@@ -150,14 +174,24 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
         setState(() {
           _isUploading = false;
         });
-        _showSnackBar('KYC upload failed. Please try again.', Colors.red);
+        FloatingNotification.show(
+          context,
+          isSuccess: false,
+          title: 'Upload Failed',
+          subtitle: 'KYC upload failed. Please try again.',
+        );
       }
     } catch (e) {
       setState(() {
         _isUploading = false;
       });
       print('Upload error: $e');
-      _showSnackBar('Upload failed: $e', Colors.red);
+      FloatingNotification.show(
+        context,
+        isSuccess: false,
+        title: 'Error',
+        subtitle: 'Upload failed: $e',
+      );
     }
   }
 
@@ -241,16 +275,6 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
             child: const Text('Done'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -407,30 +431,17 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          TextField(
+          EnhancedLocationInputField(
             controller: _homeCityController,
-            decoration: InputDecoration(
-              hintText: 'Enter your city',
-              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
-              filled: true,
-              fillColor: Theme.of(context).colorScheme.surface,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide: BorderSide(color: Theme.of(context).dividerColor),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide: BorderSide(color: Theme.of(context).dividerColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
-              ),
-            ),
+            label: '',
+            hint: 'Enter your city',
+            icon: Icons.location_city,
+            isOrigin: true,
+            onLocationSelected: (position) {
+              setState(() {
+                _homeCityPosition = position;
+              });
+            },
           ),
           const SizedBox(height: 20),
 

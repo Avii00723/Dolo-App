@@ -91,30 +91,30 @@ mixin LocationAutocompleteMixin<T extends StatefulWidget> on State<T>{
             labelStyle: TextStyle(color: AppColors.primary),
           ),
         ),
-        if (currentPosition != null) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.location_on, color: Colors.green[700], size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Lat: ${currentPosition.latitude.toStringAsFixed(6)}, '
-                        'Lng: ${currentPosition.longitude.toStringAsFixed(6)}',
-                    style: TextStyle(color: Colors.green[700], fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        // if (currentPosition != null) ...[
+        //   const SizedBox(height: 8),
+        //   Container(
+        //     padding: const EdgeInsets.all(8),
+        //     decoration: BoxDecoration(
+        //       color: Colors.green[50],
+        //       borderRadius: BorderRadius.circular(8),
+        //       border: Border.all(color: Colors.green[200]!),
+        //     ),
+        //     child: Row(
+        //       children: [
+        //         Icon(Icons.location_on, color: Colors.green[700], size: 16),
+        //         const SizedBox(width: 8),
+        //         Expanded(
+        //           child: Text(
+        //             'Lat: ${currentPosition.latitude.toStringAsFixed(6)}, '
+        //                 'Lng: ${currentPosition.longitude.toStringAsFixed(6)}',
+        //             style: TextStyle(color: Colors.green[700], fontSize: 12),
+        //           ),
+        //         ),
+        //       ],
+        //     ),
+        //   ),
+        // ],
         if (helperText.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
