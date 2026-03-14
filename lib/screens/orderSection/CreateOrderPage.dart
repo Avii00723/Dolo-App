@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
+import 'dart:async';
 import '../../Controllers/OrderService.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ProfileService.dart';
@@ -69,6 +70,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     'Plane',
   ];
 
+  OverlayEntry? _floatingOverlay;
+
   @override
   void initState() {
     super.initState();
@@ -80,7 +83,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       final fetchedUserId = await AuthService.getUserId();
       if (fetchedUserId == null) {
         if (mounted) {
-          _showSnackBar('Please log in to create orders', Colors.red);
+          _showFloatingNotification(
+            isSuccess: false,
+            title: 'Auth Error',
+            subtitle: 'Please log in to create orders',
+          );
           Navigator.of(context).pop();
         }
         return;
@@ -98,7 +105,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         _isLoadingUser = false;
       });
       if (mounted) {
-        _showSnackBar('Error loading user data: $e', Colors.red);
+        _showFloatingNotification(
+          isSuccess: false,
+          title: 'Load Error',
+          subtitle: 'Error loading user data: $e',
+        );
       }
     }
   }
@@ -114,7 +125,36 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     packageTypeController.dispose();
     transportController.dispose();
     restrictionsController.dispose();
+    _dismissFloatingNotification();
     super.dispose();
+  }
+
+  void _showFloatingNotification({
+    required bool isSuccess,
+    required String title,
+    required String subtitle,
+  }) {
+    // Dismiss any existing overlay
+    _dismissFloatingNotification();
+
+    _floatingOverlay = OverlayEntry(
+      builder: (context) => _FloatingNotificationWidget(
+        isSuccess: isSuccess,
+        title: title,
+        subtitle: subtitle,
+        onDismiss: _dismissFloatingNotification,
+      ),
+    );
+
+    Overlay.of(context).insert(_floatingOverlay!);
+
+    // Auto-dismiss after 4 seconds
+    Timer(const Duration(seconds: 4), _dismissFloatingNotification);
+  }
+
+  void _dismissFloatingNotification() {
+    _floatingOverlay?.remove();
+    _floatingOverlay = null;
   }
 
   void _nextStep() {
@@ -147,34 +187,62 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     switch (_currentStep) {
       case 0:
         if (pickupCityController.text.trim().isEmpty) {
-          _showSnackBar('Please enter pickup city', Colors.orange);
+          _showFloatingNotification(
+            isSuccess: false,
+            title: 'Validation',
+            subtitle: 'Please enter pickup city',
+          );
           return false;
         }
         if (dropCityController.text.trim().isEmpty) {
-          _showSnackBar('Please enter drop city', Colors.orange);
+          _showFloatingNotification(
+            isSuccess: false,
+            title: 'Validation',
+            subtitle: 'Please enter drop city',
+          );
           return false;
         }
         if (pickupDateController.text.trim().isEmpty || _pickupDateTime == null) {
-          _showSnackBar('Please select pickup date & time', Colors.orange);
+          _showFloatingNotification(
+            isSuccess: false,
+            title: 'Validation',
+            subtitle: 'Please select pickup date & time',
+          );
           return false;
         }
         if (deliveryDateController.text.trim().isEmpty || _deliveryDateTime == null) {
-          _showSnackBar('Please select delivery date & time', Colors.orange);
+          _showFloatingNotification(
+            isSuccess: false,
+            title: 'Validation',
+            subtitle: 'Please select delivery date & time',
+          );
           return false;
         }
         // Date Validation: Delivery date cannot be before pickup date
         if (_deliveryDateTime!.isBefore(_pickupDateTime!)) {
-          _showSnackBar('Delivery date cannot be before pickup date', Colors.red);
+          _showFloatingNotification(
+            isSuccess: false,
+            title: 'Date Error',
+            subtitle: 'Delivery date cannot be before pickup date',
+          );
           return false;
         }
         return true;
       case 1:
         if (_selectedWeightRange == null) {
-          _showSnackBar('Please select package weight', Colors.orange);
+          _showFloatingNotification(
+            isSuccess: false,
+            title: 'Validation',
+            subtitle: 'Please select package weight',
+          );
           return false;
         }
         if (_selectedMainCategory == null) {
-          _showSnackBar('Please select package type', Colors.orange);
+          _showFloatingNotification(
+            isSuccess: false,
+            title: 'Validation',
+            subtitle: 'Please select package type',
+          );
           return false;
         }
         return true;
@@ -187,7 +255,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
   Future<void> _createOrder() async {
     if (userId == null) {
-      _showSnackBar('User ID not found. Please log in again.', Colors.red);
+      _showFloatingNotification(
+        isSuccess: false,
+        title: 'Auth Error',
+        subtitle: 'User ID not found. Please log in again.',
+      );
       return;
     }
 
@@ -234,7 +306,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         });
         _pageController.jumpToPage(0);
 
-        _showSuccessToast('Order ID: #${response.orderId}');
+        _showFloatingNotification(
+          isSuccess: true,
+          title: 'Order Created!',
+          subtitle: 'Order #${response.orderId} posted successfully.',
+        );
         widget.onOrderCreated?.call();
       } else {
         setState(() {
@@ -250,7 +326,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       if (e.toString().contains('KYC') || e.toString().contains('403')) {
         _showKycRequiredDialog();
       } else {
-        _showSnackBar('Failed to create order: ${e.toString().replaceAll('Exception: ', '')}', Colors.red);
+        _showFloatingNotification(
+          isSuccess: false,
+          title: 'Order Failed',
+          subtitle: e.toString().replaceAll('Exception: ', ''),
+        );
       }
     }
   }
@@ -285,12 +365,20 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         _deliveryDateTime == null ||
         _selectedWeightRange == null ||
         _selectedMainCategory == null) {
-      _showSnackBar('Please fill all required fields', Colors.red);
+      _showFloatingNotification(
+        isSuccess: false,
+        title: 'Validation',
+        subtitle: 'Please fill all required fields',
+      );
       return false;
     }
     // Date Validation: Delivery date cannot be before pickup date
     if (_deliveryDateTime!.isBefore(_pickupDateTime!)) {
-      _showSnackBar('Delivery date cannot be before pickup date', Colors.red);
+      _showFloatingNotification(
+        isSuccess: false,
+        title: 'Date Error',
+        subtitle: 'Delivery date cannot be before pickup date',
+      );
       return false;
     }
     return true;
@@ -316,34 +404,6 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       _selectedTransportModes = [];
       _isUrgent = false;
     });
-  }
-
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _showSuccessToast(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   void _showKycRequiredDialog() {
@@ -385,7 +445,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
 
     if (result == true) {
-      _showSnackBar('KYC document uploaded successfully!', Colors.green);
+      _showFloatingNotification(
+        isSuccess: true,
+        title: 'KYC Success',
+        subtitle: 'KYC document uploaded successfully!',
+      );
     }
   }
 
@@ -457,7 +521,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           }
         }
       } catch (e) {
-        _showSnackBar('Error picking image: $e', Colors.red);
+        _showFloatingNotification(
+          isSuccess: false,
+          title: 'Image Error',
+          subtitle: 'Error picking image: $e',
+        );
       }
     }
   }
@@ -953,6 +1021,200 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           onChanged: (value) => setState(() => _selectedMainCategory = value),
         ),
       ],
+    );
+  }
+}
+
+class _FloatingNotificationWidget extends StatefulWidget {
+  final bool isSuccess;
+  final String title;
+  final String subtitle;
+  final VoidCallback onDismiss;
+
+  const _FloatingNotificationWidget({
+    required this.isSuccess,
+    required this.title,
+    required this.subtitle,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_FloatingNotificationWidget> createState() =>
+      _FloatingNotificationWidgetState();
+}
+
+class _FloatingNotificationWidgetState
+    extends State<_FloatingNotificationWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, -1.5),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.4, curve: Curves.easeIn),
+      ),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    );
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _dismiss() async {
+    await _controller.reverse(from: 1.0);
+    widget.onDismiss();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bgColor =
+        widget.isSuccess ? const Color(0xFF1A1A2E) : const Color(0xFF2D0A0A);
+    final Color accentColor =
+        widget.isSuccess ? const Color(0xFF00E676) : const Color(0xFFFF5252);
+    final Color iconBgColor =
+        widget.isSuccess ? const Color(0xFF00E676) : const Color(0xFFFF5252);
+    final IconData iconData =
+        widget.isSuccess ? Icons.check_rounded : Icons.error_outline_rounded;
+
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 16,
+      left: 16,
+      right: 16,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Material(
+              color: Colors.transparent,
+              child: GestureDetector(
+                onTap: _dismiss,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: accentColor.withOpacity(0.35),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accentColor.withOpacity(0.18),
+                        blurRadius: 24,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.35),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      // Icon bubble
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: iconBgColor.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: iconBgColor.withOpacity(0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Icon(iconData, color: iconBgColor, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+
+                      // Text content
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              widget.subtitle,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.65),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 10),
+
+                      // Dismiss X button
+                      GestureDetector(
+                        onTap: _dismiss,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: Colors.white.withOpacity(0.5),
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
