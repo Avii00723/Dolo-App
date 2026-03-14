@@ -1,5 +1,7 @@
 import 'package:dolo/screens/LoginScreens/kyc_screen.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../Controllers/LoginService.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Models/LoginModel.dart';
@@ -34,6 +36,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isLoading = false;
   String? _currentUserId;
   String? _selectedGender;
+  bool _isTermsAccepted = false;
 
   @override
   void initState() {
@@ -76,6 +79,11 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
+    if (!_isTermsAccepted) {
+      _showSnackBar('Please accept the Terms and Conditions', isError: true);
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -113,6 +121,7 @@ class _SignupScreenState extends State<SignupScreen> {
             : null,
         gender: _selectedGender ?? 'male',
         isEmailVerified: true,
+        termsAndPolicyAccepted: _isTermsAccepted,
       );
 
       debugPrint('Calling signup API with data: ${signupRequest.toJson()}');
@@ -176,8 +185,8 @@ class _SignupScreenState extends State<SignupScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF2D2D2D),
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.primary,
             ),
           ),
           child: child!,
@@ -207,7 +216,7 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -222,7 +231,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   width: 140,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
@@ -231,7 +240,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
@@ -239,12 +248,12 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 40),
 
                 // Sign Up Title
-                const Text(
+                Text(
                   'Sign Up',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2D2D),
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
 
@@ -253,9 +262,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Phone number subtitle
                 Text(
                   'Enter Information for + 91 ${widget.phoneNumber}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF666666),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
 
@@ -265,7 +274,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
@@ -281,12 +290,12 @@ class _SignupScreenState extends State<SignupScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Section title
-                        const Text(
+                        Text(
                           'Enter info/tagline',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D2D2D),
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
 
@@ -365,26 +374,26 @@ class _SignupScreenState extends State<SignupScreen> {
                             hintText: 'Gender',
                             hintStyle: TextStyle(
                               fontSize: 15,
-                              color: Colors.grey[500],
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                             ),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: Theme.of(context).colorScheme.surface,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 18,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(30),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
+                              borderSide: BorderSide(color: Theme.of(context).dividerColor),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(30),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
+                              borderSide: BorderSide(color: Theme.of(context).dividerColor),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(30),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF2D2D2D),
+                              borderSide: BorderSide(
+                                color: Theme.of(context).colorScheme.primary,
                                 width: 1.5,
                               ),
                             ),
@@ -398,10 +407,10 @@ class _SignupScreenState extends State<SignupScreen> {
                               value: 'female',
                               child: Text('Female'),
                             ),
-                            DropdownMenuItem(
-                              value: 'other',
-                              child: Text('Other'),
-                            ),
+                            // DropdownMenuItem(
+                            //   value: 'other',
+                            //   child: Text('Other'),
+                            // ),
                           ],
                           onChanged: (value) {
                             setState(() {
@@ -416,7 +425,76 @@ class _SignupScreenState extends State<SignupScreen> {
                           },
                         ),
 
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
+
+                        // Terms and Conditions Checkbox
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: Checkbox(
+                                value: _isTermsAccepted,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _isTermsAccepted = value ?? false;
+                                  });
+                                },
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                  ),
+                                  children: [
+                                    const TextSpan(
+                                      text: "I confirm that I have read, understood, and agree to Dolo's ",
+                                    ),
+                                    TextSpan(
+                                      text: 'Terms & Conditions',
+                                      style: const TextStyle(
+                                        color: Colors.blue,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () async {
+                                          final uri = Uri.parse('https://yourdomain.com/terms');
+                                          if (await canLaunchUrl(uri)) {
+                                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                          }
+                                        },
+                                    ),
+                                    const TextSpan(text: ' and '),
+                                    TextSpan(
+                                      text: 'Privacy Policy',
+                                      style: const TextStyle(
+                                        color: Colors.blue,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () async {
+                                          final uri = Uri.parse('https://yourdomain.com/privacy');
+                                          if (await canLaunchUrl(uri)) {
+                                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                          }
+                                        },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 24),
 
                         // Get Started Button
                         SizedBox(
@@ -424,8 +502,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _submitSignup,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2D2D2D),
-                              disabledBackgroundColor: Colors.grey[400],
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
                               padding: const EdgeInsets.symmetric(vertical: 18),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30),
@@ -477,34 +555,34 @@ class _SignupScreenState extends State<SignupScreen> {
       textCapitalization: keyboardType == TextInputType.emailAddress
           ? TextCapitalization.none
           : TextCapitalization.words,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 15,
-        color: Color(0xFF2D2D2D),
+        color: Theme.of(context).colorScheme.onSurface,
       ),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(
           fontSize: 15,
-          color: Colors.grey[500],
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
         ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Theme.of(context).colorScheme.surface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 20,
           vertical: 18,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderSide: BorderSide(color: Theme.of(context).dividerColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderSide: BorderSide(color: Theme.of(context).dividerColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
-          borderSide: const BorderSide(
-            color: Color(0xFF2D2D2D),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.primary,
             width: 1.5,
           ),
         ),

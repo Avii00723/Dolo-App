@@ -75,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -90,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: 140,
                   height: 140,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -99,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -108,13 +108,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 80),
 
                 // Title
-                const Text(
+                Text(
                   'Log In To Your\nAccount',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: Theme.of(context).colorScheme.onSurface,
                     height: 1.2,
                   ),
                 ),
@@ -127,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
 
@@ -137,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
@@ -150,12 +150,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Welcome!',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -163,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       // Phone Number Input with Country Code
                       Container(
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: Theme.of(context).dividerColor),
                           borderRadius: BorderRadius.circular(30),
                         ),
                         child: Row(
@@ -173,16 +173,19 @@ class _LoginScreenState extends State<LoginScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               decoration: BoxDecoration(
                                 border: Border(
-                                  right: BorderSide(color: Colors.grey[300]!),
+                                  right: BorderSide(color: Theme.of(context).dividerColor),
                                 ),
                               ),
                               child: Row(
                                 children: [
-                                  const Text(
-                                    '🇮🇳',
-                                    style: TextStyle(fontSize: 20),
+                                  Text(
+                                    selectedCountryCode,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context).colorScheme.onSurface,
+                                    ),
                                   ),
-
                                 ],
                               ),
                             ),
@@ -200,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 decoration: InputDecoration(
                                   hintText: 'Phone Number',
                                   hintStyle: TextStyle(
-                                    color: Colors.grey[400],
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
                                     fontWeight: FontWeight.normal,
                                   ),
                                   border: InputBorder.none,
@@ -228,7 +231,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: isLoading ? null : sendOTP,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF001127),
-                            disabledBackgroundColor: Colors.grey[400],
+                            disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30),

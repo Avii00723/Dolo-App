@@ -121,7 +121,7 @@ class _OTPScreenState extends State<OTPScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -136,7 +136,7 @@ class _OTPScreenState extends State<OTPScreen> {
                   width: 140,
                   height: 140,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -145,7 +145,7 @@ class _OTPScreenState extends State<OTPScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -154,13 +154,13 @@ class _OTPScreenState extends State<OTPScreen> {
                 const SizedBox(height: 80),
 
                 // Title
-                const Text(
+                Text(
                   'Log In To Your\nAccount',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: Theme.of(context).colorScheme.onSurface,
                     height: 1.2,
                   ),
                 ),
@@ -173,7 +173,7 @@ class _OTPScreenState extends State<OTPScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
 
@@ -183,7 +183,7 @@ class _OTPScreenState extends State<OTPScreen> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
@@ -196,12 +196,12 @@ class _OTPScreenState extends State<OTPScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'OTP Verification',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -209,7 +209,7 @@ class _OTPScreenState extends State<OTPScreen> {
                         'Enter the 6-digit OTP sent to +91 ${widget.phoneNumber}',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -226,7 +226,7 @@ class _OTPScreenState extends State<OTPScreen> {
                               border: Border.all(
                                 color: _otpControllers[index].text.isNotEmpty
                                     ? const Color(0xFF001127)
-                                    : Colors.grey[300]!,
+                                    : Theme.of(context).dividerColor,
                                 width: _otpControllers[index].text.isNotEmpty ? 2 : 1,
                               ),
                               borderRadius: BorderRadius.circular(12),
@@ -288,7 +288,7 @@ class _OTPScreenState extends State<OTPScreen> {
                           onPressed: _isLoading ? null : _verifyOTP,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF001127),
-                            disabledBackgroundColor: Colors.grey[400],
+                            disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30),

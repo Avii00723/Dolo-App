@@ -157,6 +157,7 @@ class SignupRequest {
   final String? dob;
   final String? gender;
   final bool isEmailVerified;
+  final bool termsAndPolicyAccepted;
 
   SignupRequest({
     required this.userId,
@@ -166,6 +167,7 @@ class SignupRequest {
     this.dob,
     this.gender,
     this.isEmailVerified = true,
+    required this.termsAndPolicyAccepted,
   });
 
   Map<String, dynamic> toJson() {
@@ -177,6 +179,7 @@ class SignupRequest {
       if (dob != null) 'dob': dob,
       if (gender != null) 'gender': gender,
       'is_email_verified': isEmailVerified,
+      'terms_and_policy_accepted': termsAndPolicyAccepted,
     };
   }
 }
