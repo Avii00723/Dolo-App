@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Models/OrderModel.dart';
 import '../../Controllers/TripRequestService.dart';
+
 import '../Widgets/sendtriprequestpage.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -170,8 +171,8 @@ class _SearchResultsPageState extends State<SearchResultsPage>
             .toList();
         break;
       case SearchFilter.all:
-      default:
         filtered = List.from(widget.orders);
+        break;
     }
 
     switch (_activeSort) {
@@ -196,7 +197,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         });
         break;
       case SortOption.newest:
-      default:
         filtered.sort((a, b) {
           final dateA =
               DateTime.tryParse(a.createdAt ?? '') ?? DateTime(2000);
@@ -204,6 +204,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
               DateTime.tryParse(b.createdAt ?? '') ?? DateTime(2000);
           return dateB.compareTo(dateA);
         });
+        break;
     }
     return filtered;
   }
@@ -1525,7 +1526,7 @@ class _OrderDetailSheet extends StatelessWidget {
                   // Collect all image URLs from both imageUrl (String)
                   // and imageUrls (List<String>) fields, resolve relative paths
                   const String baseUrl = 'http://YOUR_SERVER_BASE_URL'; // ← replace with your server base URL
-                  String _resolve(String url) {
+                  String resolve(String url) {
                     if (url.isEmpty) return '';
                     if (url.startsWith('http://') || url.startsWith('https://')) return url;
                     return '$baseUrl$url'; // prepend base for relative paths like /order_images/...
@@ -1533,11 +1534,11 @@ class _OrderDetailSheet extends StatelessWidget {
 
                   final List<String> images = [];
                   if (order.imageUrl.isNotEmpty) {
-                    images.add(_resolve(order.imageUrl));
+                    images.add(resolve(order.imageUrl));
                   }
                   if (order.imageUrls != null) {
                     for (final u in order.imageUrls!) {
-                      final resolved = _resolve(u);
+                      final resolved = resolve(u);
                       if (resolved.isNotEmpty && !images.contains(resolved)) {
                         images.add(resolved);
                       }
