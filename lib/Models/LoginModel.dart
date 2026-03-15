@@ -101,32 +101,44 @@ class KycStartResponse {
 }
 class UserProfile {
   final String id;
+  final String hashedId;
   final String name;
   final String email;
   final String phone;
+  final String? permanentAddress;
+  final String? homeCity;
   final String kycStatus;
   final String lastLogin;
-  final String photoURL;
+  final String? photoURL;
+  final bool termsAndPolicyAccepted;
 
   UserProfile({
     required this.id,
+    required this.hashedId,
     required this.name,
     required this.email,
     required this.phone,
+    this.permanentAddress,
+    this.homeCity,
     required this.kycStatus,
     required this.lastLogin,
-    required this.photoURL,
+    this.photoURL,
+    required this.termsAndPolicyAccepted,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
       id: json['id']?.toString() ?? '',
+      hashedId: json['hashed_id']?.toString() ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
+      permanentAddress: json['permanant_address'],
+      homeCity: json['home_city'],
       kycStatus: json['kycStatus'] ?? '',
       lastLogin: json['lastLogin'] ?? '',
-      photoURL: json['photoURL'] ?? '',
+      photoURL: json['photoURL'],
+      termsAndPolicyAccepted: (json['terms_and_policy_accepted'] == 1 || json['terms_and_policy_accepted'] == true),
     );
   }
 }

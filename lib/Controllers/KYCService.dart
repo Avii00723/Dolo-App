@@ -6,51 +6,22 @@ import '../Constants/ApiConstants.dart';
 import '../Models/LoginModel.dart';
 
 class KycService {
-  // Save KYC personal information
-  Future<KycPersonalInfoResponse?> saveKycPersonalInfo(KycPersonalInfoRequest data) async {
-    try {
-      print('┌─────────────────────────────────────');
-      print('│ 📤 SAVE KYC INFO REQUEST');
-      print('├─────────────────────────────────────');
-      print('│ URL: ${ApiConstants.saveKycPersonalInfo}');
-      print('│ Body: ${json.encode(data.toJson())}');
-      print('└─────────────────────────────────────');
-
-      final response = await http.post(
-        Uri.parse(ApiConstants.saveKycPersonalInfo),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(data.toJson()),
-      );
-
-      print('┌─────────────────────────────────────');
-      print('│ 📥 SAVE KYC INFO RESPONSE');
-      print('├─────────────────────────────────────');
-      print('│ Status Code: ${response.statusCode}');
-      print('│ Body: ${response.body}');
-      print('└─────────────────────────────────────');
-
-      if (response.statusCode == 200) {
-        return KycPersonalInfoResponse.fromJson(json.decode(response.body));
-      }
-      return null;
-    } catch (e) {
-      print('❌ SAVE KYC INFO ERROR: $e');
-      return null;
-    }
-  }
-
-  // Upload KYC document
+  // Upload KYC document along with personal information
   Future<KycUploadResponse?> uploadKyc({
     required String userId,
+    required String permanentAddress,
+    required String homeCity,
     required File file,
     Function(double)? onProgress,
   }) async {
     try {
       print('┌─────────────────────────────────────');
-      print('│ 📤 KYC UPLOAD REQUEST');
+      print('│ 📤 KYC UPLOAD REQUEST (WITH INFO)');
       print('├─────────────────────────────────────');
       print('│ URL: ${ApiConstants.uploadKyc}');
       print('│ User ID: $userId');
+      print('│ Address: $permanentAddress');
+      print('│ City: $homeCity');
       print('│ File Path: ${file.path}');
       print('└─────────────────────────────────────');
 
@@ -60,8 +31,10 @@ class KycService {
         Uri.parse(ApiConstants.uploadKyc),
       );
 
-      // Add userId field
+      // Add text fields
       request.fields['userId'] = userId;
+      request.fields['permanant_address'] = permanentAddress;
+      request.fields['home_city'] = homeCity;
 
       // Get file extension and determine content type
       String fileName = file.path.split('/').last;
@@ -110,5 +83,11 @@ class KycService {
       print('❌ KYC UPLOAD EXCEPTION: $e');
       return null;
     }
+  }
+
+  // Deprecated: Keeping for backward compatibility if needed, but updated to use combined logic
+  Future<KycPersonalInfoResponse?> saveKycPersonalInfo(KycPersonalInfoRequest data) async {
+    // This is now redundant as uploadKyc handles it, but we can keep the stub
+    return KycPersonalInfoResponse(message: "Info will be saved during upload");
   }
 }

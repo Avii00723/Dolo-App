@@ -145,7 +145,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   String _getPhoneNumber() => userProfile?.phone ?? 'Not available';
   String _getEmail() => userProfile?.email ?? 'Not available';
   bool _isKycVerified() => userProfile?.kycStatus == 'approved';
-  bool _isProfileComplete() => userProfile != null && userProfile!.name.isNotEmpty;
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -420,12 +419,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                       child: CircleAvatar(
                         radius: 50,
                         backgroundColor: const Color(0xFF2B6390), // denimDark
-                        backgroundImage: userProfile?.photoURL != null && userProfile!.photoURL.isNotEmpty
-                            ? NetworkImage(userProfile!.photoURL.startsWith('http')
-                            ? userProfile!.photoURL
+                        backgroundImage: userProfile?.photoURL != null && userProfile!.photoURL!.isNotEmpty
+                            ? NetworkImage(userProfile!.photoURL!.startsWith('http')
+                            ? userProfile!.photoURL!
                             : '${ApiConstants.imagebaseUrl}${userProfile!.photoURL}')
                             : null,
-                        child: (userProfile?.photoURL == null || userProfile!.photoURL.isEmpty)
+                        child: (userProfile?.photoURL == null || userProfile!.photoURL!.isEmpty)
                             ? Text(
                           _getDisplayName().isNotEmpty
                               ? _getDisplayName()[0].toUpperCase()
