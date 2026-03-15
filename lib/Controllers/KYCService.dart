@@ -3,28 +3,42 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
 import '../Constants/ApiConstants.dart';
-
-class KycUploadResponse {
-  final String message;
-  final String kycStatus;
-  final String fileUrl;
-
-  KycUploadResponse({
-    required this.message,
-    required this.kycStatus,
-    required this.fileUrl,
-  });
-
-  factory KycUploadResponse.fromJson(Map<String, dynamic> json) {
-    return KycUploadResponse(
-      message: json['message'] ?? '',
-      kycStatus: json['kycStatus'] ?? '',
-      fileUrl: json['fileURL'] ?? '',
-    );
-  }
-}
+import '../Models/LoginModel.dart';
 
 class KycService {
+  // Save KYC personal information
+  Future<KycPersonalInfoResponse?> saveKycPersonalInfo(KycPersonalInfoRequest data) async {
+    try {
+      print('┌─────────────────────────────────────');
+      print('│ 📤 SAVE KYC INFO REQUEST');
+      print('├─────────────────────────────────────');
+      print('│ URL: ${ApiConstants.saveKycPersonalInfo}');
+      print('│ Body: ${json.encode(data.toJson())}');
+      print('└─────────────────────────────────────');
+
+      final response = await http.post(
+        Uri.parse(ApiConstants.saveKycPersonalInfo),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(data.toJson()),
+      );
+
+      print('┌─────────────────────────────────────');
+      print('│ 📥 SAVE KYC INFO RESPONSE');
+      print('├─────────────────────────────────────');
+      print('│ Status Code: ${response.statusCode}');
+      print('│ Body: ${response.body}');
+      print('└─────────────────────────────────────');
+
+      if (response.statusCode == 200) {
+        return KycPersonalInfoResponse.fromJson(json.decode(response.body));
+      }
+      return null;
+    } catch (e) {
+      print('❌ SAVE KYC INFO ERROR: $e');
+      return null;
+    }
+  }
+
   // Upload KYC document
   Future<KycUploadResponse?> uploadKyc({
     required String userId,
@@ -38,8 +52,6 @@ class KycService {
       print('│ URL: ${ApiConstants.uploadKyc}');
       print('│ User ID: $userId');
       print('│ File Path: ${file.path}');
-      print('│ File Name: ${file.path.split('/').last}');
-      print('│ File Size: ${file.lengthSync()} bytes');
       print('└─────────────────────────────────────');
 
       // Create multipart request
@@ -51,11 +63,10 @@ class KycService {
       // Add userId field
       request.fields['userId'] = userId;
 
-      // Get file extension and name
+      // Get file extension and determine content type
       String fileName = file.path.split('/').last;
       String extension = fileName.split('.').last.toLowerCase();
 
-      // Determine content type
       MediaType contentType;
       if (extension == 'pdf') {
         contentType = MediaType('application', 'pdf');
@@ -76,13 +87,8 @@ class KycService {
         ),
       );
 
-      print('📤 Sending request...');
-
-      // Send request and get streamed response
+      // Send request
       var streamedResponse = await request.send();
-
-      // Convert streamed response to regular response
-      // Note: We read the bytes directly instead of listening to the stream multiple times
       final responseBytes = await streamedResponse.stream.toBytes();
       final responseString = String.fromCharCodes(responseBytes);
 
@@ -90,27 +96,18 @@ class KycService {
       print('│ 📥 KYC UPLOAD RESPONSE');
       print('├─────────────────────────────────────');
       print('│ Status Code: ${streamedResponse.statusCode}');
-      print('│ Response Headers: ${streamedResponse.headers}');
       print('│ Response Body: $responseString');
       print('└─────────────────────────────────────');
 
-      // Update progress to 100% when complete
-      if (onProgress != null) {
-        onProgress(1.0);
-      }
+      if (onProgress != null) onProgress(1.0);
 
       if (streamedResponse.statusCode == 200) {
-        print('✅ KYC UPLOAD SUCCESS');
         final jsonResponse = json.decode(responseString);
         return KycUploadResponse.fromJson(jsonResponse);
-      } else {
-        print('❌ KYC UPLOAD FAILED');
-        print('Error: $responseString');
-        return null;
       }
-    } catch (e, stackTrace) {
+      return null;
+    } catch (e) {
       print('❌ KYC UPLOAD EXCEPTION: $e');
-      print('Stack Trace: $stackTrace');
       return null;
     }
   }

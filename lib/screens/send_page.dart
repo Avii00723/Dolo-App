@@ -952,7 +952,7 @@ class _SendPageState extends State<SendPage> {
             style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: selectedVehicle,
+          value: selectedVehicle,
           hint: const Text('Eg. Car'),
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.directions_car_outlined),
@@ -970,9 +970,66 @@ class _SendPageState extends State<SendPage> {
           items: vehicleOptions
               .map((v) => DropdownMenuItem(value: v, child: Text(v)))
               .toList(),
-          onChanged: (v) => setState(() => selectedVehicle = v),
+          onChanged: (v) {
+            setState(() => selectedVehicle = v);
+            // Show notice when Plane/Airline is selected
+            if (v == 'Plane') {
+              _showAirlineNoticeDialog();
+            }
+          },
         ),
       ],
+    );
+  }
+
+  void _showAirlineNoticeDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Airline Transport Notice',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Airline transport has strict rules on weight, hazardous materials, and packaging.\n'
+                    'Confirm that your item meets these requirements before proceeding.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[700],
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Ok',
+                    style: TextStyle(
+                        color: Colors.black87, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

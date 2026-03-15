@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:geolocator/geolocator.dart';
 import '../../Controllers/KYCService.dart';
+import '../../Models/LoginModel.dart';
 import '../home/homepage.dart';
 import '../LocationinputField.dart';
 import '../../Widgets/FloatingNotification.dart';
@@ -14,12 +15,12 @@ class KycUploadScreen extends StatefulWidget {
   final String? phone;
 
   const KycUploadScreen({
-    Key? key,
+    super.key,
     required this.userId,
     this.fullName,
     this.email,
     this.phone,
-  }) : super(key: key);
+  });
 
   @override
   State<KycUploadScreen> createState() => _KycUploadScreenState();
@@ -36,14 +37,10 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
   final TextEditingController _addressController = TextEditingController();
   late final TextEditingController _emailController;
 
-  Position? _homeCityPosition;
   int _currentStep = 0;
   String? _selectedDocumentType;
   File? _selectedFile;
-  String? _fileName;
-  String? _fileExtension;
   bool _isUploading = false;
-  double _uploadProgress = 0.0;
 
   @override
   void initState() {
@@ -64,7 +61,7 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
     super.dispose();
   }
 
-  void _goToNextStep() {
+  Future<void> _goToNextStep() async {
     if (_currentStep == 0) {
       // Validate personal information
       if (_fullNameController.text.trim().isEmpty ||
@@ -82,12 +79,51 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
       }
 
       setState(() {
-        _currentStep = 1;
+        _isUploading = true;
       });
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+
+      try {
+        final request = KycPersonalInfoRequest(
+          userId: widget.userId,
+          permanentAddress: _addressController.text.trim(),
+          homeCity: _homeCityController.text.trim(),
+        );
+
+        final response = await _kycService.saveKycPersonalInfo(request);
+
+        if (response != null) {
+          if (!mounted) return;
+          setState(() {
+            _currentStep = 1;
+          });
+          _pageController.nextPage(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        } else {
+          if (!mounted) return;
+          FloatingNotification.show(
+            context,
+            isSuccess: false,
+            title: 'Save Failed',
+            subtitle: 'Failed to save personal information. Please try again.',
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        FloatingNotification.show(
+          context,
+          isSuccess: false,
+          title: 'Error',
+          subtitle: 'An unexpected error occurred: $e',
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isUploading = false;
+          });
+        }
+      }
     } else if (_currentStep == 1) {
       // Validate document selection
       if (_selectedDocumentType == null) {
@@ -119,14 +155,11 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
       if (result != null) {
         setState(() {
           _selectedFile = File(result.files.single.path!);
-          _fileName = result.files.single.name;
-          _fileExtension = result.files.single.extension;
         });
-        print('File selected: $_fileName');
         _uploadKyc();
       }
     } catch (e) {
-      print('Error picking file: $e');
+      if (!mounted) return;
       FloatingNotification.show(
         context,
         isSuccess: false,
@@ -150,27 +183,19 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
 
     setState(() {
       _isUploading = true;
-      _uploadProgress = 0.0;
     });
 
     try {
       final response = await _kycService.uploadKyc(
         userId: widget.userId,
         file: _selectedFile!,
-        onProgress: (progress) {
-          setState(() {
-            _uploadProgress = progress;
-          });
-        },
       );
 
       if (response != null) {
-        print('KYC Upload Success: ${response.message}');
-        print('KYC Status: ${response.kycStatus}');
-        print('File URL: ${response.fileUrl}');
-
+        if (!mounted) return;
         _showSuccessDialog(response);
       } else {
+        if (!mounted) return;
         setState(() {
           _isUploading = false;
         });
@@ -182,10 +207,10 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isUploading = false;
       });
-      print('Upload error: $e');
       FloatingNotification.show(
         context,
         isSuccess: false,
@@ -202,11 +227,11 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 28),
-            const SizedBox(width: 12),
-            const Expanded(
+            SizedBox(width: 12),
+            Expanded(
               child: Text(
                 'KYC Uploaded Successfully',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -257,11 +282,10 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop(); // Close dialog
-              // Navigate to home screen instead of just popping
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const HomePageWithNav()),
-                    (route) => false,
+                (route) => false,
               );
             },
             style: ElevatedButton.styleFrom(
@@ -332,21 +356,21 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
                     ),
                     child: _isUploading
                         ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.black),
-                      ),
-                    )
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.black),
+                            ),
+                          )
                         : Text(
-                      _currentStep == 1 ? 'UPLOAD DOCUMENT' : 'NEXT',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
+                            _currentStep == 1 ? 'UPLOAD DOCUMENT' : 'NEXT',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -438,9 +462,7 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
             icon: Icons.location_city,
             isOrigin: true,
             onLocationSelected: (position) {
-              setState(() {
-                _homeCityPosition = position;
-              });
+              // Position is available here if needed
             },
           ),
           const SizedBox(height: 20),
@@ -640,10 +662,10 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
               ),
               child: isSelected
                   ? const Icon(
-                Icons.check,
-                size: 16,
-                color: Colors.white,
-              )
+                      Icons.check,
+                      size: 16,
+                      color: Colors.white,
+                    )
                   : null,
             ),
           ],

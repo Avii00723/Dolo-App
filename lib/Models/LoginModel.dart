@@ -237,3 +237,36 @@ class CompleteProfileResponse {
     );
   }
 }
+
+// NEW: KYC Personal Information Models
+class KycPersonalInfoRequest {
+  final String userId;
+  final String permanentAddress;
+  final String homeCity;
+
+  KycPersonalInfoRequest({
+    required this.userId,
+    required this.permanentAddress,
+    required this.homeCity,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'userId': userId,
+      'permanant_address': permanentAddress,
+      'home_city': homeCity,
+    };
+  }
+}
+
+class KycPersonalInfoResponse {
+  final String message;
+
+  KycPersonalInfoResponse({required this.message});
+
+  factory KycPersonalInfoResponse.fromJson(Map<String, dynamic> json) {
+    return KycPersonalInfoResponse(
+      message: json['message'] ?? '',
+    );
+  }
+}

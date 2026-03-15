@@ -13,6 +13,7 @@ class ApiConstants {
   static const String completeSignup = '$baseUrl/users/signup';
   static const String getUserTrustScore = '$baseUrl/users/trust-score';
   static const String uploadProfilePhoto = '$baseUrl/users/upload-profile-photo';
+  static const String saveKycPersonalInfo = '$baseUrl/users/kyc-information';
 
 
 
