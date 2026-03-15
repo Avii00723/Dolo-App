@@ -3,13 +3,71 @@ import 'package:intl/intl.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Models/OrderModel.dart';
 import '../../Controllers/TripRequestService.dart';
-import '../CustomRouteMapScreen.dart';
 import '../Widgets/sendtriprequestpage.dart';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Responsive Helper
+// ═══════════════════════════════════════════════════════════════════════════
+class _R {
+  final double w;
+
+  const _R(this.w);
+
+  factory _R.of(BuildContext context) =>
+      _R(MediaQuery.of(context).size.width);
+
+  /// Scale a value relative to a 390-wide baseline
+  double s(double base) => (base * w / 390).clamp(base * 0.78, base * 1.18);
+
+  // ── Font sizes ─────────────────────────────────────────────────────────
+  double get fontXS => s(10);
+  double get fontSM => s(11);
+  double get fontBase => s(12);
+  double get fontMD => s(13);
+  double get fontLG => s(14);
+  double get fontXL => s(15);
+  double get font2XL => s(16);
+  double get font3XL => s(17);
+  double get font4XL => s(18);
+  double get font5XL => s(20);
+  double get font6XL => s(22);
+
+  // ── Spacing ────────────────────────────────────────────────────────────
+  double get sp2 => s(2);
+  double get sp4 => s(4);
+  double get sp6 => s(6);
+  double get sp8 => s(8);
+  double get sp10 => s(10);
+  double get sp12 => s(12);
+  double get sp14 => s(14);
+  double get sp16 => s(16);
+  double get sp20 => s(20);
+  double get sp24 => s(24);
+  double get sp28 => s(28);
+  double get sp32 => s(32);
+
+  // ── Component sizes ────────────────────────────────────────────────────
+  double get avatarSM => s(36);
+  double get avatarMD => s(52);
+  double get iconSM => s(13);
+  double get iconMD => s(15);
+  double get iconLG => s(18);
+  double get iconXL => s(20);
+  double get dotSM => s(6);
+  double get dotMD => s(8);
+  double get chipDot => s(6);
+  double get borderRadius => s(12);
+  double get cardRadius => s(20);
+  double get badgeRadius => s(6);
+  double get chipRadius => s(10);
+  double get buttonRadius => s(16);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Enums
 // ═══════════════════════════════════════════════════════════════════════════
 enum SearchFilter { all, urgentDelivery, preferredMode }
+
 enum SortOption { newest, priceHighToLow, preferredVehicle }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -45,6 +103,24 @@ class SearchResultsPage extends StatefulWidget {
     required this.tripRequestService,
   });
 
+  static String formatTimeForDisplay(String? time) {
+    if (time == null || time.isEmpty || time == 'N/A') return 'N/A';
+    try {
+      final parts = time.split(':');
+      if (parts.length >= 2) {
+        int hour = int.parse(parts[0]);
+        int minute = int.parse(parts[1]);
+        final period = hour >= 12 ? 'PM' : 'AM';
+        hour = hour % 12;
+        if (hour == 0) hour = 12;
+        return '$hour:${minute.toString().padLeft(2, '0')} $period';
+      }
+      return time;
+    } catch (_) {
+      return time;
+    }
+  }
+
   @override
   State<SearchResultsPage> createState() => _SearchResultsPageState();
 }
@@ -70,8 +146,8 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     super.dispose();
   }
 
-  String _formatDateForDisplay(String isoDate) {
-    if (isoDate.isEmpty || isoDate == 'N/A') return 'N/A';
+  String _formatDateForDisplay(String? isoDate) {
+    if (isoDate == null || isoDate.isEmpty || isoDate == 'N/A') return 'N/A';
     try {
       return DateFormat('dd MMM yyyy').format(DateTime.parse(isoDate));
     } catch (_) {
@@ -173,18 +249,20 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           onSuccess: (tripRequestId, orderOwner) {
             Navigator.pop(context);
             Navigator.pop(context);
+            final r = _R.of(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Row(
                   children: [
-                    const Icon(Icons.check_circle,
-                        color: Colors.white, size: 20),
-                    const SizedBox(width: 12),
+                    Icon(Icons.check_circle,
+                        color: Colors.white, size: r.iconXL),
+                    SizedBox(width: r.sp12),
                     Expanded(
                       child: Text(
                         'Request sent to $orderOwner!',
-                        style:
-                        const TextStyle(fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: r.fontMD),
                       ),
                     ),
                   ],
@@ -192,8 +270,8 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                 backgroundColor: const Color(0xFF22C55E),
                 behavior: SnackBarBehavior.floating,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                margin: const EdgeInsets.all(16),
+                    borderRadius: BorderRadius.circular(r.borderRadius)),
+                margin: EdgeInsets.all(r.sp16),
               ),
             );
             widget.onSendRequest(order);
@@ -210,45 +288,47 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+      builder: (context) {
+        final r = _R.of(context);
+        return StatefulBuilder(
+          builder: (context, setModalState) => Padding(
+            padding: EdgeInsets.fromLTRB(r.sp20, r.sp16, r.sp20, r.sp32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: r.s(40),
+                    height: r.s(4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Sort By',
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-              _buildSortTile(SortOption.newest, 'Newest First',
-                  Icons.access_time_rounded),
-              _buildSortTile(SortOption.priceHighToLow,
-                  'Pricing: High to Low', Icons.trending_up_rounded),
-              _buildSortTile(SortOption.preferredVehicle,
-                  'Preferred Vehicle First', Icons.local_shipping_outlined),
-            ],
+                SizedBox(height: r.sp20),
+                Text(
+                  'Sort By',
+                  style: TextStyle(
+                      fontSize: r.font4XL, fontWeight: FontWeight.w700),
+                ),
+                SizedBox(height: r.sp12),
+                _buildSortTile(r, SortOption.newest, 'Newest First',
+                    Icons.access_time_rounded),
+                _buildSortTile(r, SortOption.priceHighToLow,
+                    'Pricing: High to Low', Icons.trending_up_rounded),
+                _buildSortTile(r, SortOption.preferredVehicle,
+                    'Preferred Vehicle First', Icons.local_shipping_outlined),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildSortTile(
-      SortOption option, String title, IconData icon) {
+  Widget _buildSortTile(_R r, SortOption option, String title, IconData icon) {
     final isSelected = _activeSort == option;
     return GestureDetector(
       onTap: () {
@@ -257,42 +337,39 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.symmetric(vertical: 4),
+        margin: EdgeInsets.symmetric(vertical: r.sp4),
         padding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        EdgeInsets.symmetric(horizontal: r.sp16, vertical: r.s(14)),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.08)
+              ? AppColors.primary.withValues(alpha: 0.08)
               : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(r.s(14)),
           border: Border.all(
             color: isSelected
-                ? AppColors.primary.withOpacity(0.4)
+                ? AppColors.primary.withValues(alpha: 0.4)
                 : Colors.transparent,
           ),
         ),
         child: Row(
           children: [
             Icon(icon,
-                color:
-                isSelected ? AppColors.primary : Colors.grey.shade500,
-                size: 20),
-            const SizedBox(width: 12),
+                color: isSelected ? AppColors.primary : Colors.grey.shade500,
+                size: r.iconXL),
+            SizedBox(width: r.sp12),
             Text(
               title,
               style: TextStyle(
-                color:
-                isSelected ? AppColors.primary : Colors.grey.shade700,
-                fontWeight: isSelected
-                    ? FontWeight.w700
-                    : FontWeight.w500,
-                fontSize: 14,
+                color: isSelected ? AppColors.primary : Colors.grey.shade700,
+                fontWeight:
+                isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: r.fontLG,
               ),
             ),
             const Spacer(),
             if (isSelected)
               Icon(Icons.check_circle_rounded,
-                  color: AppColors.primary, size: 20),
+                  color: AppColors.primary, size: r.iconXL),
           ],
         ),
       ),
@@ -302,6 +379,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   @override
   Widget build(BuildContext context) {
     final processed = _processedOrders;
+    final r = _R.of(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -310,108 +388,120 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           // ── Sliver App Bar ─────────────────────────────────────────
           SliverAppBar(
             pinned: true,
+            floating: false,
+            snap: false,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             foregroundColor: Theme.of(context).colorScheme.onSurface,
             elevation: 0,
-            expandedHeight: 110,
-            leading: Padding(
-              padding: const EdgeInsets.all(8),
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.arrow_back_ios_new,
-                      size: 18, color: Colors.black87),
-                ),
-              ),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding:
-              const EdgeInsets.only(left: 56, bottom: 14, right: 56),
-              title: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${widget.fromLocation} → ${widget.toLocation}',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87,
+            // toolbarHeight covers back button + title row when collapsed
+            toolbarHeight: r.s(56),
+            // expandedHeight = toolbarHeight + filter chips bar
+            expandedHeight: r.s(56),
+            automaticallyImplyLeading: false,
+            title: Row(
+              children: [
+                // Back button
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: r.s(36),
+                    height: r.s(36),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(r.borderRadius),
                     ),
-                    overflow: TextOverflow.ellipsis,
+                    child: Icon(Icons.arrow_back_ios_new,
+                        size: r.s(16), color: Colors.black87),
                   ),
-                  Text(
-                    '${widget.date}  ·  ${widget.departureTime}',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500),
+                ),
+                SizedBox(width: r.sp10),
+                // Title block
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${widget.fromLocation} → ${widget.toLocation}',
+                        style: TextStyle(
+                          fontSize: r.fontMD,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black87,
+                          height: 1.2,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      Text(
+                        '${widget.date}  ·  ${SearchResultsPage.formatTimeForDisplay(widget.departureTime)}',
+                        style: TextStyle(
+                            fontSize: r.fontXS,
+                            color: Colors.grey.shade500,
+                            height: 1.3),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: GestureDetector(
+                ),
+                SizedBox(width: r.sp8),
+                // Sort button
+                GestureDetector(
                   onTap: _showSortOptions,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(r.sp8),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(r.borderRadius),
                     ),
-                    child: const Icon(Icons.tune_rounded,
-                        size: 20, color: Colors.black87),
+                    child: Icon(Icons.tune_rounded,
+                        size: r.iconXL, color: Colors.black87),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(52),
+              preferredSize: Size.fromHeight(r.s(48)),
               child: Container(
                 color: Theme.of(context).scaffoldBackgroundColor,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                padding: EdgeInsets.fromLTRB(r.sp16, r.sp4, r.sp16, r.sp10),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
                       _FilterChip(
+                        r: r,
                         label: 'All',
                         count: widget.orders.length,
                         isActive: _activeFilter == SearchFilter.all,
-                        onTap: () => setState(
-                                () => _activeFilter = SearchFilter.all),
+                        onTap: () =>
+                            setState(() => _activeFilter = SearchFilter.all),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: r.sp8),
                       _FilterChip(
+                        r: r,
                         label: 'Urgent',
-                        count: widget.orders
-                            .where((o) => o.isUrgent == true)
-                            .length,
+                        count:
+                        widget.orders.where((o) => o.isUrgent == true).length,
                         isActive:
                         _activeFilter == SearchFilter.urgentDelivery,
-                        onTap: () => setState(() =>
-                        _activeFilter = SearchFilter.urgentDelivery),
+                        onTap: () => setState(
+                                () => _activeFilter = SearchFilter.urgentDelivery),
                         accentColor: const Color(0xFFEF4444),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: r.sp8),
                       _FilterChip(
+                        r: r,
                         label: 'Preferred Mode',
                         count: widget.orders
                             .where((o) =>
                         o.preferenceTransport?.any((v) =>
                         v.toLowerCase() ==
-                            widget.searchedVehicle
-                                .toLowerCase()) ??
+                            widget.searchedVehicle.toLowerCase()) ??
                             false)
                             .length,
                         isActive:
                         _activeFilter == SearchFilter.preferredMode,
-                        onTap: () => setState(() =>
-                        _activeFilter = SearchFilter.preferredMode),
+                        onTap: () => setState(
+                                () => _activeFilter = SearchFilter.preferredMode),
                       ),
                     ],
                   ),
@@ -420,15 +510,14 @@ class _SearchResultsPageState extends State<SearchResultsPage>
             ),
           ),
 
-          // ── Result Count ───────────────────────────────────────────
+          // ── Result Count ──────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding:
-              const EdgeInsets.fromLTRB(20, 16, 20, 4),
+              padding: EdgeInsets.fromLTRB(r.sp20, r.sp16, r.sp20, r.sp4),
               child: Text(
                 '${processed.length} result${processed.length == 1 ? '' : 's'} found',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: r.fontMD,
                   color: Colors.grey.shade500,
                   fontWeight: FontWeight.w500,
                 ),
@@ -440,7 +529,8 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           processed.isEmpty
               ? const SliverFillRemaining(child: _EmptyState())
               : SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            padding:
+            EdgeInsets.fromLTRB(r.sp16, r.sp8, r.sp16, r.sp24),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -467,6 +557,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 // _FilterChip
 // ═══════════════════════════════════════════════════════════════════════════
 class _FilterChip extends StatelessWidget {
+  final _R r;
   final String label;
   final int count;
   final bool isActive;
@@ -474,6 +565,7 @@ class _FilterChip extends StatelessWidget {
   final Color? accentColor;
 
   const _FilterChip({
+    required this.r,
     required this.label,
     required this.count,
     required this.isActive,
@@ -489,7 +581,7 @@ class _FilterChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding:
-        const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        EdgeInsets.symmetric(horizontal: r.s(14), vertical: r.s(7)),
         decoration: BoxDecoration(
           color: isActive ? color : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(50),
@@ -500,26 +592,25 @@ class _FilterChip extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 13,
-                fontWeight:
-                isActive ? FontWeight.w700 : FontWeight.w500,
+                fontSize: r.fontMD,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                 color: isActive ? Colors.white : Colors.grey.shade600,
               ),
             ),
-            const SizedBox(width: 6),
+            SizedBox(width: r.sp6),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 6, vertical: 1),
+              padding: EdgeInsets.symmetric(
+                  horizontal: r.sp6, vertical: r.sp2),
               decoration: BoxDecoration(
                 color: isActive
-                    ? Colors.white.withOpacity(0.25)
+                    ? Colors.white.withValues(alpha: 0.25)
                     : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(50),
               ),
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: r.fontSM,
                   fontWeight: FontWeight.w700,
                   color: isActive ? Colors.white : Colors.grey.shade600,
                 ),
@@ -533,12 +624,12 @@ class _FilterChip extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// _OrderCard  (redesigned)
+// _OrderCard
 // ═══════════════════════════════════════════════════════════════════════════
 class _OrderCard extends StatelessWidget {
   final Order order;
   final int index;
-  final String Function(String) formatDate;
+  final String Function(String?) formatDate;
   final String searchedVehicle;
   final VoidCallback onTap;
 
@@ -552,11 +643,9 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = _R.of(context);
     final hasPrice =
         order.calculatedPrice != null && order.calculatedPrice! > 0;
-    final isPreferred = order.preferenceTransport?.any((v) =>
-    v.toLowerCase() == searchedVehicle.toLowerCase()) ??
-        false;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -572,15 +661,15 @@ class _OrderCard extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: EdgeInsets.only(bottom: r.sp12),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(r.cardRadius),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: r.s(12),
+                offset: Offset(0, r.sp4),
               ),
             ],
           ),
@@ -588,92 +677,154 @@ class _OrderCard extends StatelessWidget {
             children: [
               // ── Top section ──────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(r.sp16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Route row
+                    // Vehicle type (left) + Price (right) top row
                     Row(
                       children: [
-                        _RouteDots(),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            '${order.origin}  ⟶  ${order.destination}',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (hasPrice) ...[
-                          const SizedBox(width: 8),
+                        // Vehicle type badge
+                        if (order.preferenceTransport != null &&
+                            order.preferenceTransport!.isNotEmpty)
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: r.sp8, vertical: r.sp4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(r.s(6)),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.local_shipping_outlined,
+                                    size: r.s(12),
+                                    color: AppColors.primary),
+                                SizedBox(width: r.s(4)),
+                                Text(
+                                  order.preferenceTransport!.first,
+                                  style: TextStyle(
+                                    fontSize: r.fontXS,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        const Spacer(),
+                        // Price badge
+                        if (hasPrice)
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: r.sp10, vertical: r.sp4),
                             decoration: BoxDecoration(
                               color: const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(r.chipRadius),
                             ),
                             child: Text(
                               '₹${order.calculatedPrice!.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 15,
+                              style: TextStyle(
+                                fontSize: r.fontXL,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF16A34A),
+                                color: const Color(0xFF16A34A),
                               ),
                             ),
                           ),
+                      ],
+                    ),
+
+                    SizedBox(height: r.sp10),
+
+                    // Vertical route tracker with separate date + time chips
+                    _RouteTracker(
+                      r: r,
+                      origin: order.origin,
+                      destination: order.destination,
+                      departureDate: formatDate(order.departureDate),
+                      departureTime: SearchResultsPage.formatTimeForDisplay(order.departureTime),
+                      deliveryDate: formatDate(order.deliveryDate),
+                      deliveryTime: SearchResultsPage.formatTimeForDisplay(order.deliveryTime),
+                    ),
+
+                    // ── Preferred Vehicle + Delivery Status ──────
+                    if ((order.preferenceTransport != null &&
+                        order.preferenceTransport!.isNotEmpty) ||
+                        order.isUrgent != null) ...[
+                      SizedBox(height: r.sp10),
+                      Divider(height: 1, color: Colors.grey.shade100),
+                      SizedBox(height: r.sp10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Preferred Vehicle
+                          if (order.preferenceTransport != null &&
+                              order.preferenceTransport!.isNotEmpty)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Preferred Vehicle',
+                                    style: TextStyle(
+                                      fontSize: r.fontXS,
+                                      color: Colors.grey.shade400,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: r.s(4)),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.local_shipping_outlined,
+                                          size: r.s(13),
+                                          color: AppColors.primary),
+                                      SizedBox(width: r.s(4)),
+                                      Flexible(
+                                        child: Text(
+                                          order.preferenceTransport!.join(', '),
+                                          style: TextStyle(
+                                            fontSize: r.fontBase,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.black87,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          if ((order.preferenceTransport != null &&
+                              order.preferenceTransport!.isNotEmpty) &&
+                              order.isUrgent != null)
+                            SizedBox(width: r.sp12),
+
+                          // Delivery Status
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Delivery Status',
+                                  style: TextStyle(
+                                    fontSize: r.fontXS,
+                                    color: Colors.grey.shade400,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: r.s(4)),
+                                _UrgentBadge(r: r, isUrgent: order.isUrgent == true),
+                              ],
+                            ),
+                          ),
                         ],
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Dates row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _InfoTile(
-                            icon: Icons.flight_takeoff_rounded,
-                            label: 'Departure',
-                            value:
-                            '${formatDate(order.departureDate ?? '')}  ·  ${order.departureTime ?? ''}',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _InfoTile(
-                            icon: Icons.flag_rounded,
-                            label: 'Delivery',
-                            value:
-                            '${formatDate(order.deliveryDate)}  ·  ${order.deliveryTime ?? ''}',
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // Preference + Status row
-                    Row(
-                      children: [
-                        if (isPreferred) ...[
-                          _InfoTile(
-                            icon: Icons.local_shipping_outlined,
-                            label: 'Preference',
-                            value: order.preferenceTransport
-                                ?.join(', ') ??
-                                '—',
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        if (order.isUrgent == true)
-                          _UrgentBadge(),
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -683,18 +834,18 @@ class _OrderCard extends StatelessWidget {
 
               // ── User row ─────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 12),
+                padding: EdgeInsets.symmetric(
+                    horizontal: r.sp16, vertical: r.sp12),
                 child: Row(
                   children: [
                     // Avatar
                     Container(
-                      width: 36,
-                      height: 36,
+                      width: r.avatarSM,
+                      height: r.avatarSM,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            AppColors.primary.withOpacity(0.7),
+                            AppColors.primary.withValues(alpha: 0.7),
                             AppColors.primary,
                           ],
                           begin: Alignment.topLeft,
@@ -708,37 +859,37 @@ class _OrderCard extends StatelessWidget {
                               ? order.ownerName![0]
                               : 'U')
                               .toUpperCase(),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
-                            fontSize: 14,
+                            fontSize: r.fontLG,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: r.sp10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             order.ownerName ?? 'Unknown',
-                            style: const TextStyle(
-                              fontSize: 13,
+                            style: TextStyle(
+                              fontSize: r.fontMD,
                               fontWeight: FontWeight.w700,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                           Row(
                             children: [
-                              const Icon(Icons.star_rounded,
-                                  size: 13,
-                                  color: Color(0xFFFACC15)),
-                              const SizedBox(width: 2),
+                              Icon(Icons.star_rounded,
+                                  size: r.iconSM,
+                                  color: const Color(0xFFFACC15)),
+                              SizedBox(width: r.sp2),
                               Text(
-                                order.ownerRating?.toStringAsFixed(1) ??
-                                    '—',
+                                order.ownerRating?.toStringAsFixed(1) ?? '—',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: r.fontBase,
                                   color: Colors.grey.shade500,
                                 ),
                               ),
@@ -749,17 +900,17 @@ class _OrderCard extends StatelessWidget {
                     ),
                     // Send button
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: r.s(14), vertical: r.sp8),
                       decoration: BoxDecoration(
                         color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(r.sp10),
                       ),
-                      child: const Text(
+                      child: Text(
                         'View Details',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: r.fontBase,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -776,45 +927,247 @@ class _OrderCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// _RouteDots  – two dots connected by a dashed line
+// _RouteTracker  – vertical origin → destination with date/time chips
 // ═══════════════════════════════════════════════════════════════════════════
-class _RouteDots extends StatelessWidget {
+class _RouteTracker extends StatelessWidget {
+  final _R r;
+  final String origin;
+  final String destination;
+  final String departureDate;
+  final String departureTime;
+  final String deliveryDate;
+  final String deliveryTime;
+
+  const _RouteTracker({
+    required this.r,
+    required this.origin,
+    required this.destination,
+    required this.departureDate,
+    required this.departureTime,
+    required this.deliveryDate,
+    required this.deliveryTime,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
+        // ── Left: vertical icon track ─────────────────────────────
+        SizedBox(
+          width: r.s(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Origin dot
+              Container(
+                width: r.s(12),
+                height: r.s(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    width: r.s(2.5),
+                  ),
+                ),
+              ),
+              // Dashed connector line
+              SizedBox(
+                height: r.s(34),
+                child: Column(
+                  children: List.generate(
+                    5,
+                        (_) => Expanded(
+                      child: Center(
+                        child: Container(
+                          width: r.s(1.5),
+                          color: Colors.grey.shade300,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Destination dot
+              Container(
+                width: r.s(12),
+                height: r.s(12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.grey.shade400,
+                    width: r.s(2),
+                  ),
+                ),
+                child: Center(
+                  child: Container(
+                    width: r.s(4),
+                    height: r.s(4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 2),
-        ...List.generate(
-          3,
-              (_) => Container(
-            width: 3,
-            height: 2,
-            margin: const EdgeInsets.symmetric(horizontal: 1),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(1),
-            ),
-          ),
-        ),
-        const SizedBox(width: 2),
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade400,
-            shape: BoxShape.circle,
+
+        SizedBox(width: r.sp10),
+
+        // ── Right: origin block + destination block ───────────────
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Origin
+              _RouteStop(
+                r: r,
+                locationLabel: 'From',
+                location: origin,
+                date: departureDate,
+                time: departureTime,
+                isOrigin: true,
+              ),
+
+              SizedBox(height: r.s(10)),
+
+              // Destination
+              _RouteStop(
+                r: r,
+                locationLabel: 'To',
+                location: destination,
+                date: deliveryDate,
+                time: deliveryTime,
+                isOrigin: false,
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Single stop row (location + date chip + time chip) ────────────────────
+class _RouteStop extends StatelessWidget {
+  final _R r;
+  final String locationLabel;
+  final String location;
+  final String date;
+  final String time;
+  final bool isOrigin;
+
+  const _RouteStop({
+    required this.r,
+    required this.locationLabel,
+    required this.location,
+    required this.date,
+    required this.time,
+    required this.isOrigin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labelColor = isOrigin ? AppColors.primary : Colors.grey.shade500;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Location label
+        Text(
+          locationLabel,
+          style: TextStyle(
+            fontSize: r.fontXS,
+            color: labelColor,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.4,
+          ),
+        ),
+        SizedBox(height: r.s(2)),
+        // Full location name – wraps to next line
+        Text(
+          location.isNotEmpty ? location : '—',
+          style: TextStyle(
+            fontSize: r.fontMD,
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
+            height: 1.3,
+          ),
+          softWrap: true,
+        ),
+        SizedBox(height: r.s(5)),
+        // Date + Time chips
+        Wrap(
+          spacing: r.sp6,
+          runSpacing: r.s(4),
+          children: [
+            _DateTimeChip(
+              r: r,
+              icon: Icons.calendar_today_rounded,
+              text: date.isNotEmpty ? date : '—',
+              color: isOrigin ? AppColors.primary : Colors.grey.shade600,
+              bgColor: isOrigin
+                  ? AppColors.primary.withValues(alpha: 0.07)
+                  : Colors.grey.shade100,
+            ),
+            _DateTimeChip(
+              r: r,
+              icon: Icons.access_time_rounded,
+              text: time.isNotEmpty ? time : '—',
+              color: isOrigin ? AppColors.primary : Colors.grey.shade600,
+              bgColor: isOrigin
+                  ? AppColors.primary.withValues(alpha: 0.07)
+                  : Colors.grey.shade100,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Pill chip for a single date or time value ─────────────────────────────
+class _DateTimeChip extends StatelessWidget {
+  final _R r;
+  final IconData icon;
+  final String text;
+  final Color color;
+  final Color bgColor;
+
+  const _DateTimeChip({
+    required this.r,
+    required this.icon,
+    required this.text,
+    required this.color,
+    required this.bgColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+          horizontal: r.s(8), vertical: r.s(4)),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(r.s(6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: r.s(11), color: color),
+          SizedBox(width: r.s(4)),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: r.fontXS,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -823,11 +1176,13 @@ class _RouteDots extends StatelessWidget {
 // _InfoTile
 // ═══════════════════════════════════════════════════════════════════════════
 class _InfoTile extends StatelessWidget {
+  final _R r;
   final IconData icon;
   final String label;
   final String value;
 
   const _InfoTile({
+    required this.r,
     required this.icon,
     required this.label,
     required this.value,
@@ -838,8 +1193,8 @@ class _InfoTile extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 13, color: Colors.grey.shade400),
-        const SizedBox(width: 5),
+        Icon(icon, size: r.iconSM, color: Colors.grey.shade400),
+        SizedBox(width: r.sp4 + 1),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -847,16 +1202,16 @@ class _InfoTile extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: r.fontXS,
                   color: Colors.grey.shade400,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 1),
+              SizedBox(height: r.sp2 / 2),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 12,
+                style: TextStyle(
+                  fontSize: r.fontBase,
                   fontWeight: FontWeight.w600,
                   color: Colors.black87,
                 ),
@@ -871,35 +1226,45 @@ class _InfoTile extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// _UrgentBadge
+// _UrgentBadge  – shows "Urgent" (red) or "Standard" (green) delivery status
 // ═══════════════════════════════════════════════════════════════════════════
 class _UrgentBadge extends StatelessWidget {
+  final _R r;
+  final bool isUrgent;
+  const _UrgentBadge({required this.r, this.isUrgent = true});
+
   @override
   Widget build(BuildContext context) {
+    final bgColor    = isUrgent ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5);
+    final borderColor = isUrgent ? const Color(0xFFFECACA) : const Color(0xFFBBF7D0);
+    final dotColor   = isUrgent ? const Color(0xFFEF4444) : const Color(0xFF22C55E);
+    final textColor  = isUrgent ? const Color(0xFFDC2626) : const Color(0xFF16A34A);
+    final label      = isUrgent ? 'Urgent' : 'Standard';
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: r.sp10, vertical: r.sp4),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(r.badgeRadius),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: Color(0xFFEF4444),
+            width: r.dotSM,
+            height: r.dotSM,
+            decoration: BoxDecoration(
+              color: dotColor,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 5),
-          const Text(
-            'Urgent',
+          SizedBox(width: r.sp4 + 1),
+          Text(
+            label,
             style: TextStyle(
-              fontSize: 11,
-              color: Color(0xFFDC2626),
+              fontSize: r.fontSM,
+              color: textColor,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -910,11 +1275,11 @@ class _UrgentBadge extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// _OrderDetailSheet  – replaces old NavigateTo SendTripRequest preview
+// _OrderDetailSheet
 // ═══════════════════════════════════════════════════════════════════════════
 class _OrderDetailSheet extends StatelessWidget {
   final Order order;
-  final String Function(String) formatDate;
+  final String Function(String?) formatDate;
   final VoidCallback onSendRequest;
 
   const _OrderDetailSheet({
@@ -923,8 +1288,17 @@ class _OrderDetailSheet extends StatelessWidget {
     required this.onSendRequest,
   });
 
+  static void _showImageFullscreen(BuildContext context, List<String> images, int initialIndex) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (_) => _ImageViewer(images: images, initialIndex: initialIndex),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final r = _R.of(context);
     final hasPrice =
         order.calculatedPrice != null && order.calculatedPrice! > 0;
 
@@ -934,32 +1308,34 @@ class _OrderDetailSheet extends StatelessWidget {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.black87),
+          icon: Icon(Icons.close_rounded,
+              color: Colors.black87, size: r.iconXL),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Order Details',
           style: TextStyle(
               fontWeight: FontWeight.w800,
               color: Colors.black87,
-              fontSize: 17),
+              fontSize: r.font3XL),
         ),
         centerTitle: true,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(r.sp16),
         children: [
           // ── Sender card ──────────────────────────────────────────
           _DetailCard(
+            r: r,
             child: Row(
               children: [
                 Container(
-                  width: 52,
-                  height: 52,
+                  width: r.avatarMD,
+                  height: r.avatarMD,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppColors.primary.withOpacity(0.7),
+                        AppColors.primary.withValues(alpha: 0.7),
                         AppColors.primary,
                       ],
                       begin: Alignment.topLeft,
@@ -973,36 +1349,38 @@ class _OrderDetailSheet extends StatelessWidget {
                           ? order.ownerName![0]
                           : 'U')
                           .toUpperCase(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
-                        fontSize: 20,
+                        fontSize: r.font5XL,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 14),
+                SizedBox(width: r.s(14)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         order.ownerName ?? 'Unknown',
-                        style: const TextStyle(
-                          fontSize: 16,
+                        style: TextStyle(
+                          fontSize: r.font2XL,
                           fontWeight: FontWeight.w800,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: r.sp2),
                       Row(
                         children: [
-                          const Icon(Icons.star_rounded,
-                              size: 15, color: Color(0xFFFACC15)),
-                          const SizedBox(width: 3),
+                          Icon(Icons.star_rounded,
+                              size: r.iconMD,
+                              color: const Color(0xFFFACC15)),
+                          SizedBox(width: r.s(3)),
                           Text(
                             order.ownerRating?.toStringAsFixed(1) ?? '—',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: r.fontMD,
                               color: Colors.grey.shade500,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1012,84 +1390,121 @@ class _OrderDetailSheet extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (order.isUrgent == true) _UrgentBadge(),
+                _UrgentBadge(r: r, isUrgent: order.isUrgent == true),
               ],
             ),
           ),
 
-          const SizedBox(height: 12),
+          SizedBox(height: r.sp12),
 
           // ── Route card ───────────────────────────────────────────
           _DetailCard(
+            r: r,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Vertical route tracker with separate date + time chips
+                _RouteTracker(
+                  r: r,
+                  origin: order.origin,
+                  destination: order.destination,
+                  departureDate: formatDate(order.departureDate),
+                  departureTime: SearchResultsPage.formatTimeForDisplay(order.departureTime),
+                  deliveryDate: formatDate(order.deliveryDate),
+                  deliveryTime: SearchResultsPage.formatTimeForDisplay(order.deliveryTime),
+                ),
+                // ── Preferred Vehicle + Delivery Status ──────
+                SizedBox(height: r.sp12),
+                Divider(height: 1, color: Colors.grey.shade100),
+                SizedBox(height: r.sp12),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _RouteDots(),
-                    const SizedBox(width: 10),
+                    // Preferred Vehicle
                     Expanded(
-                      child: Text(
-                        '${order.origin}  ⟶  ${order.destination}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Preferred Vehicle',
+                            style: TextStyle(
+                              fontSize: r.fontXS,
+                              color: Colors.grey.shade400,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          SizedBox(height: r.s(5)),
+                          Row(
+                            children: [
+                              Icon(Icons.local_shipping_outlined,
+                                  size: r.s(14), color: AppColors.primary),
+                              SizedBox(width: r.s(5)),
+                              Flexible(
+                                child: Text(
+                                  (order.preferenceTransport != null &&
+                                      order.preferenceTransport!.isNotEmpty)
+                                      ? order.preferenceTransport!.join(', ')
+                                      : 'Not specified',
+                                  style: TextStyle(
+                                    fontSize: r.fontMD,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(width: r.sp12),
+
+                    // Delivery Status
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Delivery Status',
+                            style: TextStyle(
+                              fontSize: r.fontXS,
+                              color: Colors.grey.shade400,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          SizedBox(height: r.s(5)),
+                          _UrgentBadge(r: r, isUrgent: order.isUrgent == true),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _InfoTile(
-                        icon: Icons.flight_takeoff_rounded,
-                        label: 'Departure',
-                        value:
-                        '${formatDate(order.departureDate ?? '')}  ·  ${order.departureTime ?? ''}',
-                      ),
-                    ),
-                    Expanded(
-                      child: _InfoTile(
-                        icon: Icons.flag_rounded,
-                        label: 'Delivery',
-                        value:
-                        '${formatDate(order.deliveryDate)}  ·  ${order.deliveryTime ?? ''}',
-                      ),
-                    ),
-                  ],
-                ),
-                if (order.preferenceTransport != null &&
-                    order.preferenceTransport!.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  _InfoTile(
-                    icon: Icons.local_shipping_outlined,
-                    label: 'Preference',
-                    value: order.preferenceTransport!.join(', '),
-                  ),
-                ],
               ],
             ),
           ),
 
-          const SizedBox(height: 12),
+          SizedBox(height: r.sp12),
 
           // ── Product details card ─────────────────────────────────
           _DetailCard(
+            r: r,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Product Details',
                   style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w800),
+                      fontSize: r.fontXL, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: r.s(14)),
                 Row(
                   children: [
                     Expanded(
                       child: _InfoTile(
+                        r: r,
                         icon: Icons.inventory_2_outlined,
                         label: 'Category',
                         value: order.itemDescription,
@@ -1097,6 +1512,7 @@ class _OrderDetailSheet extends StatelessWidget {
                     ),
                     Expanded(
                       child: _InfoTile(
+                        r: r,
                         icon: Icons.scale_outlined,
                         label: 'Weight',
                         value: order.weight,
@@ -1104,102 +1520,167 @@ class _OrderDetailSheet extends StatelessWidget {
                     ),
                   ],
                 ),
-                // Product images placeholder
-                if (order.imageUrls != null &&
-                    order.imageUrls!.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Images',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 80,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: order.imageUrls!.length,
-                      itemBuilder: (context, i) => Container(
-                        width: 80,
-                        height: 80,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                          image: DecorationImage(
-                            image:
-                            NetworkImage(order.imageUrls![i]),
-                            fit: BoxFit.cover,
-                          ),
+                // ── Images ───────────────────────────────────────
+                Builder(builder: (context) {
+                  // Collect all image URLs from both imageUrl (String)
+                  // and imageUrls (List<String>) fields, resolve relative paths
+                  const String baseUrl = 'http://YOUR_SERVER_BASE_URL'; // ← replace with your server base URL
+                  String _resolve(String url) {
+                    if (url.isEmpty) return '';
+                    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+                    return '$baseUrl$url'; // prepend base for relative paths like /order_images/...
+                  }
+
+                  final List<String> images = [];
+                  if (order.imageUrl.isNotEmpty) {
+                    images.add(_resolve(order.imageUrl));
+                  }
+                  if (order.imageUrls != null) {
+                    for (final u in order.imageUrls!) {
+                      final resolved = _resolve(u);
+                      if (resolved.isNotEmpty && !images.contains(resolved)) {
+                        images.add(resolved);
+                      }
+                    }
+                  }
+
+                  if (images.isEmpty) return const SizedBox.shrink();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: r.s(14)),
+                      Text(
+                        'Product Images',
+                        style: TextStyle(
+                          fontSize: r.fontXS,
+                          color: Colors.grey.shade400,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.2,
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                      SizedBox(height: r.sp8),
+                      SizedBox(
+                        height: r.s(110),
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: images.length,
+                          itemBuilder: (context, i) {
+                            return GestureDetector(
+                              onTap: () => _showImageFullscreen(context, images, i),
+                              child: Container(
+                                width: r.s(110),
+                                height: r.s(110),
+                                margin: EdgeInsets.only(right: r.sp8),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(r.borderRadius),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(r.borderRadius),
+                                  child: Image.network(
+                                    images[i],
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (ctx, child, progress) {
+                                      if (progress == null) return child;
+                                      return Center(
+                                        child: SizedBox(
+                                          width: r.s(20),
+                                          height: r.s(20),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: r.s(2),
+                                            color: AppColors.primary,
+                                            value: progress.expectedTotalBytes != null
+                                                ? progress.cumulativeBytesLoaded /
+                                                progress.expectedTotalBytes!
+                                                : null,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (ctx, error, stack) => Center(
+                                      child: Icon(
+                                        Icons.broken_image_outlined,
+                                        size: r.s(28),
+                                        color: Colors.grey.shade300,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                }),
               ],
             ),
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-        child: Row(
-          children: [
-            if (hasPrice) ...[
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Price',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500),
-                  ),
-                  Text(
-                    '₹${order.calculatedPrice!.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF16A34A),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-            ],
-            Expanded(
-              child: GestureDetector(
-                onTap: onSendRequest,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.35),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          padding: EdgeInsets.fromLTRB(r.sp16, r.sp12, r.sp16, r.sp16),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (hasPrice) ...[
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Price',
+                        style: TextStyle(
+                            fontSize: r.fontSM, color: Colors.grey.shade500),
+                      ),
+                      Text(
+                        '₹${order.calculatedPrice!.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: r.font6XL,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF16A34A),
+                        ),
                       ),
                     ],
                   ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'Send Request',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
+                  SizedBox(width: r.sp16),
+                ],
+                Expanded(
+                  child: GestureDetector(
+                    onTap: onSendRequest,
+                    child: Container(
+                      height: r.s(52),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(r.buttonRadius),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.35),
+                            blurRadius: r.sp16,
+                            offset: Offset(0, r.sp6),
+                          ),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Send Request',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: r.font2XL,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1210,21 +1691,22 @@ class _OrderDetailSheet extends StatelessWidget {
 // _DetailCard
 // ═══════════════════════════════════════════════════════════════════════════
 class _DetailCard extends StatelessWidget {
+  final _R r;
   final Widget child;
-  const _DetailCard({required this.child});
+  const _DetailCard({required this.r, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(r.sp16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(r.cardRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: r.sp10,
+            offset: Offset(0, r.s(3)),
           ),
         ],
       ),
@@ -1241,36 +1723,139 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = _R.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(r.sp24),
             decoration: BoxDecoration(
               color: Colors.grey.shade100,
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.search_off_rounded,
-                size: 48, color: Colors.grey.shade300),
+                size: r.s(48), color: Colors.grey.shade300),
           ),
-          const SizedBox(height: 20),
-          const Text(
+          SizedBox(height: r.sp20),
+          Text(
             'No orders found',
             style: TextStyle(
-              fontSize: 17,
+              fontSize: r.font3XL,
               fontWeight: FontWeight.w700,
               color: Colors.black54,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: r.sp6),
           Text(
             'Try adjusting your filters',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: r.fontMD,
               color: Colors.grey.shade400,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// _ImageViewer  – full-screen swipeable image viewer
+// ═══════════════════════════════════════════════════════════════════════════
+class _ImageViewer extends StatefulWidget {
+  final List<String> images;
+  final int initialIndex;
+  const _ImageViewer({required this.images, required this.initialIndex});
+
+  @override
+  State<_ImageViewer> createState() => _ImageViewerState();
+}
+
+class _ImageViewerState extends State<_ImageViewer> {
+  late PageController _pageController;
+  late int _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.zero,
+      child: Stack(
+        children: [
+          // Swipeable image pages
+          PageView.builder(
+            controller: _pageController,
+            itemCount: widget.images.length,
+            onPageChanged: (i) => setState(() => _current = i),
+            itemBuilder: (ctx, i) => InteractiveViewer(
+              child: Center(
+                child: Image.network(
+                  widget.images[i],
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.broken_image_outlined,
+                    color: Colors.white54,
+                    size: 64,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Close button
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            right: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+
+          // Page indicator dots (only if multiple images)
+          if (widget.images.length > 1)
+            Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(widget.images.length, (i) {
+                  final active = i == _current;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: active ? 20 : 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: active ? Colors.white : Colors.white38,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  );
+                }),
+              ),
+            ),
         ],
       ),
     );
