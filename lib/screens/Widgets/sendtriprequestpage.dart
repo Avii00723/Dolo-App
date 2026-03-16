@@ -45,18 +45,45 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     super.dispose();
   }
 
-  // Get PNR input hint based on transport mode
-  String _getPnrHint(String transportMode) {
+  // Get Vehicle Info label based on transport mode
+  String _getVehicleInfoLabel(String transportMode) {
     switch (transportMode.toLowerCase()) {
-      case 'train':
-        return 'Enter 10-digit PNR (e.g., 1234567890)';
-      case 'flight':
+      case 'car': return 'Car Model/Info';
+      case 'train': return 'Train Name/No.';
       case 'plane':
-        return 'Enter flight booking reference or PNR';
-      case 'bus':
-        return 'Enter bus ticket number';
-      default:
-        return 'Enter ticket/PNR number (optional)';
+      case 'flight': return 'Airlines/Flight No.';
+      case 'bus': return 'Bus Operator/Info';
+      case 'bike':
+      case 'motorcycle': return 'Bike Model/Info';
+      default: return 'Vehicle Info';
+    }
+  }
+
+  // Get Vehicle Info hint based on transport mode
+  String _getVehicleInfoHint(String transportMode) {
+    switch (transportMode.toLowerCase()) {
+      case 'car': return 'e.g. Toyota Camry, White';
+      case 'train': return 'e.g. Rajdhani Express (12301)';
+      case 'plane':
+      case 'flight': return 'e.g. Indigo (6E-2134)';
+      case 'bus': return 'e.g. RedBus / Intercity Operator';
+      case 'bike':
+      case 'motorcycle': return 'e.g. Honda Activa / Royal Enfield';
+      default: return 'Enter vehicle details';
+    }
+  }
+
+  // Get PNR/Number label based on transport mode
+  String _getPnrLabel(String transportMode) {
+    switch (transportMode.toLowerCase()) {
+      case 'car': return 'Vehicle Number';
+      case 'bike':
+      case 'motorcycle': return 'Bike Number';
+      case 'train':
+      case 'plane':
+      case 'flight':
+      case 'bus': return 'PNR / Ticket Number';
+      default: return 'ID / Registration Number';
     }
   }
 
@@ -64,80 +91,42 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
   String _getPnrPlaceholder(String transportMode) {
     switch (transportMode.toLowerCase()) {
       case 'train':
-        return 'PNR: 1234567890';
+        return 'Enter 10-digit PNR';
       case 'flight':
       case 'plane':
-        return 'Booking Ref/PNR';
+        return 'Booking Ref / PNR';
       case 'bus':
-        return 'Ticket Number';
+        return 'Ticket / Seat Number';
+      case 'car':
+        return 'e.g. MH 12 AB 1234';
+      case 'bike':
+      case 'motorcycle':
+        return 'e.g. DL 1S AB 1234';
       default:
-        return 'Ticket/PNR';
+        return 'Enter identification number';
     }
   }
 
   // Validate PNR format
   bool _validatePnrFormat(String transportMode, String pnr) {
-    if (pnr.isEmpty) return true; // PNR is optional
+    if (pnr.isEmpty) return true; // Optional
 
+    final cleanPnr = pnr.trim();
     switch (transportMode.toLowerCase()) {
       case 'train':
-      // Train PNR should be exactly 10 digits
-        return RegExp(r'^\d{10}$').hasMatch(pnr);
+        return RegExp(r'^\d{10}$').hasMatch(cleanPnr);
       case 'flight':
       case 'plane':
-      // Flight booking reference: 6 alphanumeric characters or PNR format
-        return pnr.length >= 5 && pnr.length <= 10;
+        return cleanPnr.length >= 5 && cleanPnr.length <= 15;
       case 'bus':
-      // Bus ticket: 6-20 alphanumeric characters
-        return pnr.length >= 6 && pnr.length <= 20;
+        return cleanPnr.length >= 3 && cleanPnr.length <= 20;
+      case 'car':
+      case 'bike':
+      case 'motorcycle':
+        return cleanPnr.length >= 4 && cleanPnr.length <= 15;
       default:
-        return pnr.length >= 5 && pnr.length <= 20;
+        return cleanPnr.length >= 3 && cleanPnr.length <= 25;
     }
-  }
-
-  Widget _buildReadOnlyDateTimeField({
-    required String label,
-    required String value,
-    required IconData icon,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Theme.of(context).dividerColor),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.primary, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 
   void _showSnackBar(String message, Color color) {
@@ -169,29 +158,27 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
   }
 
   Future<void> _submitRequest() async {
+    final mode = widget.order.transportMode;
     // Validate required fields
     if (vehicleInfoController.text.trim().isEmpty) {
-      _showSnackBar('Please enter vehicle information', Colors.red);
+      _showSnackBar('Please enter ${_getVehicleInfoLabel(mode)}', Colors.red);
       return;
     }
 
     // Validate PNR format if provided
     final pnr = pnrController.text.trim();
-    if (pnr.isNotEmpty && !_validatePnrFormat(widget.order.transportMode, pnr)) {
+    if (pnr.isNotEmpty && !_validatePnrFormat(mode, pnr)) {
       String formatHint;
-      switch (widget.order.transportMode.toLowerCase()) {
+      switch (mode.toLowerCase()) {
         case 'train':
-          formatHint = 'Train PNR must be exactly 10 digits';
+          formatHint = 'Train PNR must be 10 digits';
           break;
-        case 'flight':
-        case 'plane':
-          formatHint = 'Flight booking reference must be 5-10 characters';
-          break;
-        case 'bus':
-          formatHint = 'Bus ticket must be 6-20 characters';
+        case 'car':
+        case 'bike':
+          formatHint = 'Invalid vehicle number format';
           break;
         default:
-          formatHint = 'Invalid ticket format';
+          formatHint = 'Invalid ${_getPnrLabel(mode)} format';
       }
       _showSnackBar(formatHint, Colors.red);
       return;
@@ -202,17 +189,16 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     });
 
     try {
-      // Build ISO datetime strings: YYYY-MM-DDTHH:MM:SSZ
       final departureDatetime = '${widget.departureDate}T${widget.departureTime}Z';
       final deliveryDatetime = '${widget.deliveryDate}T${widget.deliveryTime}Z';
 
       final tripRequest = TripRequestSendRequest(
         travelerId: widget.currentUserId,
         orderId: widget.order.id,
-        travelDate: deliveryDatetime, // travel_date = delivery datetime
+        travelDate: deliveryDatetime,
         vehicleInfo: vehicleInfoController.text.trim(),
-        vehicleType: widget.order.transportMode, // Use transport mode from order
-        pnr: pnr.isNotEmpty ? pnr : null, // Optional PNR
+        vehicleType: mode,
+        pnr: pnr.isNotEmpty ? pnr : null,
         source: widget.order.origin,
         destination: widget.order.destination,
         departureDatetime: departureDatetime,
@@ -220,14 +206,6 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
             ? commentsController.text.trim()
             : null,
       );
-
-      debugPrint('DEBUG: Sending trip request...');
-      debugPrint('DEBUG: Traveler ID: ${widget.currentUserId}');
-      debugPrint('DEBUG: Order ID: ${widget.order.id}');
-      debugPrint('DEBUG: Travel Date (delivery): $deliveryDatetime');
-      debugPrint('DEBUG: Departure Datetime: $departureDatetime');
-      debugPrint('DEBUG: Vehicle Type: ${widget.order.transportMode}');
-      debugPrint('DEBUG: PNR: $pnr');
 
       final response = await widget.tripRequestService.sendTripRequest(tripRequest);
 
@@ -248,8 +226,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
         setState(() {
           isSubmitting = false;
         });
-        debugPrint('ERROR: Failed to send trip request: $e');
-        _showSnackBar('Failed to send request: $e', Colors.red);
+        _showSnackBar('An error occurred: $e', Colors.red);
       }
     }
   }
@@ -356,6 +333,8 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
 
   @override
   Widget build(BuildContext context) {
+    final transportMode = widget.order.transportMode;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -400,23 +379,23 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
             ),
             const SizedBox(height: 16),
             _buildReadOnlyField(
-              label: 'Vehicle Info',
-              value: widget.order.transportMode,
+              label: 'Selected Mode',
+              value: transportMode,
               icon: Icons.directions_bus_outlined,
             ),
             const SizedBox(height: 16),
             _buildEnhancedTextField(
               controller: vehicleInfoController,
-              label: 'Enter Vehicle Info',
-              hint: 'e.g., Bus, Train, Plane',
+              label: _getVehicleInfoLabel(transportMode),
+              hint: _getVehicleInfoHint(transportMode),
               icon: Icons.info_outline,
               isRequired: true,
             ),
             const SizedBox(height: 16),
             _buildEnhancedTextField(
               controller: pnrController,
-              label: 'Enter PNR',
-              hint: _getPnrPlaceholder(widget.order.transportMode),
+              label: _getPnrLabel(transportMode),
+              hint: _getPnrPlaceholder(transportMode),
               icon: Icons.confirmation_number_outlined,
             ),
             const SizedBox(height: 16),
@@ -428,28 +407,59 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
               maxLines: 3,
             ),
             const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: isSubmitting ? null : _submitRequest,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      side: BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
                   ),
                 ),
-                child: isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                  'Send Request',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: isSubmitting ? null : _submitRequest,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                      'Send Request',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
