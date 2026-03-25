@@ -686,38 +686,38 @@ class _OrderCard extends StatelessWidget {
                     Row(
                       children: [
                         // Vehicle type badge
-                        if (order.preferenceTransport != null &&
-                            order.preferenceTransport!.isNotEmpty)
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: r.sp8, vertical: r.sp4),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(r.s(6)),
-                              border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.local_shipping_outlined,
-                                    size: r.s(12),
-                                    color: AppColors.primary),
-                                SizedBox(width: r.s(4)),
-                                Text(
-                                  order.preferenceTransport!.first,
-                                  style: TextStyle(
-                                    fontSize: r.fontXS,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        // if (order.preferenceTransport != null &&
+                        //     order.preferenceTransport!.isNotEmpty)
+                        //   Container(
+                        //     padding: EdgeInsets.symmetric(
+                        //         horizontal: r.sp8, vertical: r.sp4),
+                        //     decoration: BoxDecoration(
+                        //       color: AppColors.primary.withValues(alpha: 0.08),
+                        //       borderRadius: BorderRadius.circular(r.s(6)),
+                        //       border: Border.all(
+                        //         color: AppColors.primary.withValues(alpha: 0.2),
+                        //       ),
+                        //     ),
+                        //     child: Row(
+                        //       mainAxisSize: MainAxisSize.min,
+                        //       children: [
+                        //         Icon(Icons.local_shipping_outlined,
+                        //             size: r.s(12),
+                        //             color: AppColors.primary),
+                        //         SizedBox(width: r.s(4)),
+                        //         Text(
+                        //           order.preferenceTransport!.first,
+                        //           style: TextStyle(
+                        //             fontSize: r.fontXS,
+                        //             color: AppColors.primary,
+                        //             fontWeight: FontWeight.w600,
+                        //           ),
+                        //         ),
+                        //       ],
+                        //     ),
+                        //   ),
                         const Spacer(),
-                        // Price badge
+                        // Price badge-
                         if (hasPrice)
                           Container(
                             padding: EdgeInsets.symmetric(
