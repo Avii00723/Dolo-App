@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../Constants/colorconstant.dart';
+import '../../Constants/ApiConstants.dart';
 import '../../Models/OrderModel.dart';
 import '../../Controllers/TripRequestService.dart';
 
@@ -685,37 +686,6 @@ class _OrderCard extends StatelessWidget {
                     // Vehicle type (left) + Price (right) top row
                     Row(
                       children: [
-                        // Vehicle type badge
-                        // if (order.preferenceTransport != null &&
-                        //     order.preferenceTransport!.isNotEmpty)
-                        //   Container(
-                        //     padding: EdgeInsets.symmetric(
-                        //         horizontal: r.sp8, vertical: r.sp4),
-                        //     decoration: BoxDecoration(
-                        //       color: AppColors.primary.withValues(alpha: 0.08),
-                        //       borderRadius: BorderRadius.circular(r.s(6)),
-                        //       border: Border.all(
-                        //         color: AppColors.primary.withValues(alpha: 0.2),
-                        //       ),
-                        //     ),
-                        //     child: Row(
-                        //       mainAxisSize: MainAxisSize.min,
-                        //       children: [
-                        //         Icon(Icons.local_shipping_outlined,
-                        //             size: r.s(12),
-                        //             color: AppColors.primary),
-                        //         SizedBox(width: r.s(4)),
-                        //         Text(
-                        //           order.preferenceTransport!.first,
-                        //           style: TextStyle(
-                        //             fontSize: r.fontXS,
-                        //             color: AppColors.primary,
-                        //             fontWeight: FontWeight.w600,
-                        //           ),
-                        //         ),
-                        //       ],
-                        //     ),
-                        //   ),
                         const Spacer(),
                         // Price badge-
                         if (hasPrice)
@@ -1522,100 +1492,11 @@ class _OrderDetailSheet extends StatelessWidget {
                   ],
                 ),
                 // ── Images ───────────────────────────────────────
-                Builder(builder: (context) {
-                  // Collect all image URLs from both imageUrl (String)
-                  // and imageUrls (List<String>) fields, resolve relative paths
-                  const String baseUrl = 'http://YOUR_SERVER_BASE_URL'; // ← replace with your server base URL
-                  String resolve(String url) {
-                    if (url.isEmpty) return '';
-                    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-                    return '$baseUrl$url'; // prepend base for relative paths like /order_images/...
-                  }
-
-                  final List<String> images = [];
-                  if (order.imageUrl.isNotEmpty) {
-                    images.add(resolve(order.imageUrl));
-                  }
-                  if (order.imageUrls != null) {
-                    for (final u in order.imageUrls!) {
-                      final resolved = resolve(u);
-                      if (resolved.isNotEmpty && !images.contains(resolved)) {
-                        images.add(resolved);
-                      }
-                    }
-                  }
-
-                  if (images.isEmpty) return const SizedBox.shrink();
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: r.s(14)),
-                      Text(
-                        'Product Images',
-                        style: TextStyle(
-                          fontSize: r.fontXS,
-                          color: Colors.grey.shade400,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                      SizedBox(height: r.sp8),
-                      SizedBox(
-                        height: r.s(110),
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: images.length,
-                          itemBuilder: (context, i) {
-                            return GestureDetector(
-                              onTap: () => _showImageFullscreen(context, images, i),
-                              child: Container(
-                                width: r.s(110),
-                                height: r.s(110),
-                                margin: EdgeInsets.only(right: r.sp8),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(r.borderRadius),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(r.borderRadius),
-                                  child: Image.network(
-                                    images[i],
-                                    fit: BoxFit.cover,
-                                    loadingBuilder: (ctx, child, progress) {
-                                      if (progress == null) return child;
-                                      return Center(
-                                        child: SizedBox(
-                                          width: r.s(20),
-                                          height: r.s(20),
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: r.s(2),
-                                            color: AppColors.primary,
-                                            value: progress.expectedTotalBytes != null
-                                                ? progress.cumulativeBytesLoaded /
-                                                progress.expectedTotalBytes!
-                                                : null,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    errorBuilder: (ctx, error, stack) => Center(
-                                      child: Icon(
-                                        Icons.broken_image_outlined,
-                                        size: r.s(28),
-                                        color: Colors.grey.shade300,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                }),
+                _OrderImageGallery(
+                  order: order,
+                  r: r,
+                  onImageTap: (images, index) => _showImageFullscreen(context, images, index),
+                ),
               ],
             ),
           ),
@@ -1684,6 +1565,201 @@ class _OrderDetailSheet extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// _OrderImageGallery – Horizontally scrollable images with arrow indicators
+// ═══════════════════════════════════════════════════════════════════════════
+class _OrderImageGallery extends StatefulWidget {
+  final Order order;
+  final _R r;
+  final Function(List<String>, int) onImageTap;
+
+  const _OrderImageGallery({
+    required this.order,
+    required this.r,
+    required this.onImageTap,
+  });
+
+  @override
+  State<_OrderImageGallery> createState() => _OrderImageGalleryState();
+}
+
+class _OrderImageGalleryState extends State<_OrderImageGallery> {
+  final ScrollController _scrollController = ScrollController();
+  bool _showLeftArrow = false;
+  bool _showRightArrow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_handleScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleScroll());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+    
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.offset;
+    
+    setState(() {
+      _showLeftArrow = currentScroll > 10;
+      _showRightArrow = currentScroll < maxScroll - 10;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.r;
+    final order = widget.order;
+
+    // Resolve relative paths using server base URL
+    String resolve(String url) {
+      if (url.isEmpty) return '';
+      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+      return '${ApiConstants.imagebaseUrl}$url';
+    }
+
+    final List<String> images = [];
+    if (order.imageUrl.isNotEmpty) {
+      images.add(resolve(order.imageUrl));
+    }
+    if (order.imageUrls != null) {
+      for (final u in order.imageUrls!) {
+        final resolved = resolve(u);
+        if (resolved.isNotEmpty && !images.contains(resolved)) {
+          images.add(resolved);
+        }
+      }
+    }
+
+    if (images.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: r.s(14)),
+        Text(
+          'Product Images',
+          style: TextStyle(
+            fontSize: r.fontXS,
+            color: Colors.grey.shade400,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.2,
+          ),
+        ),
+        SizedBox(height: r.sp8),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              height: r.s(110),
+              child: ListView.builder(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                itemCount: images.length,
+                padding: EdgeInsets.symmetric(horizontal: images.length > 3 ? r.sp12 : 0),
+                itemBuilder: (context, i) {
+                  return GestureDetector(
+                    onTap: () => widget.onImageTap(images, i),
+                    child: Container(
+                      width: r.s(110),
+                      height: r.s(110),
+                      margin: EdgeInsets.only(right: r.sp8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(r.borderRadius),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(r.borderRadius),
+                        child: Image.network(
+                          images[i],
+                          fit: BoxFit.cover,
+                          loadingBuilder: (ctx, child, progress) {
+                            if (progress == null) return child;
+                            return Center(
+                              child: SizedBox(
+                                width: r.s(20),
+                                height: r.s(20),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: r.s(2),
+                                  color: AppColors.primary,
+                                  value: progress.expectedTotalBytes != null
+                                      ? progress.cumulativeBytesLoaded /
+                                      progress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (ctx, error, stack) => Center(
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              size: r.s(28),
+                              color: Colors.grey.shade300,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            
+            // Left Arrow
+            if (_showLeftArrow)
+              Positioned(
+                left: -5,
+                child: _ArrowIndicator(icon: Icons.chevron_left_rounded, r: r),
+              ),
+              
+            // Right Arrow
+            if (_showRightArrow)
+              Positioned(
+                right: -5,
+                child: _ArrowIndicator(icon: Icons.chevron_right_rounded, r: r),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Arrow Indicator pill ───────────────────────────────────────────────────
+class _ArrowIndicator extends StatelessWidget {
+  final IconData icon;
+  final _R r;
+  const _ArrowIndicator({required this.icon, required this.r});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: r.s(28),
+      height: r.s(28),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.85),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Icon(icon, size: r.s(20), color: Colors.black87),
     );
   }
 }
