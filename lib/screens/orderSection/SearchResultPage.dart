@@ -975,7 +975,7 @@ class _RouteTracker extends StatelessWidget {
               ),
               // Dashed connector line
               SizedBox(
-                height: r.s(34),
+                height: r.s(37),
                 child: Column(
                   children: List.generate(
                     5,

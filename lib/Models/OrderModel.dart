@@ -13,12 +13,12 @@ class Order {
   final double destinationLongitude;
   final String deliveryDate;
   final String? deliveryTime;
-  final String? departureDate; // Added
-  final String? departureTime; // Added
+  final String? departureDate; 
+  final String? departureTime; 
   final String weight; // API values: "below 2kg", "2-5kg", "5-10kg", "more than 10kg"
   final int? expectedPrice;
   final String imageUrl;
-  final List<String>? imageUrls; // Added for multiple images
+  final List<String>? imageUrls; 
   final String specialInstructions;
   final String status;
   final String? category; // API values: "technology", "documents", "clothing", "fragile", "food", "other"
@@ -29,8 +29,8 @@ class Order {
   final String transportMode;
   final List<String>? preferenceTransport;
   final bool? isUrgent;
-  final String? ownerName; // Added
-  final double? ownerRating; // Added
+  final String? ownerName; 
+  final double? ownerRating; 
 
   Order({
     required this.id,
@@ -65,7 +65,7 @@ class Order {
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
-    // Parse preference_transport (can be array or single string)
+    // Parse preference_transport
     List<String>? preferenceTransport;
     if (json['preference_transport'] != null) {
       if (json['preference_transport'] is String) {
@@ -75,7 +75,7 @@ class Order {
       }
     }
 
-    // Parse is_urgent (can be int 0/1 or boolean)
+    // Parse is_urgent
     bool? isUrgent;
     if (json['is_urgent'] != null) {
       if (json['is_urgent'] is bool) {
@@ -100,8 +100,7 @@ class Order {
         json['delivery_datetime'].toString().isNotEmpty) {
       try {
         String datetime = json['delivery_datetime'].toString();
-        datetime =
-            datetime.replaceAll('.000Z', '').replaceAll('Z', '').trim();
+        datetime = datetime.replaceAll('.000Z', '').replaceAll('Z', '').trim();
 
         if (datetime.contains('T')) {
           final parts = datetime.split('T');
@@ -117,13 +116,12 @@ class Order {
       }
     }
 
-    // Parse pickup_datetime (mapped to departureDate/Time)
+    // Parse pickup_datetime
     if (json['pickup_datetime'] != null &&
         json['pickup_datetime'].toString().isNotEmpty) {
       try {
         String datetime = json['pickup_datetime'].toString();
-        datetime =
-            datetime.replaceAll('.000Z', '').replaceAll('Z', '').trim();
+        datetime = datetime.replaceAll('.000Z', '').replaceAll('Z', '').trim();
 
         if (datetime.contains('T')) {
           final parts = datetime.split('T');
@@ -152,10 +150,29 @@ class Order {
       deliveryDate = 'N/A';
     }
 
+    // Improve Category / Item Description mapping logic
+    String? apiCategory = json['category']?.toString();
+    String? rawItemDesc = json['item_description']?.toString();
+    String mappedDescription = 'Package';
+
+    if (rawItemDesc != null && rawItemDesc.isNotEmpty) {
+      mappedDescription = rawItemDesc;
+    } else if (apiCategory != null && apiCategory.isNotEmpty) {
+      // Try to find the user-friendly name from our predefined categories
+      try {
+        mappedDescription = orderCategories
+            .firstWhere((c) => c.apiValue.toLowerCase() == apiCategory.toLowerCase())
+            .name;
+      } catch (_) {
+        // Fallback: Capitalize technical category string
+        mappedDescription = apiCategory[0].toUpperCase() + apiCategory.substring(1);
+      }
+    }
+
     return Order(
       id: parsedId,
       userName: json['user_name'] ?? json['order_creator_name'] ?? '',
-      itemDescription: json['item_description'] ?? 'Package',
+      itemDescription: mappedDescription,
       origin: json['origin'] ?? '',
       originLatitude: _parseDouble(json['origin_latitude']),
       originLongitude: _parseDouble(json['origin_longitude']),
@@ -174,7 +191,7 @@ class Order {
       imageUrls: json['image_urls'] != null ? List<String>.from(json['image_urls']) : null,
       specialInstructions: json['special_instructions'] ?? '',
       status: json['status'] ?? '',
-      category: json['category'],
+      category: apiCategory,
       subcategory: json['subcategory'],
       distanceKm: json['distance_km'] != null
           ? _parseDouble(json['distance_km'])
