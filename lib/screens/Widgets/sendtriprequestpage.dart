@@ -34,7 +34,7 @@ class SendTripRequestPage extends StatefulWidget {
 class _SendTripRequestPageState extends State<SendTripRequestPage> {
   final vehicleInfoController = TextEditingController();
   final commentsController = TextEditingController();
-  final pnrController = TextEditingController(); // NEW: For PNR/Ticket number
+  final pnrController = TextEditingController(); 
   bool isSubmitting = false;
 
   @override
@@ -47,86 +47,68 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
 
   // Get Vehicle Info label based on transport mode
   String _getVehicleInfoLabel(String transportMode) {
-    switch (transportMode.toLowerCase()) {
-      case 'car': return 'Car Model/Info';
-      case 'train': return 'Train Name/No.';
-      case 'plane':
-      case 'flight': return 'Airlines/Flight No.';
-      case 'bus': return 'Bus Operator/Info';
-      case 'bike':
-      case 'motorcycle': return 'Bike Model/Info';
-      default: return 'Vehicle Info';
-    }
+    final mode = transportMode.toLowerCase();
+    if (mode == 'car') return 'Car Model/Info';
+    if (mode == 'bike' || mode == 'motorcycle' || mode == 'scooter') return 'Bike Model/Info';
+    if (mode == 'train' || mode == 'metro') return 'Train Name/No.';
+    if (mode == 'plane' || mode == 'flight') return 'Airlines/Flight No.';
+    if (mode == 'bus') return 'Bus Operator/Info';
+    if (mode == 'auto' || mode == 'rickshaw') return 'Auto Info';
+    if (mode == 'truck') return 'Truck Info';
+    if (mode == 'van') return 'Van Info';
+    return 'Vehicle Info';
   }
 
   // Get Vehicle Info hint based on transport mode
   String _getVehicleInfoHint(String transportMode) {
-    switch (transportMode.toLowerCase()) {
-      case 'car': return 'e.g. Toyota Camry, White';
-      case 'train': return 'e.g. Rajdhani Express (12301)';
-      case 'plane':
-      case 'flight': return 'e.g. Indigo (6E-2134)';
-      case 'bus': return 'e.g. RedBus / Intercity Operator';
-      case 'bike':
-      case 'motorcycle': return 'e.g. Honda Activa / Royal Enfield';
-      default: return 'Enter vehicle details';
-    }
+    final mode = transportMode.toLowerCase();
+    if (mode == 'car') return 'e.g. Toyota Camry, White';
+    if (mode == 'bike' || mode == 'motorcycle' || mode == 'scooter') return 'e.g. Honda Activa / RE';
+    if (mode == 'train' || mode == 'metro') return 'e.g. Rajdhani Express';
+    if (mode == 'plane' || mode == 'flight') return 'e.g. Flight Indigo 6E-2134';
+    if (mode == 'bus') return 'e.g. Intercity / Volvo Bus';
+    if (mode == 'auto' || mode == 'rickshaw') return 'e.g. Local Auto-rickshaw';
+    if (mode == 'truck') return 'e.g. Tata Truck / Container';
+    if (mode == 'van') return 'e.g. Maruti Omni / Cargo Van';
+    return 'Enter vehicle details';
   }
 
   // Get PNR/Number label based on transport mode
   String _getPnrLabel(String transportMode) {
-    switch (transportMode.toLowerCase()) {
-      case 'car': return 'Vehicle Number';
-      case 'bike':
-      case 'motorcycle': return 'Bike Number';
-      case 'train':
-      case 'plane':
-      case 'flight':
-      case 'bus': return 'PNR / Ticket Number';
-      default: return 'ID / Registration Number';
-    }
+    final mode = transportMode.toLowerCase();
+    if (mode == 'car') return 'Car Number';
+    if (mode == 'bike' || mode == 'motorcycle' || mode == 'scooter') return 'Bike Number';
+    if (mode == 'train' || mode == 'plane' || mode == 'flight') return 'PNR Number';
+    if (mode == 'bus') return 'Ticket Number';
+    if (mode == 'auto' || mode == 'rickshaw') return 'Registration Number';
+    if (mode == 'truck' || mode == 'van') return 'Vehicle Number';
+    return 'PNR / Ticket Number';
   }
 
   // Get placeholder text based on transport mode
   String _getPnrPlaceholder(String transportMode) {
-    switch (transportMode.toLowerCase()) {
-      case 'train':
-        return 'Enter 10-digit PNR';
-      case 'flight':
-      case 'plane':
-        return 'Booking Ref / PNR';
-      case 'bus':
-        return 'Ticket / Seat Number';
-      case 'car':
-        return 'e.g. MH 12 AB 1234';
-      case 'bike':
-      case 'motorcycle':
-        return 'e.g. DL 1S AB 1234';
-      default:
-        return 'Enter identification number';
-    }
+    final mode = transportMode.toLowerCase();
+    if (mode == 'train') return 'Enter 10-digit PNR';
+    if (mode == 'plane' || mode == 'flight') return 'Booking Ref / PNR';
+    if (mode == 'bus') return 'Ticket / Seat Number';
+    if (mode == 'car') return 'e.g. MH 12 AB 1234';
+    if (mode == 'bike' || mode == 'motorcycle' || mode == 'scooter') return 'e.g. DL 1S AB 1234';
+    if (mode == 'auto' || mode == 'rickshaw') return 'e.g. UP 16 AB 9999';
+    return 'Enter identification number';
   }
 
   // Validate PNR format
   bool _validatePnrFormat(String transportMode, String pnr) {
-    if (pnr.isEmpty) return true; // Optional
-
+    if (pnr.isEmpty) return true;
     final cleanPnr = pnr.trim();
-    switch (transportMode.toLowerCase()) {
-      case 'train':
-        return RegExp(r'^\d{10}$').hasMatch(cleanPnr);
-      case 'flight':
-      case 'plane':
-        return cleanPnr.length >= 5 && cleanPnr.length <= 15;
-      case 'bus':
-        return cleanPnr.length >= 3 && cleanPnr.length <= 20;
-      case 'car':
-      case 'bike':
-      case 'motorcycle':
-        return cleanPnr.length >= 4 && cleanPnr.length <= 15;
-      default:
-        return cleanPnr.length >= 3 && cleanPnr.length <= 25;
+    final mode = transportMode.toLowerCase();
+    if (mode == 'train') return RegExp(r'^\d{10}$').hasMatch(cleanPnr);
+    if (mode == 'plane' || mode == 'flight') return cleanPnr.length >= 5 && cleanPnr.length <= 15;
+    if (mode == 'bus') return cleanPnr.length >= 3 && cleanPnr.length <= 20;
+    if (mode == 'car' || mode == 'bike' || mode == 'motorcycle' || mode == 'scooter' || mode == 'auto' || mode == 'rickshaw' || mode == 'truck' || mode == 'van') {
+      return cleanPnr.length >= 4 && cleanPnr.length <= 15;
     }
+    return cleanPnr.length >= 3 && cleanPnr.length <= 25;
   }
 
   void _showSnackBar(String message, Color color) {
@@ -159,26 +141,18 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
 
   Future<void> _submitRequest() async {
     final mode = widget.order.transportMode;
-    // Validate required fields
     if (vehicleInfoController.text.trim().isEmpty) {
       _showSnackBar('Please enter ${_getVehicleInfoLabel(mode)}', Colors.red);
       return;
     }
 
-    // Validate PNR format if provided
     final pnr = pnrController.text.trim();
     if (pnr.isNotEmpty && !_validatePnrFormat(mode, pnr)) {
       String formatHint;
-      switch (mode.toLowerCase()) {
-        case 'train':
-          formatHint = 'Train PNR must be 10 digits';
-          break;
-        case 'car':
-        case 'bike':
-          formatHint = 'Invalid vehicle number format';
-          break;
-        default:
-          formatHint = 'Invalid ${_getPnrLabel(mode)} format';
+      if (mode.toLowerCase() == 'train') {
+        formatHint = 'Train PNR must be 10 digits';
+      } else {
+        formatHint = 'Invalid ${_getPnrLabel(mode)} format';
       }
       _showSnackBar(formatHint, Colors.red);
       return;
@@ -189,22 +163,34 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     });
 
     try {
-      final departureDatetime = '${widget.departureDate}T${widget.departureTime}Z';
-      final deliveryDatetime = '${widget.deliveryDate}T${widget.deliveryTime}Z';
+      // Logic modified to match API documentation provided
+      
+      // Ensure time format is HH:mm:ss for ISO strings
+      String ensureSeconds(String time) {
+        if (time.isEmpty) return "00:00:00";
+        List<String> parts = time.split(':');
+        if (parts.length == 1) return "${parts[0].padLeft(2, '0')}:00:00";
+        if (parts.length == 2) return "${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}:00";
+        return time;
+      }
+
+      // API example shows travel_date and departure_datetime are typically same for trip request
+      final formattedTime = ensureSeconds(widget.departureTime);
+      final departureIsoString = '${widget.departureDate}T${formattedTime}Z';
 
       final tripRequest = TripRequestSendRequest(
         travelerId: widget.currentUserId,
         orderId: widget.order.id,
-        travelDate: deliveryDatetime,
+        travelDate: departureIsoString, // Using departure time as travel_date per API example
         vehicleInfo: vehicleInfoController.text.trim(),
-        vehicleType: mode,
-        pnr: pnr.isNotEmpty ? pnr : null,
+        vehicleType: mode.toLowerCase(), // API expects lowercase type (e.g., "train")
+        pnr: pnr.isNotEmpty ? pnr : "N/A", // Use "N/A" or value to avoid missing field issues if required
         source: widget.order.origin,
         destination: widget.order.destination,
-        departureDatetime: departureDatetime,
+        departureDatetime: departureIsoString,
         comments: commentsController.text.trim().isNotEmpty
             ? commentsController.text.trim()
-            : null,
+            : "No specific comments", // Ensuring comments is sent per API example
       );
 
       final response = await widget.tripRequestService.sendTripRequest(tripRequest);
@@ -218,7 +204,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
           Navigator.pop(context);
           widget.onSuccess(response.tripRequestId, widget.order.userName);
         } else {
-          _showSnackBar('Failed to send request. Please try again.', Colors.red);
+          _showSnackBar('Failed to send request. Please check required fields.', Colors.red);
         }
       }
     } catch (e) {
