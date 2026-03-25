@@ -14,6 +14,7 @@ class SendTripRequestPage extends StatefulWidget {
   final String departureTime;
   final String deliveryDate;
   final String deliveryTime;
+  final String selectedVehicle;
 
   const SendTripRequestPage({
     super.key,
@@ -25,6 +26,7 @@ class SendTripRequestPage extends StatefulWidget {
     required this.departureTime,
     required this.deliveryDate,
     required this.deliveryTime,
+    required this.selectedVehicle,
   });
 
   @override
@@ -45,21 +47,19 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     super.dispose();
   }
 
-  // Get Vehicle Info label based on transport mode
   String _getVehicleInfoLabel(String transportMode) {
     final mode = transportMode.toLowerCase();
     if (mode == 'car') return 'Car Model/Info';
-    if (mode == 'bike' || mode == 'motorcycle' || mode == 'scooter') return 'Bike Model/Info';
-    if (mode == 'train' || mode == 'metro') return 'Train Name/No.';
-    if (mode == 'plane' || mode == 'flight') return 'Airlines/Flight No.';
-    if (mode == 'bus') return 'Bus Operator/Info';
+    if (mode == 'bike' || mode == 'motorcycle' || mode == 'scooter') return 'Bike Info';
+    if (mode == 'train' || mode == 'metro') return 'Train Info';
+    if (mode == 'plane' || mode == 'flight') return 'Plane Info';
+    if (mode == 'bus') return 'Bus Info';
     if (mode == 'auto' || mode == 'rickshaw') return 'Auto Info';
     if (mode == 'truck') return 'Truck Info';
     if (mode == 'van') return 'Van Info';
     return 'Vehicle Info';
   }
 
-  // Get Vehicle Info hint based on transport mode
   String _getVehicleInfoHint(String transportMode) {
     final mode = transportMode.toLowerCase();
     if (mode == 'car') return 'e.g. Toyota Camry, White';
@@ -73,7 +73,6 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     return 'Enter vehicle details';
   }
 
-  // Get PNR/Number label based on transport mode
   String _getPnrLabel(String transportMode) {
     final mode = transportMode.toLowerCase();
     if (mode == 'car') return 'Car Number';
@@ -85,7 +84,6 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     return 'PNR / Ticket Number';
   }
 
-  // Get placeholder text based on transport mode
   String _getPnrPlaceholder(String transportMode) {
     final mode = transportMode.toLowerCase();
     if (mode == 'train') return 'Enter 10-digit PNR';
@@ -97,7 +95,6 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     return 'Enter identification number';
   }
 
-  // Validate PNR format
   bool _validatePnrFormat(String transportMode, String pnr) {
     if (pnr.isEmpty) return true;
     final cleanPnr = pnr.trim();
@@ -140,7 +137,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
   }
 
   Future<void> _submitRequest() async {
-    final mode = widget.order.transportMode;
+    final mode = widget.selectedVehicle;
     if (vehicleInfoController.text.trim().isEmpty) {
       _showSnackBar('Please enter ${_getVehicleInfoLabel(mode)}', Colors.red);
       return;
@@ -163,9 +160,6 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     });
 
     try {
-      // Logic modified to match API documentation provided
-      
-      // Ensure time format is HH:mm:ss for ISO strings
       String ensureSeconds(String time) {
         if (time.isEmpty) return "00:00:00";
         List<String> parts = time.split(':');
@@ -174,23 +168,25 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
         return time;
       }
 
-      // API example shows travel_date and departure_datetime are typically same for trip request
-      final formattedTime = ensureSeconds(widget.departureTime);
-      final departureIsoString = '${widget.departureDate}T${formattedTime}Z';
+      final formattedDepartureTime = ensureSeconds(widget.departureTime);
+      final departureIsoString = '${widget.departureDate}T${formattedDepartureTime}Z';
+      
+      final formattedDeliveryTime = ensureSeconds(widget.deliveryTime);
+      final deliveryIsoString = '${widget.deliveryDate}T${formattedDeliveryTime}Z';
 
       final tripRequest = TripRequestSendRequest(
         travelerId: widget.currentUserId,
         orderId: widget.order.id,
-        travelDate: departureIsoString, // Using departure time as travel_date per API example
+        travelDate: deliveryIsoString,
         vehicleInfo: vehicleInfoController.text.trim(),
-        vehicleType: mode.toLowerCase(), // API expects lowercase type (e.g., "train")
-        pnr: pnr.isNotEmpty ? pnr : "N/A", // Use "N/A" or value to avoid missing field issues if required
+        vehicleType: mode.toLowerCase(), 
+        pnr: pnr.isNotEmpty ? pnr : "N/A", 
         source: widget.order.origin,
         destination: widget.order.destination,
         departureDatetime: departureIsoString,
         comments: commentsController.text.trim().isNotEmpty
             ? commentsController.text.trim()
-            : "No specific comments", // Ensuring comments is sent per API example
+            : "No specific comments", 
       );
 
       final response = await widget.tripRequestService.sendTripRequest(tripRequest);
@@ -319,7 +315,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
 
   @override
   Widget build(BuildContext context) {
-    final transportMode = widget.order.transportMode;
+    final transportMode = widget.selectedVehicle;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

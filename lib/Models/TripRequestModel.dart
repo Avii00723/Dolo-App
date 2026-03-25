@@ -68,8 +68,8 @@ class TripRequestSendResponse {
 
   factory TripRequestSendResponse.fromJson(Map<String, dynamic> json) {
     return TripRequestSendResponse(
-      message: json['message'] as String,
-      tripRequestId: json['tripRequestId']?.toString() ?? '',
+      message: json['message']?.toString() ?? '',
+      tripRequestId: (json['tripRequestId'] ?? json['trip_request_id'] ?? json['hashed_id'] ?? '').toString(),
     );
   }
 

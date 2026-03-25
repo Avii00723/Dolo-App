@@ -248,6 +248,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           departureTime: widget.departureTime,
           deliveryDate: widget.deliveryDate,
           deliveryTime: widget.deliveryTime,
+          selectedVehicle: widget.searchedVehicle,
           onSuccess: (tripRequestId, orderOwner) {
             Navigator.pop(context);
             Navigator.pop(context);
