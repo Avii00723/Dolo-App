@@ -59,7 +59,7 @@ class AppTheme {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppColors.denim.withValues(alpha: 0.08)),
+        side: BorderSide(color: AppColors.denim.withOpacity(0.08)),
       ),
     ),
 
@@ -104,7 +104,7 @@ class AppTheme {
         return Colors.white;
       }),
       trackColor: WidgetStateProperty.resolveWith<Color?>((states) {
-        if (states.contains(WidgetState.selected)) return AppColors.denim.withValues(alpha: 0.45);
+        if (states.contains(WidgetState.selected)) return AppColors.denim.withOpacity(0.45);
         return const Color(0xFFCCCCCC);
       }),
     ),
@@ -114,29 +114,29 @@ class AppTheme {
       linearTrackColor: Color(0xFFD8D8D8),
     ),
 
-    dividerColor: AppColors.denim.withValues(alpha: 0.12),
+    dividerColor: AppColors.denim.withOpacity(0.12),
 
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.denim.withValues(alpha: 0.25)),
+        borderSide: BorderSide(color: AppColors.denim.withOpacity(0.25)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.denim.withValues(alpha: 0.2)),
+        borderSide: BorderSide(color: AppColors.denim.withOpacity(0.2)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.denim, width: 1.8),
       ),
       labelStyle: const TextStyle(color: Color(0xFF777777)),
-      hintStyle: TextStyle(color: AppColors.obsidian.withValues(alpha: 0.35)),
+      hintStyle: TextStyle(color: AppColors.obsidian.withOpacity(0.35)),
     ),
 
     chipTheme: ChipThemeData(
-      backgroundColor: AppColors.teaGreen.withValues(alpha: 0.25),
+      backgroundColor: AppColors.teaGreen.withOpacity(0.25),
       selectedColor: AppColors.denim,
       labelStyle: const TextStyle(color: AppColors.obsidian),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -183,7 +183,7 @@ class AppTheme {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppColors.denimDark.withValues(alpha: 0.25)),
+        side: BorderSide(color: AppColors.denimDark.withOpacity(0.25)),
       ),
     ),
 
@@ -212,7 +212,7 @@ class AppTheme {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.seashell,
-        side: BorderSide(color: AppColors.seashell.withValues(alpha: 0.4), width: 1.5),
+        side: BorderSide(color: AppColors.seashell.withOpacity(0.4), width: 1.5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
       ),
@@ -220,7 +220,7 @@ class AppTheme {
 
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: AppColors.seashell.withValues(alpha: 0.85),
+        foregroundColor: AppColors.seashell.withOpacity(0.85),
       ),
     ),
 
@@ -230,39 +230,39 @@ class AppTheme {
         return const Color(0xFF888888);
       }),
       trackColor: WidgetStateProperty.resolveWith<Color?>((states) {
-        if (states.contains(WidgetState.selected)) return AppColors.denimDark.withValues(alpha: 0.7);
+        if (states.contains(WidgetState.selected)) return AppColors.denimDark.withOpacity(0.7);
         return const Color(0xFF444444);
       }),
     ),
 
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: AppColors.denimDark,
-      linearTrackColor: AppColors.seashell.withValues(alpha: 0.15),
+      linearTrackColor: AppColors.seashell.withOpacity(0.15),
     ),
 
-    dividerColor: AppColors.seashell.withValues(alpha: 0.1),
+    dividerColor: AppColors.seashell.withOpacity(0.1),
 
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: const Color(0xFF2A2A2A),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.seashell.withValues(alpha: 0.12)),
+        borderSide: BorderSide(color: AppColors.seashell.withOpacity(0.12)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.seashell.withValues(alpha: 0.1)),
+        borderSide: BorderSide(color: AppColors.seashell.withOpacity(0.1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: AppColors.denimDark, width: 1.8),
       ),
-      labelStyle: TextStyle(color: AppColors.seashell.withValues(alpha: 0.5)),
-      hintStyle: TextStyle(color: AppColors.seashell.withValues(alpha: 0.3)),
+      labelStyle: TextStyle(color: AppColors.seashell.withOpacity(0.5)),
+      hintStyle: TextStyle(color: AppColors.seashell.withOpacity(0.3)),
     ),
 
     chipTheme: ChipThemeData(
-      backgroundColor: AppColors.teaGreen.withValues(alpha: 0.15),
+      backgroundColor: AppColors.teaGreen.withOpacity(0.15),
       selectedColor: AppColors.denimDark,
       labelStyle: const TextStyle(color: AppColors.seashell),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

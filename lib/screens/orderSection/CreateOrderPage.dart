@@ -10,6 +10,7 @@ import '../../Controllers/OrderService.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ProfileService.dart';
 import '../../Constants/colorconstant.dart';
+import '../../Constants/ApiConstants.dart';
 import '../../Models/OrderModel.dart';
 import '../../Models/LoginModel.dart';
 import '../LoginScreens/kyc_screen.dart';
@@ -101,8 +102,8 @@ class _PlacesFieldState extends State<_PlacesField> {
         GooglePlacesAutoCompleteTextFormField(
           textEditingController: _controller,
           focusNode: _focusNode,
-          config: const GoogleApiConfig(
-            apiKey: 'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
+          config: GoogleApiConfig(
+            apiKey: ApiConstants.googleMapsApiKey,
             countries: ['in'],
             fetchPlaceDetailsWithCoordinates: true,
             debounceTime: 400,

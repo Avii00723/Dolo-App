@@ -7,11 +7,11 @@ class TrustScoreWidget extends StatelessWidget {
   final bool isCompact;
 
   const TrustScoreWidget({
-    Key? key,
+    super.key,
     required this.trustScore,
     this.showBreakdown = true,
     this.isCompact = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

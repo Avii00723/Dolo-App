@@ -2,14 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../../Controllers/KYCService.dart';
+import '../../Models/LoginModel.dart';
 import '../home/homepage.dart';
 
 class KycUploadScreen extends StatefulWidget {
   final String userId;
+  final String? fullName;
+  final String? email;
+  final String? phone;
 
   const KycUploadScreen({
     Key? key,
     required this.userId,
+    this.fullName,
+    this.email,
+    this.phone,
   }) : super(key: key);
 
   @override
@@ -21,11 +28,11 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
   final PageController _pageController = PageController();
 
   // Form controllers
-  final TextEditingController _fullNameController = TextEditingController();
+  late final TextEditingController _fullNameController;
   final TextEditingController _homeCityController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+  late final TextEditingController _phoneController;
   final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
+  late final TextEditingController _emailController;
 
   int _currentStep = 0;
   String? _selectedDocumentType;
@@ -34,6 +41,14 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
   String? _fileExtension;
   bool _isUploading = false;
   double _uploadProgress = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fullNameController = TextEditingController(text: widget.fullName);
+    _phoneController = TextEditingController(text: widget.phone);
+    _emailController = TextEditingController(text: widget.email);
+  }
 
   @override
   void dispose() {
@@ -118,6 +133,8 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
     try {
       final response = await _kycService.uploadKyc(
         userId: widget.userId,
+        permanentAddress: _addressController.text.trim(),
+        homeCity: _homeCityController.text.trim(),
         file: _selectedFile!,
         onProgress: (progress) {
           setState(() {
@@ -129,7 +146,7 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
       if (response != null) {
         print('KYC Upload Success: ${response.message}');
         print('KYC Status: ${response.kycStatus}');
-        print('File URL: ${response.fileUrl}');
+        print('File URL: ${response.fileURL}');
 
         _showSuccessDialog(response);
       } else {

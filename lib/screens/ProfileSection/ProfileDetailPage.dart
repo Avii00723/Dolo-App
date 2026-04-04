@@ -282,11 +282,11 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                             fit: BoxFit.cover,
                           ),
                         )
-                            : (widget.userProfile.photoURL.isNotEmpty
+                            : (widget.userProfile.photoURL != null && widget.userProfile.photoURL!.isNotEmpty
                             ? ClipOval(
                           child: Image.network(
-                            widget.userProfile.photoURL.startsWith('http')
-                                ? widget.userProfile.photoURL
+                            widget.userProfile.photoURL!.startsWith('http')
+                                ? widget.userProfile.photoURL!
                                 : '${ApiConstants.imagebaseUrl}${widget.userProfile.photoURL}',
                             width: 120,
                             height: 120,

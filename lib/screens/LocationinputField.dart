@@ -45,7 +45,7 @@ class _EnhancedLocationInputFieldState
               readOnly: true,
               decoration: InputDecoration(
                 hintText: widget.hint,
-                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35), fontSize: 14),
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35), fontSize: 14),
                 prefixIcon: Icon(widget.icon, size: 20, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                 filled: true,
                 fillColor: Theme.of(context).colorScheme.surface,
@@ -375,9 +375,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                             ),
                             child: GooglePlacesAutoCompleteTextFormField(
                               textEditingController: _searchController,
-                              config: const GoogleApiConfig(
-                                apiKey:
-                                'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
+config: const GoogleApiConfig(
+                                apiKey: 'AIzaSyD1p7YCYS0TKCVDqJSGU_x2nJgquJy92Es',
                                 countries: ['in'],
                                 fetchPlaceDetailsWithCoordinates: true,
                                 debounceTime: 400,
@@ -424,8 +423,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                               },
                               decoration: InputDecoration(
                                 hintText: 'Search for a location...',
-                                hintStyle: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                hintStyle: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                                   fontSize: 16,
                                 ),
                                 prefixIcon: Padding(
@@ -433,7 +432,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                                       left: 16, right: 12),
                                   child: Icon(
                                     Icons.search,
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
                                     size: 22,
                                   ),
                                 ),

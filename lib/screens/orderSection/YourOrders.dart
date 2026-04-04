@@ -260,7 +260,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             id: request.id,
             orderId: request.orderId,
             travellerId: request.travelerId,
-            travellerName: request.travelerName ?? 'Traveler ${request.travelerId}',
+            travellerName: request.travelerName ?? request.travelerId,
             vehicleInfo: request.vehicleInfo,
             departureDatetime: request.departureDatetime,
             travelDate: request.travelDate,

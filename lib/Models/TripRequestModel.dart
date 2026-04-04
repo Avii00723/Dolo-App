@@ -6,7 +6,8 @@ class TripRequestSendRequest {
   final String travelerId;
   final String orderId;
   final String travelDate; // Format: YYYY-MM-DDTHH:MM:SSZ (delivery datetime)
-  final String vehicleInfo;
+  final String info;
+  final String number;
   final String source;
   final String destination;
   final String departureDatetime; // Format: YYYY-MM-DDTHH:MM:SSZ
@@ -18,7 +19,8 @@ class TripRequestSendRequest {
     required this.travelerId,
     required this.orderId,
     required this.travelDate,
-    required this.vehicleInfo,
+    required this.info,
+    required this.number,
     required this.source,
     required this.destination,
     required this.departureDatetime,
@@ -32,7 +34,9 @@ class TripRequestSendRequest {
       'traveler_id': travelerId,
       'order_id': orderId,
       'travel_date': travelDate, // ISO datetime format
-      'vehicle_info': vehicleInfo,
+      'info': info,
+      'number': number,
+      'vehicle_type': vehicleType ?? '',
       'source': source,
       'destination': destination,
       'departure_datetime': departureDatetime, // ISO datetime format
@@ -147,6 +151,8 @@ class TripRequest {
   final String? origin; // Additional field from API (same as source typically)
   final String? createdAt;
   final String? comments;
+  final String? counterpartName;
+  final String? travelerName;
 
   TripRequest({
     required this.id,
@@ -161,6 +167,8 @@ class TripRequest {
     this.origin,
     this.createdAt,
     this.comments,
+    this.counterpartName,
+    this.travelerName,
   });
 
   factory TripRequest.fromJson(Map<String, dynamic> json) {
@@ -177,6 +185,8 @@ class TripRequest {
       origin: json['origin']?.toString(),
       createdAt: json['created_at']?.toString(),
       comments: json['comments']?.toString(),
+      counterpartName: json['counterpartName']?.toString(),
+      travelerName: json['travelerName']?.toString(),
     );
   }
 
@@ -194,6 +204,8 @@ class TripRequest {
       'origin': origin,
       'created_at': createdAt,
       'comments': comments,
+      'counterpartName': counterpartName,
+      'travelerName': travelerName,
     };
   }
 }

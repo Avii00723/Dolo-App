@@ -186,7 +186,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               Icon(
                 Icons.notifications_off_outlined,
                 size: 80,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.25),
               ),
               const SizedBox(height: 24),
               Text(
@@ -194,7 +194,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
                 ),
               ),
               const SizedBox(height: 12),

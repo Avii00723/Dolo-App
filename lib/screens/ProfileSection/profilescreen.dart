@@ -699,11 +699,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                             child: CircleAvatar(
                               radius: 50,
                               backgroundColor: Colors.grey[300],
-                              child: userProfile?.photoURL != null && userProfile!.photoURL.isNotEmpty
+                              child: userProfile?.photoURL != null && userProfile!.photoURL!.isNotEmpty
                                   ? ClipOval(
                                 child: Image.network(
-                                  userProfile!.photoURL.startsWith('http')
-                                      ? userProfile!.photoURL
+                                  userProfile!.photoURL!.startsWith('http')
+                                      ? userProfile!.photoURL!
                                       : '${ApiConstants.imagebaseUrl}${userProfile!.photoURL}',
                                   width: 100,
                                   height: 100,

@@ -39,6 +39,7 @@ class ApiService {
   final Map<String, String> defaultHeaders = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'X-Tunnel-Skip-AntiCsrf-Check': '1', // Required for MS Dev Tunnels
   };
 
   // Helper to build the full endpoint URL
@@ -156,6 +157,9 @@ class ApiService {
     try {
       final url = buildUrl(endpoint);
       final request = http.MultipartRequest('POST', Uri.parse(url));
+
+      // Add default headers first
+      request.headers.addAll(defaultHeaders);
 
       if (headers != null) {
         request.headers.addAll(headers);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_places_autocomplete_text_field/google_places_autocomplete_text_field.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../Constants/colorconstant.dart';
+import '../../Constants/ApiConstants.dart';
 
 // This mixin adds the buildLocationAutocompleteField method to your state class
 mixin LocationAutocompleteMixin<T extends StatefulWidget> on State<T>{
@@ -19,15 +20,13 @@ mixin LocationAutocompleteMixin<T extends StatefulWidget> on State<T>{
     required bool isOrigin,
     required String helperText,
   }) {
-    final Position? currentPosition = isOrigin ? originPosition : destinationPosition;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         GooglePlacesAutoCompleteTextFormField(
           textEditingController: controller,
-          config: const GoogleApiConfig(
-            apiKey: 'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
+          config: GoogleApiConfig(
+            apiKey: ApiConstants.googleMapsApiKey,
             countries: ['in'],
             fetchPlaceDetailsWithCoordinates: true,
             debounceTime: 400,
@@ -91,30 +90,6 @@ mixin LocationAutocompleteMixin<T extends StatefulWidget> on State<T>{
             labelStyle: TextStyle(color: AppColors.primary),
           ),
         ),
-        // if (currentPosition != null) ...[
-        //   const SizedBox(height: 8),
-        //   Container(
-        //     padding: const EdgeInsets.all(8),
-        //     decoration: BoxDecoration(
-        //       color: Colors.green[50],
-        //       borderRadius: BorderRadius.circular(8),
-        //       border: Border.all(color: Colors.green[200]!),
-        //     ),
-        //     child: Row(
-        //       children: [
-        //         Icon(Icons.location_on, color: Colors.green[700], size: 16),
-        //         const SizedBox(width: 8),
-        //         Expanded(
-        //           child: Text(
-        //             'Lat: ${currentPosition.latitude.toStringAsFixed(6)}, '
-        //                 'Lng: ${currentPosition.longitude.toStringAsFixed(6)}',
-        //             style: TextStyle(color: Colors.green[700], fontSize: 12),
-        //           ),
-        //         ),
-        //       ],
-        //     ),
-        //   ),
-        // ],
         if (helperText.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(

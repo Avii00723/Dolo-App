@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:google_places_autocomplete_text_field/google_places_autocomplete_text_field.dart';
 import '../Constants/colorconstant.dart';
+import '../Constants/ApiConstants.dart';
 import '../../Models/OrderModel.dart';
 import '../../Models/TripRequestModel.dart';
 import '../Controllers/OrderService.dart';
@@ -111,7 +112,7 @@ class _PlacesFieldState extends State<_PlacesField> {
           textEditingController: _controller,
           focusNode: _focusNode,
           config: const GoogleApiConfig(
-            apiKey: 'AIzaSyBin4hsTqp0DSLCzjmQwuB78hBHZRhG_3Y',
+            apiKey: ApiConstants.googleMapsApiKey,
             countries: ['in'],
             fetchPlaceDetailsWithCoordinates: true,
             debounceTime: 400,
@@ -390,6 +391,12 @@ class _SendPageState extends State<SendPage> {
     'Car', 'Bike', 'Pickup Truck', 'Truck', 'Bus', 'Train', 'Plane'
   ];
 
+  // ── New fields for API
+  String _infoText = '';
+  String _phoneNumber = '';
+  final TextEditingController _infoController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+
   // ── Services ──────────────────────────────────────────────────────────────
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
@@ -420,8 +427,8 @@ class _SendPageState extends State<SendPage> {
   void dispose() {
     departureController.dispose();
     deliveryController.dispose();
-    // No other controllers or focus nodes to dispose —
-    // they all live inside widget States and are cleaned up automatically.
+    _infoController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -636,7 +643,8 @@ class _SendPageState extends State<SendPage> {
         travelerId: currentUserId!,
         orderId: order.id,
         travelDate: '${_selectedDate}T$_selectedTime', // Updated to ISO format
-        vehicleInfo: selectedVehicle ?? 'Car',
+        info: _infoController.text.isEmpty ? selectedVehicle ?? 'Car' : _infoController.text,
+        number: _phoneController.text.isEmpty ? 'N/A' : _phoneController.text,
         source: _fromText,
         destination: _toText,
         departureDatetime: '${_departureDate}T$_departureTime', // Updated to ISO format
@@ -793,6 +801,10 @@ class _SendPageState extends State<SendPage> {
               _selectDeliveryDateTime),
           const SizedBox(height: 16),
           _buildVehicleDropdown(),
+          const SizedBox(height: 16),
+          _buildTextField(_infoController, 'Vehicle Info', 'Red Swift Dzire / Train Coach S3', Icons.info_outline),
+          const SizedBox(height: 16),
+          _buildTextField(_phoneController, 'Phone Number', '1234567890', Icons.phone),
           const SizedBox(height: 30),
           SizedBox(
             width: double.infinity,
@@ -807,19 +819,50 @@ class _SendPageState extends State<SendPage> {
               ),
               child: isSearching
                   ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor:
-                    AlwaysStoppedAnimation<Color>(Colors.white)),
-              )
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                    )
                   : const Text('Search Orders'),
             ),
           ),
           const SizedBox(height: 20),
         ],
       ),
+    );
+  }
+
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    String hint,
+    IconData icon,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: label.contains('Phone') ? TextInputType.phone : TextInputType.text,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: Icon(icon),
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1040,4 +1083,4 @@ class _SendPageState extends State<SendPage> {
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: color));
   }
-}-+
+}

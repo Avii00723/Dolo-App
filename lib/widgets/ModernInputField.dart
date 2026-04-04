@@ -20,8 +20,8 @@ class ModernInputField extends StatefulWidget {
   final bool showLabel;
   final bool showClearButton;
 
-  const ModernInputField({
-    Key? key,
+const ModernInputField({
+    super.key,
     required this.controller,
     required this.label,
     required this.hint,
@@ -38,7 +38,7 @@ class ModernInputField extends StatefulWidget {
     this.inputFormatters,
     this.showLabel = true,
     this.showClearButton = true,
-  }) : super(key: key);
+  });
 
   @override
   State<ModernInputField> createState() => _ModernInputFieldState();
@@ -115,7 +115,7 @@ class _ModernInputFieldState extends State<ModernInputField> {
                   inputFormatters: widget.inputFormatters,
                   style: TextStyle(
                     fontSize: 16,
-                    color: widget.enabled ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
@@ -128,7 +128,7 @@ class _ModernInputFieldState extends State<ModernInputField> {
                         widget.prefixIcon,
                         color: _isFocused
                             ? AppColors.primary
-                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+                            : Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
                         size: 22,
                       ),
                     )
@@ -137,7 +137,7 @@ class _ModernInputFieldState extends State<ModernInputField> {
                         ? IconButton(
                       icon: Icon(
                         Icons.close,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                         size: 20,
                       ),
                       onPressed: () {
@@ -191,8 +191,8 @@ class _ModernInputFieldState extends State<ModernInputField> {
                     style: TextStyle(
                       fontSize: isLabelFloating ? 13 : 16,
                       color: isLabelFloating
-                          ? (_isFocused ? AppColors.primary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))
-                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+                          ? (_isFocused ? AppColors.primary : Theme.of(context).colorScheme.onSurface.withOpacity(0.55))
+                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.55),
                       fontWeight:
                       isLabelFloating ? FontWeight.w600 : FontWeight.normal,
                     ),
@@ -231,7 +231,7 @@ class _ModernInputFieldState extends State<ModernInputField> {
                 '${widget.controller.text.length}/${widget.maxLength}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                 ),
               ),
             ),
@@ -273,7 +273,7 @@ class ModernButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           elevation: 0,
-          disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+          disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.15),
         ),
         child: isLoading
             ? const SizedBox(
