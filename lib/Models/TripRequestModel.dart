@@ -53,6 +53,7 @@ class TripRequestSendRequest {
       json['pnr'] = pnr!;
     }
 
+    print('📤 Trip Request JSON: $json');
     return json;
   }
 }
@@ -67,9 +68,10 @@ class TripRequestSendResponse {
   });
 
   factory TripRequestSendResponse.fromJson(Map<String, dynamic> json) {
+    print('📥 Trip Request Response: $json');
     return TripRequestSendResponse(
-      message: json['message']?.toString() ?? '',
-      tripRequestId: (json['tripRequestId'] ?? json['trip_request_id'] ?? json['hashed_id'] ?? '').toString(),
+      message: json['message'] as String,
+      tripRequestId: json['tripRequestId']?.toString() ?? '',
     );
   }
 
@@ -136,15 +138,8 @@ class TripRequest {
   final String id; // Maps to hashed_id from API
   final String travelerId; // Maps to traveler_hashed_id from API
   final String orderId; // Maps to order_hashed_id from API
-  final String? userHashedId;
-  final String? travelerName;
-  final String? orderCreatorName;
-  final String? myRole;
-  final String? counterpartName;
   final String travelDate;
   final String vehicleInfo;
-  final String? vehicleType;
-  final String? pnr;
   final String source;
   final String destination;
   final String departureDatetime; // Updated: API now uses departure_datetime
@@ -157,15 +152,8 @@ class TripRequest {
     required this.id,
     required this.travelerId,
     required this.orderId,
-    this.userHashedId,
-    this.travelerName,
-    this.orderCreatorName,
-    this.myRole,
-    this.counterpartName,
     required this.travelDate,
     required this.vehicleInfo,
-    this.vehicleType,
-    this.pnr,
     required this.source,
     required this.destination,
     required this.departureDatetime,
@@ -178,17 +166,10 @@ class TripRequest {
   factory TripRequest.fromJson(Map<String, dynamic> json) {
     return TripRequest(
       id: json['hashed_id']?.toString() ?? '',
-      travelerId: json['traveler_id']?.toString() ?? json['traveler_hashed_id']?.toString() ?? '',
-      orderId: json['order_id']?.toString() ?? json['order_hashed_id']?.toString() ?? '',
-      userHashedId: json['user_hashed_id']?.toString(),
-      travelerName: json['traveler_name']?.toString(),
-      orderCreatorName: json['order_creator_name']?.toString(),
-      myRole: json['my_role']?.toString(),
-      counterpartName: json['counterpart_name']?.toString(),
+      travelerId: json['traveler_id']?.toString() ?? '',
+      orderId: json['order_id']?.toString() ?? '',
       travelDate: json['travel_date']?.toString() ?? '',
       vehicleInfo: json['vehicle_info']?.toString() ?? '',
-      vehicleType: json['vehicle_type']?.toString(),
-      pnr: json['pnr']?.toString(),
       source: json['source']?.toString() ?? '',
       destination: json['destination']?.toString() ?? '',
       departureDatetime: json['departure_datetime']?.toString() ?? '',
@@ -202,17 +183,10 @@ class TripRequest {
   Map<String, dynamic> toJson() {
     return {
       'hashed_id': id,
-      'traveler_id': travelerId,
-      'order_id': orderId,
-      'user_hashed_id': userHashedId,
-      'traveler_name': travelerName,
-      'order_creator_name': orderCreatorName,
-      'my_role': myRole,
-      'counterpart_name': counterpartName,
+      'traveler_hashed_id': travelerId,
+      'order_hashed_id': orderId,
       'travel_date': travelDate,
       'vehicle_info': vehicleInfo,
-      'vehicle_type': vehicleType,
-      'pnr': pnr,
       'source': source,
       'destination': destination,
       'departure_datetime': departureDatetime,

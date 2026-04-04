@@ -20,10 +20,10 @@ class TrustScoreWidget extends StatelessWidget {
     }
 
     if (isCompact) {
-      return _buildCompactView(context);
+      return _buildCompactView();
     }
 
-    return _buildDetailedView(context);
+    return _buildDetailedView();
   }
 
   Widget _buildLoadingState() {
@@ -35,25 +35,25 @@ class TrustScoreWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildCompactView(BuildContext context) {
+  Widget _buildCompactView() {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor, width: 1),
+        border: Border.all(color: Colors.grey[300]!, width: 1),
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              const Text(
                 'Trust Score',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: Colors.black87,
                 ),
               ),
               Container(
@@ -78,7 +78,7 @@ class TrustScoreWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
               value: trustScore!.trustScore / trustScore!.maxScore,
-              backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+              backgroundColor: Colors.grey[300],
               valueColor: const AlwaysStoppedAnimation(Color(0xFF001127)),
               minHeight: 6,
             ),
@@ -88,11 +88,11 @@ class TrustScoreWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailedView(BuildContext context) {
+  Widget _buildDetailedView() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -109,12 +109,12 @@ class TrustScoreWidget extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              const Text(
                 'Trust Score',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: Colors.black87,
                 ),
               ),
               Container(
@@ -141,7 +141,7 @@ class TrustScoreWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
               value: trustScore!.trustScore / trustScore!.maxScore,
-              backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+              backgroundColor: Colors.grey[300],
               valueColor: const AlwaysStoppedAnimation(Color(0xFF001127)),
               minHeight: 10,
             ),
@@ -151,7 +151,7 @@ class TrustScoreWidget extends StatelessWidget {
             '${trustScore!.completionPercentage}% Complete',
             style: TextStyle(
               fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Colors.grey[600],
             ),
           ),
           const SizedBox(height: 16),
@@ -161,34 +161,34 @@ class TrustScoreWidget extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Verification Breakdown',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 12),
-                _buildBreakdownItem(context,
+                _buildBreakdownItem(
                   'Phone Verification',
                   trustScore!.phoneVerification,
                   Icons.phone,
                 ),
                 const SizedBox(height: 8),
-                _buildBreakdownItem(context,
+                _buildBreakdownItem(
                   'Email Verification',
                   trustScore!.emailVerification,
                   Icons.email,
                 ),
                 const SizedBox(height: 8),
-                _buildBreakdownItem(context,
+                _buildBreakdownItem(
                   'Profile Picture',
                   trustScore!.profileImage,
                   Icons.image,
                 ),
                 const SizedBox(height: 8),
-                _buildBreakdownItem(context,
+                _buildBreakdownItem(
                   'KYC Verification',
                   trustScore!.kycVerification,
                   Icons.verified_user,
@@ -200,7 +200,7 @@ class TrustScoreWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildBreakdownItem(BuildContext context, String label, int points, IconData icon) {
+  Widget _buildBreakdownItem(String label, int points, IconData icon) {
     final isCompleted = points > 0;
     return Container(
       padding: const EdgeInsets.all(12),
@@ -236,7 +236,7 @@ class TrustScoreWidget extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: Colors.black87,
                   ),
                 ),
                 Text(

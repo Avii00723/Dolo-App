@@ -18,27 +18,26 @@ class ImageUploadResponse {
   factory ImageUploadResponse.fromJson(Map<String, dynamic> json) {
     return ImageUploadResponse(
       message: json['message'] ?? '',
-      imageUrl: json['photoURL'] ?? json['imageUrl'] ?? json['image_url'] ?? '',
-      success: json['photoURL'] != null || json['imageUrl'] != null || json['success'] == true,
+      imageUrl: json['imageUrl'] ?? json['image_url'] ?? '',
+      success: json['success'] ?? false,
     );
   }
 }
 
 class ImageUploadService {
   // Upload profile picture to get image URL
+  // Note: This assumes your backend has an endpoint for uploading profile pictures
+  // If not, you may need to use a third-party service like Firebase Storage or AWS S3
   Future<ImageUploadResponse?> uploadProfilePicture({
     required String userId,
     required File imageFile,
     Function(double)? onProgress,
   }) async {
     try {
-      // Use the correct endpoint from ApiConstants
-      final String url = ApiConstants.uploadProfilePhoto;
-      
       print('┌─────────────────────────────────────');
       print('│ 📤 PROFILE IMAGE UPLOAD REQUEST');
       print('├─────────────────────────────────────');
-      print('│ URL: $url');
+      print('│ URL: ${ApiConstants.baseUrl}/uploads/profile-picture');
       print('│ User ID: $userId');
       print('│ File Path: ${imageFile.path}');
       print('│ File Name: ${imageFile.path.split('/').last}');
@@ -46,7 +45,10 @@ class ImageUploadService {
       print('└─────────────────────────────────────');
 
       // Create multipart request
-      var request = http.MultipartRequest('POST', Uri.parse(url));
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiConstants.baseUrl}/uploads/profile-picture'),
+      );
 
       // Add userId field
       request.fields['userId'] = userId;
@@ -69,10 +71,10 @@ class ImageUploadService {
         contentType = MediaType('image', 'jpeg');
       }
 
-      // Add file using the correct field name 'photo' from the API spec
+      // Add file
       request.files.add(
         await http.MultipartFile.fromPath(
-          'photo',
+          'profilePicture',
           imageFile.path,
           contentType: contentType,
           filename: fileName,
@@ -86,7 +88,7 @@ class ImageUploadService {
 
       // Convert streamed response to regular response
       final responseBytes = await streamedResponse.stream.toBytes();
-      final responseString = utf8.decode(responseBytes);
+      final responseString = String.fromCharCodes(responseBytes);
 
       print('┌─────────────────────────────────────');
       print('│ 📥 PROFILE IMAGE UPLOAD RESPONSE');

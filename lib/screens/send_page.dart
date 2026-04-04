@@ -1040,4 +1040,4 @@ class _SendPageState extends State<SendPage> {
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: color));
   }
-}
+}-+

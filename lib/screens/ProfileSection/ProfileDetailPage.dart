@@ -109,7 +109,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     }
   }
 
-  // Update profile
+  // UPDATED: Update profile - now uploads profile picture if selected
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -120,6 +120,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     });
 
     try {
+      // If there's a new profile image, upload it first
       String? uploadedImageUrl;
       if (_newProfileImage != null) {
         uploadedImageUrl = await _uploadProfileImage();
@@ -132,6 +133,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
         }
       }
 
+      // Update name
       Map<String, dynamic> updates = {
         'name': _nameController.text.trim(),
       };
@@ -142,6 +144,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
       );
 
       if (success) {
+        // If image was uploaded, call complete-profile endpoint
         if (uploadedImageUrl != null) {
           final completeProfileRequest = CompleteProfileRequest(
             userId: widget.userId,
@@ -177,6 +180,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     }
   }
 
+  // UPDATED: Upload profile image and return the image URL
   Future<String?> _uploadProfileImage() async {
     try {
       setState(() {
@@ -195,8 +199,10 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
       );
 
       if (response != null && response.success && response.imageUrl.isNotEmpty) {
+        print('✅ Image uploaded successfully: ${response.imageUrl}');
         return response.imageUrl;
       } else {
+        print('❌ Image upload failed: ${response?.message ?? 'Unknown error'}');
         return null;
       }
     } catch (e) {
@@ -276,21 +282,29 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                             fit: BoxFit.cover,
                           ),
                         )
-                            : (widget.userProfile.photoURL != null && widget.userProfile.photoURL!.isNotEmpty
+                            : (widget.userProfile.photoURL.isNotEmpty
                             ? ClipOval(
                           child: Image.network(
-                            widget.userProfile.photoURL!.startsWith('http')
-                                ? widget.userProfile.photoURL!
+                            widget.userProfile.photoURL.startsWith('http')
+                                ? widget.userProfile.photoURL
                                 : '${ApiConstants.imagebaseUrl}${widget.userProfile.photoURL}',
                             width: 120,
                             height: 120,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
-                              return Icon(Icons.person, size: 60, color: Colors.grey[600]);
+                              return Icon(
+                                Icons.person,
+                                size: 60,
+                                color: Colors.grey[600],
+                              );
                             },
                           ),
                         )
-                            : Icon(Icons.person, size: 60, color: Colors.grey[600])),
+                            : Icon(
+                          Icons.person,
+                          size: 60,
+                          color: Colors.grey[600],
+                        )),
                       ),
                       Positioned(
                         bottom: 0,
@@ -336,7 +350,10 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                     prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
                     filled: true,
                     fillColor: Colors.grey[50],
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(30),
                       borderSide: BorderSide(color: Colors.grey[300]!),
@@ -353,7 +370,7 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Phone Field
+                // Phone Field with checkmark (disabled)
                 TextField(
                   controller: _phoneController,
                   enabled: false,
@@ -364,8 +381,15 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                     suffixIcon: const Icon(Icons.check_circle, color: Colors.green),
                     filled: true,
                     fillColor: Colors.grey[50],
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(30),
                       borderSide: BorderSide(color: Colors.grey[300]!),
                     ),
@@ -377,10 +401,11 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Email Field
+                // Email Field (disabled - cannot be changed per API)
                 TextField(
                   controller: _emailController,
-                  enabled: false,
+                  enabled: false, // Email cannot be changed per API documentation
+                  keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
                     hintText: 'Email address',
                     hintStyle: TextStyle(color: Colors.grey[400]),
@@ -390,7 +415,10 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                         : const Icon(Icons.lock_outline, color: Colors.grey),
                     filled: true,
                     fillColor: Colors.grey[50],
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(30),
                       borderSide: BorderSide(color: Colors.grey[300]!),
@@ -400,6 +428,70 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                       borderSide: BorderSide(color: Colors.grey[300]!),
                     ),
                   ),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Text(
+                    'Email cannot be changed after signup',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Date of Birth Field
+                TextField(
+                  controller: _dobController,
+                  decoration: InputDecoration(
+                    hintText: 'dd/mm/yyyy',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    prefixIcon: Icon(Icons.calendar_today_outlined, color: Colors.grey[600]),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: const BorderSide(color: Color(0xFF001127), width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Gender Selection
+                const Text(
+                  'Gender',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildGenderOption('Female'),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildGenderOption('Male'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
 
@@ -412,16 +504,44 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                       backgroundColor: const Color(0xFF001127),
                       disabledBackgroundColor: Colors.grey[400],
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
                       elevation: 0,
                     ),
                     child: _isUpdating || _isUploadingImage
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
-                          )
-                        : const Text('Save', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        ),
+                        if (_isUploadingImage)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                      ],
+                    )
+                        : const Text(
+                      'Save',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -432,30 +552,49 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                   children: [
                     const Text(
                       'KYC Information',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
                     ),
-                    if (_isKycVerified()) const Icon(Icons.check_circle, color: Colors.green, size: 24),
+                    if (_isKycVerified())
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 24,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 16),
 
                 if (_isKycVerified()) ...[
+                  // KYC Verified - Show Details
                   _buildKycDetailRow('Status', 'Verified'),
                   const SizedBox(height: 12),
-                  _buildKycDetailRow('City', widget.userProfile.homeCity ?? 'Not provided'),
-                  const SizedBox(height: 12),
-                  _buildKycDetailRow('Address', widget.userProfile.permanentAddress ?? 'Not provided'),
+                  _buildKycDetailRow('Document', 'XXXXXXXXXXXX'),
                 ] else ...[
+                  // KYC Not Verified - Show Upload Button
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.upload_file, color: Colors.grey[700]),
                         const SizedBox(width: 12),
-                        Text('Upload KYC Document', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[700])),
+                        Text(
+                          'Upload KYC Document',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -465,10 +604,14 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                 // Account Information Section
                 const Text(
                   'Account Information',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
                 ),
                 const SizedBox(height: 16),
-                _buildAccountInfoRow('User ID', widget.userProfile.hashedId),
+                _buildAccountInfoRow('User ID', widget.userProfile.id.toString()),
                 const SizedBox(height: 12),
                 _buildAccountInfoRow('Last Login', _formatDate(widget.userProfile.lastLogin)),
               ],
@@ -479,12 +622,86 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     );
   }
 
+  Widget _buildGenderOption(String gender) {
+    final isSelected = _selectedGender == gender;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedGender = gender;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF001127) : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF001127) : Colors.grey[400]!,
+                  width: 2,
+                ),
+                color: isSelected ? const Color(0xFF001127) : Colors.transparent,
+              ),
+              child: isSelected
+                  ? const Center(
+                child: Icon(
+                  Icons.circle,
+                  size: 10,
+                  color: Colors.white,
+                ),
+              )
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              gender,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: isSelected ? Colors.black : Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildKycDetailRow(String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 80, child: Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600]))),
-        Expanded(child: Text(value, style: const TextStyle(fontSize: 14, color: Colors.black87))),
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -493,8 +710,25 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 100, child: Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600]))),
-        Expanded(child: Text(value, style: const TextStyle(fontSize: 14, color: Colors.black87))),
+        SizedBox(
+          width: 100,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+        ),
       ],
     );
   }
