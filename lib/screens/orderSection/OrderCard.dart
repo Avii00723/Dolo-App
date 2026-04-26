@@ -2,6 +2,7 @@
 // Shows: flight route, status badge, traveler info, dotted progress tracker
 
 import 'package:flutter/material.dart';
+import '../../Controllers/ordertrackingservice.dart';
 import 'YourOrders.dart';
 
 class ModernSenderOrderCard extends StatelessWidget {
@@ -14,6 +15,8 @@ class ModernSenderOrderCard extends StatelessWidget {
   final VoidCallback? onCompleteOrder;
   final Function(OrderDisplay)? onUpdateOrder;
   final Function(String)? onDeleteOrder;
+  final Function(String orderId, String otp)? onCompleteOrderWithOtp;
+  final Function(String orderId, int stage)? onUpdateStatus;
 
   const ModernSenderOrderCard({
     super.key,
@@ -26,33 +29,19 @@ class ModernSenderOrderCard extends StatelessWidget {
     this.onCompleteOrder,
     this.onUpdateOrder,
     this.onDeleteOrder,
+    this.onCompleteOrderWithOtp,
+    this.onUpdateStatus,
   });
 
   // Map status to progress step (0-4 for 5 dots)
   int _getProgressStep() {
-    switch (order.status.toLowerCase()) {
-      case 'pending':
-        return 0;
-      case 'accepted':
-      case 'matched':
-      case 'booked':
-        return 1;
-      case 'picked_up':
-        return 2;
-      case 'in-transit':
-        return 2;
-      case 'arrived':
-        return 3;
-      case 'delivered':
-        return 4;
-      default:
-        return 0;
-    }
+    return OrderTrackingService.progressStepFromStatus(order.status);
   }
 
   Color _getStatusBgColor(String status) {
     switch (status.toLowerCase()) {
       case 'in-transit':
+      case 'in_transit':
         return const Color(0xFFD4C88A);
       case 'delivered':
         return const Color(0xFFD4C88A);
@@ -69,6 +58,7 @@ class ModernSenderOrderCard extends StatelessWidget {
   Color _getStatusTextColor(String status) {
     switch (status.toLowerCase()) {
       case 'in-transit':
+      case 'in_transit':
         return const Color(0xFF5C4B00);
       case 'delivered':
         return const Color(0xFF3A3A1A);
@@ -85,11 +75,14 @@ class ModernSenderOrderCard extends StatelessWidget {
   String _getStatusLabel(String status) {
     switch (status.toLowerCase()) {
       case 'in-transit':
+      case 'in_transit':
         return 'In Transit';
       case 'delivered':
         return 'Delivered';
       case 'pending':
         return 'Pending';
+      case 'confirmed':
+        return 'Confirmed';
       case 'accepted':
         return 'Accepted';
       case 'matched':
@@ -393,6 +386,8 @@ class ModernSenderOrderCard extends StatelessWidget {
           onCompleteOrder: onCompleteOrder,
           onUpdateOrder: onUpdateOrder,
           onDeleteOrder: onDeleteOrder,
+          onCompleteOrderWithOtp: onCompleteOrderWithOtp,
+          onUpdateStatus: onUpdateStatus,
         ),
       ),
     );
@@ -412,6 +407,8 @@ class OrderDetailScreen extends StatefulWidget {
   final VoidCallback? onCompleteOrder;
   final Function(OrderDisplay)? onUpdateOrder;
   final Function(String)? onDeleteOrder;
+  final Function(String orderId, String otp)? onCompleteOrderWithOtp;
+  final Function(String orderId, int stage)? onUpdateStatus;
 
   const OrderDetailScreen({
     super.key,
@@ -424,6 +421,8 @@ class OrderDetailScreen extends StatefulWidget {
     this.onCompleteOrder,
     this.onUpdateOrder,
     this.onDeleteOrder,
+    this.onCompleteOrderWithOtp,
+    this.onUpdateStatus,
   });
 
   @override
@@ -432,12 +431,13 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _packageDetailExpanded = false;
-  final TextEditingController _otpController = TextEditingController();
+  late OrderDisplay _order;
+  bool _isUpdatingStatus = false;
 
   @override
-  void dispose() {
-    _otpController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _order = widget.order;
   }
 
   String _formatDisplayDate(String date) {
@@ -467,30 +467,151 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   int _getProgressStep() {
-    switch (widget.order.status.toLowerCase()) {
-      case 'pending':
-        return 0;
-      case 'accepted':
-      case 'matched':
-      case 'booked':
-        return 1;
-      case 'picked_up':
-        return 2;
-      case 'in-transit':
-        return 2;
-      case 'arrived':
-        return 3;
-      case 'delivered':
-        return 4;
-      default:
-        return 0;
+    return OrderTrackingService.progressStepFromStatus(_order.status);
+  }
+
+  String _displayOtp() {
+    final otp = _order.otp?.trim();
+    return otp == null || otp.isEmpty
+        ? OrderTrackingService.developmentDeliveryOtp
+        : otp;
+  }
+
+  Future<void> _updateStatus(int stage) async {
+    setState(() => _isUpdatingStatus = true);
+    try {
+      if (widget.onUpdateStatus != null) {
+        await widget.onUpdateStatus!(_order.id, stage);
+      }
+      if (!mounted) return;
+      final newStatus = OrderTrackingService.statusFromStage(stage);
+      setState(() {
+        _order = _order.copyWith(status: newStatus);
+        _isUpdatingStatus = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Status updated to $newStatus'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUpdatingStatus = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating status: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final order = widget.order;
+    final order = _order;
     final progressStep = _getProgressStep();
+
+    // ── Determine sticky action button based on status ──
+    Widget? stickyButton;
+    if (order.status.toLowerCase() == 'pending') {
+      stickyButton = Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _showEditOrderDialog(context),
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Edit Order'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => _showDeleteConfirmation(context),
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const Text('Delete'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[600],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      );
+    } else if (order.status.toLowerCase() == 'confirmed' ||
+        order.status.toLowerCase() == 'accepted' ||
+        order.status.toLowerCase() == 'matched' ||
+        order.status.toLowerCase() == 'booked') {
+      stickyButton = ElevatedButton.icon(
+        onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
+        icon: _isUpdatingStatus
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.inventory_2_outlined, size: 18),
+        label: Text(_isUpdatingStatus ? 'Updating...' : 'Hand over: Mark as Picked Up'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black87,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 2,
+        ),
+      );
+    } else if (order.status.toLowerCase() == 'picked_up') {
+      stickyButton = ElevatedButton.icon(
+        onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
+        icon: _isUpdatingStatus
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.location_on_outlined, size: 18),
+        label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black87,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 2,
+        ),
+      );
+    } else if (order.status.toLowerCase() == 'in-transit' || order.status.toLowerCase() == 'in_transit') {
+      stickyButton = ElevatedButton.icon(
+        onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
+        icon: _isUpdatingStatus
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.location_on_outlined, size: 18),
+        label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black87,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 2,
+        ),
+      );
+    } else if (order.status.toLowerCase() == 'arrived') {
+      stickyButton = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.green[50],
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.green[300]!),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.key_outlined, color: Colors.green[700], size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'Share your OTP above with the traveler',
+              style: TextStyle(
+                color: Colors.green[800],
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -521,6 +642,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: stickyButton != null
+          ? Container(
+        padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Colors.grey[200]!)),
+        ),
+        child: stickyButton,
+      )
+          : null,
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -821,65 +952,99 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                   const SizedBox(height: 20),
                   _buildTrackingTimeline(progressStep),
+
+                  // ── Status Update Buttons (added in Track Package section) ──
+                  if (order.status.toLowerCase() != 'delivered') ...[
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Update Track Package Status',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildStatusUpdateButton(order),
+                  ],
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // ── OTP / Action Buttons (Sender View) ──
-            if (order.status.toLowerCase() == 'in-transit' ||
-                order.status.toLowerCase() == 'arrived') ...[
+            // ── Sender: Show OTP card when order is 'arrived' ──
+            if (order.status.toLowerCase() == 'arrived') ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _showEnterOtpDialog(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(color: Colors.grey[400]!),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.lock_open_outlined, color: Colors.green[700], size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Your Delivery OTP',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.green[800],
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          'Enter OTP',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _displayOtp(),
+                        style: TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.green[800],
+                          letterSpacing: 12,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          widget.onCompleteOrder?.call();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[300],
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text(
-                          'Update to Delivery',
-                          style: TextStyle(
-                            color: Colors.black54,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Share this OTP with the traveler to confirm delivery.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: Colors.green[700]),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // ── Sender: in-transit or other pre-arrival active stages ──
+            if (order.status.toLowerCase() == 'in-transit' || order.status.toLowerCase() == 'in_transit') ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.local_shipping_outlined, color: Colors.orange[700], size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Your package is on its way! Confirm arrival once it reaches the destination.',
+                          style: TextStyle(fontSize: 13, color: Colors.orange[800]),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -895,39 +1060,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ...widget.tripRequests!.map((req) => _buildTripRequestCard(context, req)),
                       const SizedBox(height: 12),
                     ],
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showEditOrderDialog(context),
-                            icon: const Icon(Icons.edit_outlined, size: 16),
-                            label: const Text('Edit Order'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              side: BorderSide(color: Colors.grey[400]!),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showDeleteConfirmation(context),
-                            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                            label: const Text('Delete', style: TextStyle(color: Colors.red)),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              side: BorderSide(color: Colors.red[300]!),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -991,6 +1123,65 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  Widget _buildStatusUpdateButton(OrderDisplay order) {
+    if (order.status.toLowerCase() == 'confirmed' ||
+        order.status.toLowerCase() == 'accepted' ||
+        order.status.toLowerCase() == 'matched' ||
+        order.status.toLowerCase() == 'booked') {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
+          icon: _isUpdatingStatus
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.inventory_2_outlined),
+          label: Text(_isUpdatingStatus ? 'Updating...' : 'Hand over: Mark as Picked Up'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.black87,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      );
+    } else if (order.status.toLowerCase() == 'picked_up') {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
+          icon: _isUpdatingStatus
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.location_on_outlined),
+          label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.black87,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      );
+    } else if (order.status.toLowerCase() == 'in-transit' || order.status.toLowerCase() == 'in_transit') {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
+          icon: _isUpdatingStatus
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.location_on_outlined),
+          label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.black87,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   Widget _buildPackageDetailItem(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1027,10 +1218,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _buildTrackingTimeline(int activeStep) {
     final steps = [
-      ('Order Confirmed', '12 Oct, 25'),
-      ('Picked Up', '15 Oct, 25'),
-      ('IN TRANSIT', '16 Oct, 25'),
-      ('Delivered', '16 Oct, 25'),
+      ('Order Confirmed', 'Order accepted'),
+      ('Picked Up', 'Package collected'),
+      ('In Transit', 'En-route to destination'),
+      ('Arrived', 'At destination'),
+      ('Delivered', 'Delivery complete'),
     ];
 
     return Column(
@@ -1114,74 +1306,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ],
         );
       }),
-    );
-  }
-
-  void _showEnterOtpDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Enter OTP',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Enter the OTP provided by the traveler to confirm delivery.',
-              style: TextStyle(fontSize: 13, color: Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _otpController,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 8,
-              ),
-              decoration: InputDecoration(
-                counterText: '',
-                hintText: '• • • • • •',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.black87, width: 2),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Handle OTP submission
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('OTP ${_otpController.text} submitted'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black87,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Confirm', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1451,6 +1575,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 imageUrl: widget.order.imageUrl,
                                 profileImageUrl: widget.order.profileImageUrl,
                                 matchedTravellerId: widget.order.matchedTravellerId,
+                                otp: widget.order.otp,
                               );
                               Navigator.pop(context);
                               widget.onUpdateOrder?.call(updated);

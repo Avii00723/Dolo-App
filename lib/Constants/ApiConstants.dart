@@ -1,6 +1,6 @@
 class ApiConstants {
-  static const String baseUrl = 'https://v258p7dl-3000.inc1.devtunnels.ms/api';
-  static const String imagebaseUrl = 'https://v258p7dl-3000.inc1.devtunnels.ms';
+  static const String baseUrl = 'https://wz48ntlm-3000.inc1.devtunnels.ms/api';
+  static const String imagebaseUrl = 'https://wz48ntlm-3000.inc1.devtunnels.ms';
 
   // User
   static const String login = '$baseUrl/users/login';

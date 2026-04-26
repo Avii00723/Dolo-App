@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart'; // Add this import
-import 'package:mime/mime.dart'; // Add this import
+import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
 import '../Constants/ApiService.dart';
 import '../Constants/ApiConstants.dart';
 import '../Models/LoginModel.dart';
@@ -22,11 +22,14 @@ class LoginService {
     return response.success ? response.data : null;
   }
 
-  // Verify OTP
+  // Verify OTP - Strictly following documentation schema
   Future<VerifyOtpResponse?> verifyOtp(String phone, String otp) async {
     final response = await _api.post(
       ApiConstants.verifyOtp,
-      body: {'phone': phone, 'otp': otp},
+      body: {
+        'phone': phone,
+        'otp': otp,
+      },
       parser: (json) => VerifyOtpResponse.fromJson(json),
       requiresAuth: false,
     );
@@ -36,39 +39,30 @@ class LoginService {
   // Complete User Profile
   Future<SignupResponse?> completeSignup(SignupRequest request) async {
     try {
-      print('📤 Calling /users/signup API');
-      print('Request body: ${request.toJson()}');
-
+      debugPrint('📤 Calling /users/signup API');
       final response = await _api.post(
-        ApiConstants.completeSignup, // This should be '/users/signup'
+        ApiConstants.completeSignup,
         body: request.toJson(),
         parser: (json) => SignupResponse.fromJson(json),
       );
-
-      print('📥 Signup API response: ${response.data}');
       return response.data;
     } catch (e) {
-      print('❌ Error completing signup: $e');
+      debugPrint('❌ Error completing signup: $e');
       return null;
     }
   }
 
-  // UPDATED: Complete Profile (now only for profile image upload)
+  // Complete Profile (Profile Image)
   Future<CompleteProfileResponse?> completeProfile(CompleteProfileRequest request) async {
     try {
-      print('📤 Calling /users/complete-profile API');
-      print('Request body: ${request.toJson()}');
-
       final response = await _api.post(
-        ApiConstants.completeProfile, // This should be '/users/complete-profile'
+        ApiConstants.completeProfile,
         body: request.toJson(),
         parser: (json) => CompleteProfileResponse.fromJson(json),
       );
-
-      print('📥 Complete Profile API response: ${response.data}');
       return response.data;
     } catch (e) {
-      print('❌ Error completing profile: $e');
+      debugPrint('❌ Error completing profile: $e');
       return null;
     }
   }
@@ -91,7 +85,6 @@ class LoginService {
     return response.success ? response.data : null;
   }
 
-  // Update User Profile by userId
   Future<bool> updateUserProfile(String userId, ProfileUpdateRequest data) async {
     final response = await _api.put(
       '${ApiConstants.updateUserProfile}/$userId',
@@ -100,97 +93,40 @@ class LoginService {
     return response.success;
   }
 
-  // Upload KYC Document - FIXED VERSION WITH PROPER MIME TYPE
+  // Upload KYC Document
   Future<KycUploadResponse?> uploadKycDocument(String userId, File document) async {
     try {
-      // Build the full URL
-      final url = '${ApiConstants.baseUrl}/users/upload-kyc';
-      debugPrint('=== KYC Upload Started ===');
-      debugPrint('URL: $url');
-      debugPrint('UserId: $userId');
-      debugPrint('Document path: ${document.path}');
-      debugPrint('File exists: ${await document.exists()}');
+      final url = ApiConstants.uploadKyc;
+      debugPrint('=== KYC Upload Started === URL: $url');
 
-      // Check if file exists
-      if (!await document.exists()) {
-        debugPrint('ERROR: File does not exist at path: ${document.path}');
-        return null;
-      }
+      if (!await document.exists()) return null;
 
-      // Get the MIME type from file path
       String? mimeType = lookupMimeType(document.path);
-      debugPrint('Detected MIME type: $mimeType');
-
-      // Create multipart request
       var request = http.MultipartRequest('POST', Uri.parse(url));
-
-      // Add userId field
       request.fields['userId'] = userId;
 
-      // Determine content type based on file extension
-      MediaType? contentType;
+      MediaType contentType = MediaType('application', 'octet-stream');
       if (mimeType != null) {
-        final mimeTypeParts = mimeType.split('/');
-        if (mimeTypeParts.length == 2) {
-          contentType = MediaType(mimeTypeParts[0], mimeTypeParts[1]);
-        }
+        final parts = mimeType.split('/');
+        if (parts.length == 2) contentType = MediaType(parts[0], parts[1]);
       }
 
-      // If we couldn't detect MIME type, try to infer from file extension
-      if (contentType == null) {
-        final extension = document.path.split('.').last.toLowerCase();
-        debugPrint('File extension: $extension');
-
-        switch (extension) {
-          case 'jpg':
-          case 'jpeg':
-            contentType = MediaType('image', 'jpeg');
-            break;
-          case 'png':
-            contentType = MediaType('image', 'png');
-            break;
-          case 'pdf':
-            contentType = MediaType('application', 'pdf');
-            break;
-          default:
-            contentType = MediaType('application', 'octet-stream');
-        }
-      }
-
-      debugPrint('Using content type: $contentType');
-
-      // Add document file with proper content type
       var multipartFile = await http.MultipartFile.fromPath(
         'document',
         document.path,
         contentType: contentType,
       );
-
-      debugPrint('File size: ${multipartFile.length} bytes');
-      debugPrint('Content type sent: ${multipartFile.contentType}');
-
       request.files.add(multipartFile);
 
-      // Send request
-      debugPrint('Sending multipart request...');
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        debugPrint('✅ KYC upload successful!');
-        return KycUploadResponse.fromJson(jsonData);
-      } else {
-        debugPrint('ERROR: KYC upload failed with status ${response.statusCode}');
-        debugPrint('Error body: ${response.body}');
-        return null;
+        return KycUploadResponse.fromJson(json.decode(response.body));
       }
-    } catch (e, stackTrace) {
-      debugPrint('EXCEPTION in uploadKycDocument: $e');
-      debugPrint('Stack trace: $stackTrace');
+      return null;
+    } catch (e) {
+      debugPrint('❌ KYC upload Exception: $e');
       return null;
     }
   }

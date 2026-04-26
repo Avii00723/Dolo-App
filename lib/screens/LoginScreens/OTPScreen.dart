@@ -53,10 +53,11 @@ class _OTPScreenState extends State<OTPScreen> {
     });
 
     try {
-      final verifyResponse = await _loginService.verifyOtp(widget.phoneNumber, otp);
+      debugPrint('🔍 Verifying OTP: "$otp" for phone: "${widget.phoneNumber}"');
+      // Calling with 2 parameters as defined in updated LoginService
+      final verifyResponse = await _loginService.verifyOtp(widget.phoneNumber, otp,);
 
       if (verifyResponse != null) {
-        // Check if profile is already complete based on API response
         bool isProfileCompleted = verifyResponse.nextScreen != 'SIGNUP';
 
         await AuthService.saveUserSession(
@@ -65,15 +66,11 @@ class _OTPScreenState extends State<OTPScreen> {
           isProfileCompleted: isProfileCompleted,
         );
 
-        debugPrint('✅ UserId saved to secure storage: ${verifyResponse.userId}');
-        debugPrint('📋 Next screen from API: ${verifyResponse.nextScreen}');
-        debugPrint('👤 Profile Completed: $isProfileCompleted');
-
+        debugPrint('✅ Login Successful. UserId: ${verifyResponse.userId}');
         await DeviceTokenService.initialize();
 
         if (mounted) {
           if (!isProfileCompleted) {
-            debugPrint('✅ Profile incomplete - navigating to SignupScreen');
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
@@ -86,7 +83,6 @@ class _OTPScreenState extends State<OTPScreen> {
                   (route) => false,
             );
           } else {
-            debugPrint('✅ Profile complete - navigating to HomePage');
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
@@ -99,14 +95,15 @@ class _OTPScreenState extends State<OTPScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('OTP verification failed')),
+            const SnackBar(content: Text('Invalid OTP. Please try again.')),
           );
         }
       }
     } catch (e) {
+      debugPrint('❌ OTP verification error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Invalid OTP: ${e.toString()}')),
+          SnackBar(content: Text('Error: ${e.toString()}')),
         );
       }
     } finally {
@@ -130,8 +127,6 @@ class _OTPScreenState extends State<OTPScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 60),
-
-                // Logo
                 Container(
                   width: 140,
                   height: 140,
@@ -150,10 +145,7 @@ class _OTPScreenState extends State<OTPScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 80),
-
-                // Title
                 Text(
                   'Log In To Your\nAccount',
                   textAlign: TextAlign.center,
@@ -164,10 +156,7 @@ class _OTPScreenState extends State<OTPScreen> {
                     height: 1.2,
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
-                // Subtitle
                 Text(
                   'Log In Via Mobile Number Verification',
                   textAlign: TextAlign.center,
@@ -176,10 +165,7 @@ class _OTPScreenState extends State<OTPScreen> {
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
-
                 const SizedBox(height: 40),
-
-                // OTP Verification Card
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -213,8 +199,6 @@ class _OTPScreenState extends State<OTPScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
-
-                      // 6 OTP Input Fields
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: List.generate(
@@ -261,11 +245,9 @@ class _OTPScreenState extends State<OTPScreen> {
                                 ),
                                 onChanged: (value) {
                                   setState(() {});
-
                                   if (value.isNotEmpty && index < 5) {
                                     _otpFocusNodes[index + 1].requestFocus();
                                   }
-
                                   if (index == 5 && value.isNotEmpty) {
                                     String completeOTP = _otpControllers.map((c) => c.text).join();
                                     if (completeOTP.length == 6) {
@@ -278,10 +260,7 @@ class _OTPScreenState extends State<OTPScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 32),
-
-                      // Verify Button
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -317,7 +296,6 @@ class _OTPScreenState extends State<OTPScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 40),
               ],
             ),

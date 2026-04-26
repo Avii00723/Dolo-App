@@ -1,173 +1,175 @@
 import '../Constants/ApiService.dart';
-import '../Constants/ApiConstants.dart';
 
 class OrderTrackingService {
+  static const String developmentDeliveryOtp = '123456';
+
   final ApiService _api = ApiService();
 
-  /// Confirm an order (Stage 0 -> Stage 1)
-  /// POST /order-tracking/{orderId}/confirm
-  Future<bool> confirmOrder(String orderId) async {
-    final endpoint = '/order-tracking/$orderId/confirm';
-    print('=== CONFIRM ORDER API CALL ===');
-    print('Endpoint: $endpoint');
-    print('Order ID: $orderId');
-
+  // ─────────────────────────────────────────────────────────────
+  // GET /order-tracking/track
+  // Returns complete stage history for an order
+  // ─────────────────────────────────────────────────────────────
+  Future<Map<String, dynamic>?> getTrackingHistory(String orderId) async {
+    final endpoint = '/order-tracking/track/${Uri.encodeComponent(orderId)}';
     try {
-      final response = await _api.post(
+      final response = await _api.get(
         endpoint,
         parser: (json) => json,
       );
 
-      print('Response Success: ${response.success}');
-      print('Response Data: ${response.data}');
-
-      if (!response.success) {
-        print('❌ CONFIRM ORDER FAILED');
-        print('Error: ${response.error}');
-        print('Status Code: ${response.statusCode}');
-        throw Exception(response.error ?? 'Failed to confirm order');
-      } else {
-        print('✅ CONFIRM ORDER SUCCESS');
+      if (response.success) {
+        return response.data;
       }
-
-      return response.success;
-    } catch (e, stackTrace) {
-      print('❌ CONFIRM ORDER EXCEPTION: $e');
-      print('Stack Trace: $stackTrace');
-      rethrow;
-    }
-  }
-
-  /// Mark order as picked (Stage 1 -> Stage 2)
-  /// POST /order-tracking/{orderId}/picked
-  Future<bool> markOrderAsPicked(String orderId) async {
-    final endpoint = '/order-tracking/$orderId/picked';
-    print('=== MARK ORDER AS PICKED API CALL ===');
-    print('Endpoint: $endpoint');
-    print('Order ID: $orderId');
-
-    try {
-      final response = await _api.post(
-        endpoint,
-        parser: (json) => json,
-      );
-
-      print('Response Success: ${response.success}');
-      print('Response Data: ${response.data}');
-
-      if (!response.success) {
-        print('❌ MARK ORDER AS PICKED FAILED');
-        print('Error: ${response.error}');
-        print('Status Code: ${response.statusCode}');
-        throw Exception(response.error ?? 'Failed to mark order as picked');
-      } else {
-        print('✅ MARK ORDER AS PICKED SUCCESS');
-      }
-
-      return response.success;
-    } catch (e, stackTrace) {
-      print('❌ MARK ORDER AS PICKED EXCEPTION: $e');
-      print('Stack Trace: $stackTrace');
-      rethrow;
-    }
-  }
-
-  /// Mark order as arrived (Stage 2 -> Stage 3)
-  /// POST /order-tracking/{orderId}/arrived
-  Future<bool> markOrderAsArrived(String orderId) async {
-    final endpoint = '/order-tracking/$orderId/arrived';
-    print('=== MARK ORDER AS ARRIVED API CALL ===');
-    print('Endpoint: $endpoint');
-    print('Order ID: $orderId');
-
-    try {
-      final response = await _api.post(
-        endpoint,
-        parser: (json) => json,
-      );
-
-      print('Response Success: ${response.success}');
-      print('Response Data: ${response.data}');
-
-      if (!response.success) {
-        print('❌ MARK ORDER AS ARRIVED FAILED');
-        print('Error: ${response.error}');
-        print('Status Code: ${response.statusCode}');
-        throw Exception(response.error ?? 'Failed to mark order as arrived');
-      } else {
-        print('✅ MARK ORDER AS ARRIVED SUCCESS');
-      }
-
-      return response.success;
-    } catch (e, stackTrace) {
-      print('❌ MARK ORDER AS ARRIVED EXCEPTION: $e');
-      print('Stack Trace: $stackTrace');
-      rethrow;
-    }
-  }
-
-  /// Mark order as delivered (Stage 3 -> Completed)
-  /// POST /order-tracking/{orderId}/delivered
-  /// This is the final step that also sends rating notification
-  Future<bool> markOrderAsDelivered(String orderId) async {
-    final endpoint = '/order-tracking/$orderId/delivered';
-    print('=== MARK ORDER AS DELIVERED API CALL ===');
-    print('Endpoint: $endpoint');
-    print('Order ID: $orderId');
-
-    try {
-      final response = await _api.post(
-        endpoint,
-        parser: (json) => json,
-      );
-
-      print('Response Success: ${response.success}');
-      print('Response Data: ${response.data}');
-
-      if (!response.success) {
-        print('❌ MARK ORDER AS DELIVERED FAILED');
-        print('Error: ${response.error}');
-        print('Status Code: ${response.statusCode}');
-        throw Exception(response.error ?? 'Failed to mark order as delivered');
-      } else {
-        print('✅ MARK ORDER AS DELIVERED SUCCESS');
-        print('📬 Rating notification sent to order creator');
-      }
-
-      return response.success;
-    } catch (e, stackTrace) {
-      print('❌ MARK ORDER AS DELIVERED EXCEPTION: $e');
-      print('Stack Trace: $stackTrace');
-      rethrow;
-    }
-  }
-
-  /// Helper method to update tracking stage based on current stage
-  /// Returns the new stage number after successful update
-  Future<int?> updateTrackingStage(String orderId, int currentStage) async {
-    try {
-      bool success = false;
-
-      switch (currentStage) {
-        case 0: // Order Confirmed -> Picked Up
-          success = await confirmOrder(orderId);
-          return success ? 1 : null;
-        case 1: // Picked Up -> In Transit
-          success = await markOrderAsPicked(orderId);
-          return success ? 2 : null;
-        case 2: // In Transit -> Arrived
-          success = await markOrderAsArrived(orderId);
-          return success ? 3 : null;
-        case 3: // Arrived -> Delivered
-          success = await markOrderAsDelivered(orderId);
-          return success ? 4 : null; // Stage 4 = Completed/Delivered
-        default:
-          print('⚠️ Invalid tracking stage: $currentStage');
-          return null;
-      }
+      return null;
     } catch (e) {
-      print('❌ Error updating tracking stage: $e');
+      print('❌ GET TRACKING HISTORY EXCEPTION: $e');
       return null;
     }
   }
+
+  Future<int?> getCurrentStage(String orderId) async {
+    final history = await getTrackingHistory(orderId);
+    return currentStageFromHistory(history);
+  }
+
+  Future<String?> getCurrentStatus(String orderId) async {
+    final stage = await getCurrentStage(orderId);
+    return stage == null ? null : statusFromStage(stage);
+  }
+
+  static int? currentStageFromHistory(Map<String, dynamic>? trackingHistory) {
+    final rawHistory = trackingHistory?['history'];
+    if (rawHistory is! List || rawHistory.isEmpty) return null;
+
+    final entries = rawHistory
+        .whereType<Map>()
+        .map((entry) => Map<String, dynamic>.from(entry))
+        .toList();
+    if (entries.isEmpty) return null;
+
+    entries.sort((a, b) {
+      final aTime = DateTime.tryParse(a['timestamp']?.toString() ?? '');
+      final bTime = DateTime.tryParse(b['timestamp']?.toString() ?? '');
+      if (aTime != null && bTime != null) return aTime.compareTo(bTime);
+      return _readStage(a).compareTo(_readStage(b));
+    });
+
+    final latestStage = _readStage(entries.last);
+    return latestStage > 0 ? latestStage : null;
+  }
+
+  static int _readStage(Map<String, dynamic> entry) {
+    final stage = entry['stage'];
+    if (stage is int) return stage;
+    return int.tryParse(stage?.toString() ?? '') ?? 0;
+  }
+
+  static String statusFromStage(int stage) {
+    switch (stage) {
+      case 1:
+        return 'confirmed';
+      case 2:
+        return 'picked_up';
+      case 3:
+        return 'arrived';
+      case 4:
+        return 'delivered';
+      default:
+        return 'pending';
+    }
+  }
+
+  static int progressStepFromStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+      case 'accepted':
+      case 'matched':
+      case 'booked':
+        return 0;
+      case 'picked':
+      case 'picked_up':
+        return 1;
+      case 'in-transit':
+      case 'in_transit':
+        return 2;
+      case 'arrived':
+        return 3;
+      case 'delivered':
+        return 4;
+      case 'pending':
+      default:
+        return 0;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // POST /order-tracking/track
+  // Stage values: 1 = confirmed, 2 = picked, 3 = arrived
+  // ─────────────────────────────────────────────────────────────
+
+  /// Update order tracking to a given stage.
+  Future<bool> updateTrackingStage(String orderId, int stage) async {
+    const endpoint = '/order-tracking/track';
+    
+    // Validate stages based on documentation
+    if (stage == 4) {
+      throw Exception('Stage 4 (Delivered) must be handled via /verify-otp endpoint.');
+    }
+
+    try {
+      final response = await _api.post(
+        endpoint,
+        body: {
+          'orderHashedId': orderId,
+          'stage': stage,
+        },
+        parser: (json) => json,
+      );
+
+      if (!response.success) {
+        throw Exception(response.error ?? 'Failed to update tracking stage to $stage');
+      }
+
+      return true;
+    } catch (e) {
+      print('❌ UPDATE STAGE EXCEPTION: $e');
+      rethrow;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // POST /track/verify-otp
+  // Marks order as delivered (stage 4) if OTP is valid.
+  // ─────────────────────────────────────────────────────────────
+
+  /// Verify the OTP and mark order as delivered (stage 4).
+  Future<bool> verifyOtpAndComplete(String orderId, String otp) async {
+    const endpoint = '/track/verify-otp';
+    final otpToVerify = otp.trim().isEmpty ? developmentDeliveryOtp : otp.trim();
+
+    try {
+      final response = await _api.post(
+        endpoint,
+        body: {
+          'orderHashedId': orderId,
+          'otp': otpToVerify,
+        },
+        parser: (json) => json,
+      );
+
+      if (!response.success) {
+        throw Exception(response.error ?? 'Invalid or expired OTP');
+      }
+
+      return true;
+    } catch (e) {
+      print('❌ OTP VERIFY EXCEPTION: $e');
+      rethrow;
+    }
+  }
+
+  // Convenience helpers aligned with documentation
+  Future<bool> markAsConfirmed(String orderId) => updateTrackingStage(orderId, 1);
+  Future<bool> markAsPickedUp(String orderId) => updateTrackingStage(orderId, 2);
+  Future<bool> markAsArrived(String orderId) => updateTrackingStage(orderId, 3);
 }

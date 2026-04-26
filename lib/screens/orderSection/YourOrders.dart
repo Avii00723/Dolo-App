@@ -6,7 +6,7 @@ import 'dart:async';
 import '../../Controllers/OrderService.dart';
 import '../../Controllers/TripRequestService.dart';
 import '../../Controllers/AuthService.dart';
-import '../../Controllers/ratingservice.dart';
+import '../../Controllers/ordertrackingservice.dart';
 import '../Inbox Section/indoxscreen.dart';
 import '../../Models/OrderModel.dart' as OrderModels;
 import '../../Models/TripRequestModel.dart';
@@ -44,6 +44,7 @@ class OrderDisplay {
   final List<String>? preferenceTransport;
   final bool? isUrgent;
   final String? createdAt;
+  final String? otp; // Added otp field
 
   OrderDisplay({
     required this.id,
@@ -74,7 +75,46 @@ class OrderDisplay {
     this.preferenceTransport,
     this.isUrgent,
     this.createdAt,
+    this.otp, // Added to constructor
   });
+
+  OrderDisplay copyWith({
+    String? status,
+    String? requestStatus,
+    String? otp,
+  }) {
+    return OrderDisplay(
+      id: id,
+      userId: userId,
+      userName: userName,
+      senderInitial: senderInitial,
+      origin: origin,
+      destination: destination,
+      date: date,
+      deliveryTime: deliveryTime,
+      itemDescription: itemDescription,
+      weight: weight,
+      status: status ?? this.status,
+      profileImageUrl: profileImageUrl,
+      matchedTravellerId: matchedTravellerId,
+      originLatitude: originLatitude,
+      originLongitude: originLongitude,
+      destinationLatitude: destinationLatitude,
+      destinationLongitude: destinationLongitude,
+      orderType: orderType,
+      estimatedDistance: estimatedDistance,
+      expectedPrice: expectedPrice,
+      requestStatus: requestStatus ?? this.requestStatus,
+      notes: notes,
+      imageUrl: imageUrl,
+      tripRequestId: tripRequestId,
+      category: category,
+      preferenceTransport: preferenceTransport,
+      isUrgent: isUrgent,
+      createdAt: createdAt,
+      otp: otp ?? this.otp,
+    );
+  }
 }
 
 class TripRequestDisplay {
@@ -114,6 +154,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     with WidgetsBindingObserver {
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
+  final OrderTrackingService _trackingService = OrderTrackingService();
   String? currentUserId;
   Timer? _refreshTimer;
 
@@ -224,6 +265,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           preferenceTransport: order.preferenceTransport,
           isUrgent: order.isUrgent,
           createdAt: order.createdAt,
+          otp: order.deliveryOtp, // Map OTP from model
         ));
       }
 
@@ -231,9 +273,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         await _loadTripRequestsForOrders(orders.map((o) => o.id).toList());
       }
 
+      final trackedOrders = await _applyTrackingStatus(displayOrders);
+
       if (mounted) {
         setState(() {
-          myOrders = displayOrders;
+          myOrders = trackedOrders;
           isLoadingMyOrders = false;
         });
       }
@@ -320,9 +364,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         ));
       }
 
+      final trackedOrders = await _applyTrackingStatus(displayOrders);
+
       if (mounted) {
         setState(() {
-          myRequestedOrders = displayOrders;
+          myRequestedOrders = trackedOrders;
           isLoadingMyRequests = false;
         });
       }
@@ -537,6 +583,28 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
+  Future<void> _updateTravellerStatus(String orderId, int stage) async {
+    await _trackingService.updateTrackingStage(orderId, stage);
+    _loadAllData(silent: true);
+  }
+
+  Future<void> _completeTravellerOrderWithOtp(String orderId, String otp) async {
+    await _trackingService.verifyOtpAndComplete(orderId, otp);
+    _loadAllData(silent: true);
+  }
+
+  Future<List<OrderDisplay>> _applyTrackingStatus(List<OrderDisplay> orders) async {
+    return Future.wait(orders.map((order) async {
+      final status = await _trackingService.getCurrentStatus(order.id);
+      if (status == null) return order;
+
+      return order.copyWith(
+        status: status,
+        requestStatus: order.requestStatus == null ? null : status,
+      );
+    }));
+  }
+
   void _openInbox() {
     Navigator.push(
       context,
@@ -669,6 +737,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             onCompleteOrder: () => _completeOrder(order),
             onUpdateOrder: _updateOrder,
             onDeleteOrder: _deleteOrder,
+            onUpdateStatus: _updateTravellerStatus,
           );
         },
       ),
@@ -701,6 +770,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             onTrackOrder: () => _viewRoute(order),
             onWithdrawRequest: _withdrawTripRequest,
             onDeleteRequest: _deleteTripRequest,
+            onUpdateStatus: _updateTravellerStatus,
+            onCompleteOrderWithOtp: _completeTravellerOrderWithOtp,
           );
         },
       ),

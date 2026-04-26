@@ -31,6 +31,7 @@ class Order {
   final bool? isUrgent;
   final String? ownerName; 
   final double? ownerRating; 
+  final String? deliveryOtp; // Added field
 
   Order({
     required this.id,
@@ -62,6 +63,7 @@ class Order {
     this.isUrgent,
     this.ownerName,
     this.ownerRating,
+    this.deliveryOtp, // Added to constructor
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -205,7 +207,22 @@ class Order {
       isUrgent: isUrgent,
       ownerName: json['order_creator_name'] ?? json['user_name'],
       ownerRating: _parseDouble(json['owner_rating'] ?? 0.0),
+      deliveryOtp: _parseDeliveryOtp(json),
     );
+  }
+
+  static String? _parseDeliveryOtp(Map<String, dynamic> json) {
+    for (final key in const [
+      'delivery_otp',
+      'deliveryOtp',
+      'otp',
+      'order_otp',
+      'orderOtp',
+    ]) {
+      final value = json[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
   }
 
   static double _parseDouble(dynamic value) {
@@ -250,6 +267,7 @@ class Order {
       'transport_mode': transportMode,
       'preference_transport': preferenceTransport,
       'is_urgent': isUrgent,
+      'delivery_otp': deliveryOtp,
     };
   }
 }
