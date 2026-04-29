@@ -137,6 +137,10 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
   }
 
   Future<void> _submitRequest() async {
+    if (isSubmitting) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final mode = widget.selectedVehicle;
     if (vehicleInfoController.text.trim().isEmpty) {
       _showSnackBar('Please enter ${_getVehicleInfoLabel(mode)}', Colors.red);
@@ -198,6 +202,9 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
         });
 
         if (response != null) {
+          FocusManager.instance.primaryFocus?.unfocus();
+          await Future<void>.delayed(Duration.zero);
+          if (!mounted) return;
           Navigator.pop(context);
           widget.onSuccess(response.tripRequestId, widget.order.userName);
         } else {

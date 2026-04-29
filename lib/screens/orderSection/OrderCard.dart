@@ -434,10 +434,36 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late OrderDisplay _order;
   bool _isUpdatingStatus = false;
 
+  final _trackingService = OrderTrackingService();
+  String? _fetchedOtp;
+  DateTime? _otpExpiresAt;
+  bool _isLoadingOtp = false;
+
   @override
   void initState() {
     super.initState();
     _order = widget.order;
+    if (_order.status.toLowerCase() == 'arrived') {
+      _fetchOtp();
+    }
+  }
+
+  Future<void> _fetchOtp() async {
+    if (!mounted) return;
+    setState(() => _isLoadingOtp = true);
+    try {
+      final result = await _trackingService.getOrderOtp(_order.id);
+      if (!mounted) return;
+      setState(() {
+        _fetchedOtp = result?['otp']?.toString();
+        final expiresRaw = result?['expires_at']?.toString();
+        _otpExpiresAt = expiresRaw != null ? DateTime.tryParse(expiresRaw) : null;
+        _isLoadingOtp = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingOtp = false);
+    }
   }
 
   String _formatDisplayDate(String date) {
@@ -471,6 +497,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   String _displayOtp() {
+    if (_fetchedOtp != null && _fetchedOtp!.isNotEmpty) return _fetchedOtp!;
     final otp = _order.otp?.trim();
     return otp == null || otp.isEmpty
         ? OrderTrackingService.developmentDeliveryOtp
@@ -489,6 +516,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _order = _order.copyWith(status: newStatus);
         _isUpdatingStatus = false;
       });
+      if (stage == 3) _fetchOtp();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Status updated to $newStatus'), backgroundColor: Colors.green),
       );
@@ -642,16 +670,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: stickyButton != null
-          ? Container(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Colors.grey[200]!)),
-        ),
-        child: stickyButton,
-      )
-          : null,
+      // bottomNavigationBar: stickyButton != null
+      //     ? Container(
+      //   padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
+      //   decoration: BoxDecoration(
+      //     color: Colors.white,
+      //     border: Border(top: BorderSide(color: Colors.grey[200]!)),
+      //   ),
+      //   child: stickyButton,
+      // )
+      //     : null,
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -996,24 +1024,53 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               color: Colors.green[800],
                             ),
                           ),
+                          if (_isLoadingOtp) ...[
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.green[700],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Text(
-                        _displayOtp(),
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.green[800],
-                          letterSpacing: 12,
+                      if (_isLoadingOtp)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: CircularProgressIndicator(color: Colors.green[700]),
+                        )
+                      else
+                        Text(
+                          _displayOtp(),
+                          style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.green[800],
+                            letterSpacing: 12,
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 8),
                       Text(
                         'Share this OTP with the traveler to confirm delivery.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 12, color: Colors.green[700]),
                       ),
+                      if (_otpExpiresAt != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Expires at ${_otpExpiresAt!.toLocal().toString().substring(11, 16)}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.green[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

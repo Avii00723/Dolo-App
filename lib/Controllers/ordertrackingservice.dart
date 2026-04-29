@@ -144,7 +144,7 @@ class OrderTrackingService {
 
   /// Verify the OTP and mark order as delivered (stage 4).
   Future<bool> verifyOtpAndComplete(String orderId, String otp) async {
-    const endpoint = '/track/verify-otp';
+    const endpoint = '/order-tracking/track/verify-otp';
     final otpToVerify = otp.trim().isEmpty ? developmentDeliveryOtp : otp.trim();
 
     try {
@@ -165,6 +165,31 @@ class OrderTrackingService {
     } catch (e) {
       print('❌ OTP VERIFY EXCEPTION: $e');
       rethrow;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // GET /order-tracking/track/{orderHashedId}/otp
+  // Returns the latest OTP and its expiry for an order.
+  // ─────────────────────────────────────────────────────────────
+
+  /// Fetches the current OTP for an order.
+  /// Returns a map with keys: `otp` (String), `expires_at` (String ISO-8601).
+  Future<Map<String, dynamic>?> getOrderOtp(String orderHashedId) async {
+    final endpoint =
+        '/order-tracking/track/${Uri.encodeComponent(orderHashedId)}/otp';
+    try {
+      final response = await _api.get(
+        endpoint,
+        parser: (json) => json,
+      );
+      if (response.success) {
+        return response.data;
+      }
+      return null;
+    } catch (e) {
+      print('❌ GET ORDER OTP EXCEPTION: $e');
+      return null;
     }
   }
 

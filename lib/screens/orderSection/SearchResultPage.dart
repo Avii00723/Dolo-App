@@ -132,6 +132,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   SearchFilter _activeFilter = SearchFilter.all;
   SortOption _activeSort = SortOption.newest;
   late AnimationController _animController;
+  final Set<String> _sendingOrderIds = {};
 
   @override
   void initState() {
@@ -237,10 +238,15 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   void _handleSendRequest(Order order) {
+    if (_sendingOrderIds.contains(order.id)) return;
+    _sendingOrderIds.add(order.id);
+
+    FocusManager.instance.primaryFocus?.unfocus();
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SendTripRequestPage(
+        builder: (_) => SendTripRequestPage(
           order: order,
           currentUserId: widget.currentUserId,
           tripRequestService: widget.tripRequestService,
@@ -250,7 +256,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           deliveryTime: widget.deliveryTime,
           selectedVehicle: widget.searchedVehicle,
           onSuccess: (tripRequestId, orderOwner) {
-            Navigator.pop(context);
+            _sendingOrderIds.remove(order.id);
+            FocusManager.instance.primaryFocus?.unfocus();
+            if (!mounted) return;
             Navigator.pop(context);
             final r = _R.of(context);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -277,11 +285,12 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                 margin: EdgeInsets.all(r.sp16),
               ),
             );
-            widget.onSendRequest(order);
           },
         ),
       ),
-    );
+    ).whenComplete(() {
+      _sendingOrderIds.remove(order.id);
+    });
   }
 
   void _showSortOptions() {

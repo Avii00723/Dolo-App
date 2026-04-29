@@ -889,9 +889,7 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
   }
 
   void _showCompleteOrderOtpDialog(BuildContext context) {
-    final otpController = TextEditingController(
-      text: OrderTrackingService.developmentDeliveryOtp,
-    );
+    final otpController = TextEditingController();
     bool isSubmitting = false;
     String? errorText;
 
