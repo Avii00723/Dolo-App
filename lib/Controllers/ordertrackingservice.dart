@@ -169,6 +169,27 @@ class OrderTrackingService {
   }
 
   // ─────────────────────────────────────────────────────────────
+  // GET /order-tracking/track/{orderHashedId}/details
+  // Returns order info, tracking history, and accepted trip vehicle details.
+  // ─────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>?> getOrderDetails(String orderHashedId) async {
+    final endpoint =
+        '/order-tracking/track/${Uri.encodeComponent(orderHashedId)}/details';
+    try {
+      final response = await _api.get(
+        endpoint,
+        parser: (json) => json,
+      );
+      if (response.success) return response.data;
+      return null;
+    } catch (e) {
+      print('❌ GET ORDER DETAILS EXCEPTION: $e');
+      return null;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // GET /order-tracking/track/{orderHashedId}/otp
   // Returns the latest OTP and its expiry for an order.
   // ─────────────────────────────────────────────────────────────

@@ -36,7 +36,8 @@ class SendTripRequestPage extends StatefulWidget {
 class _SendTripRequestPageState extends State<SendTripRequestPage> {
   final vehicleInfoController = TextEditingController();
   final commentsController = TextEditingController();
-  final pnrController = TextEditingController(); 
+  final pnrController = TextEditingController();
+  final phoneController = TextEditingController();
   bool isSubmitting = false;
 
   @override
@@ -44,6 +45,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     vehicleInfoController.dispose();
     commentsController.dispose();
     pnrController.dispose();
+    phoneController.dispose();
     super.dispose();
   }
 
@@ -183,7 +185,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
         orderId: widget.order.id,
         travelDate: deliveryIsoString,
         info: vehicleInfoController.text.trim(),
-        number: "1234567890",
+        number: phoneController.text.trim().isEmpty ? 'N/A' : phoneController.text.trim(),
         vehicleType: mode.toLowerCase(), 
         pnr: pnr.isNotEmpty ? pnr : "N/A", 
         source: widget.order.origin,
@@ -387,6 +389,14 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
               label: _getPnrLabel(transportMode),
               hint: _getPnrPlaceholder(transportMode),
               icon: Icons.confirmation_number_outlined,
+            ),
+            const SizedBox(height: 16),
+            _buildEnhancedTextField(
+              controller: phoneController,
+              label: 'Phone Number',
+              hint: 'e.g. 9876543210',
+              icon: Icons.phone_outlined,
+              keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 16),
             _buildEnhancedTextField(

@@ -323,13 +323,41 @@ class TravellerOrderDetailScreen extends StatefulWidget {
 class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen> {
   bool _packageDetailExpanded = false;
   bool _isUpdatingStatus = false;
-  late OrderDisplay _order; // local copy so we can update status in-place
+  late OrderDisplay _order;
 
-  // Maps stage int → the status string the backend returns
+  final _trackingService = OrderTrackingService();
+  Map<String, dynamic>? _orderDetails;
+  bool _isLoadingDetails = false;
+
+  Map<String, dynamic>? get _tripInfo => _orderDetails?['trip'] as Map<String, dynamic>?;
+  String get _vehicleType => (_tripInfo?['vehicle_type'] as String?)?.isNotEmpty == true ? _tripInfo!['vehicle_type'] : '—';
+  String get _vehicleInfo => (_tripInfo?['info'] as String?)?.isNotEmpty == true ? _tripInfo!['info'] : '—';
+  String get _vehicleNumber => (_tripInfo?['number'] as String?)?.isNotEmpty == true ? _tripInfo!['number'] : '—';
+
+  String? get _apiPickupDate => (_orderDetails?['order'] as Map<String, dynamic>?)?['pickup_date'] as String?;
+  String? get _apiDeliveryDate => (_orderDetails?['order'] as Map<String, dynamic>?)?['delivery_date'] as String?;
+
   @override
   void initState() {
     super.initState();
     _order = widget.order;
+    _fetchOrderDetails();
+  }
+
+  Future<void> _fetchOrderDetails() async {
+    if (!mounted) return;
+    setState(() => _isLoadingDetails = true);
+    try {
+      final result = await _trackingService.getOrderDetails(_order.id);
+      if (!mounted) return;
+      setState(() {
+        _orderDetails = result;
+        _isLoadingDetails = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingDetails = false);
+    }
   }
 
   String _formatDisplayDate(String date) {
@@ -681,26 +709,44 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.flight_takeoff, size: 20, color: Colors.black87),
+                      const Icon(Icons.directions_car_outlined, size: 20, color: Colors.black87),
                       const SizedBox(width: 10),
                       const Text(
-                        'Flight Detail',
+                        'Travel Detail',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: Colors.black,
                         ),
                       ),
+                      if (_isLoadingDetails) ...[
+                        const SizedBox(width: 8),
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
+                      Expanded(child: _buildDetailItem('Vehicle Type', _vehicleType)),
+                      Expanded(child: _buildDetailItem('Vehicle Info', _vehicleInfo)),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(child: _buildDetailItem('Vehicle No.', _vehicleNumber)),
                       Expanded(
-                        child: _buildDetailItem('Departure Date', _formatShortDate(order.date)),
-                      ),
-                      Expanded(
-                        child: _buildDetailItem('Arrival Date', '—'),
+                        child: _buildDetailItem(
+                          'Departure',
+                          _apiPickupDate != null
+                              ? _formatShortDate(_apiPickupDate!)
+                              : _formatShortDate(order.date),
+                        ),
                       ),
                     ],
                   ),
@@ -709,22 +755,13 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                     children: [
                       Expanded(
                         child: _buildDetailItem(
-                          'Airline Name',
-                          order.preferenceTransport?.isNotEmpty == true
-                              ? order.preferenceTransport!.first
+                          'Delivery Date',
+                          _apiDeliveryDate != null
+                              ? _formatShortDate(_apiDeliveryDate!)
                               : '—',
                         ),
                       ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Flight no.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                            const SizedBox(height: 4),
-                            Text('—', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
+                      const Expanded(child: SizedBox.shrink()),
                     ],
                   ),
                 ],

@@ -5,7 +5,6 @@ import 'package:google_places_autocomplete_text_field/google_places_autocomplete
 import '../Constants/colorconstant.dart';
 import '../Constants/ApiConstants.dart';
 import '../../Models/OrderModel.dart';
-import '../../Models/TripRequestModel.dart';
 import '../Controllers/OrderService.dart';
 import '../Controllers/TripRequestService.dart';
 import '../Controllers/AuthService.dart';
@@ -391,11 +390,6 @@ class _SendPageState extends State<SendPage> {
     'Car', 'Bike', 'Pickup Truck', 'Truck', 'Bus', 'Train', 'Plane'
   ];
 
-  // ── New fields for API
-  String _infoText = '';
-  String _phoneNumber = '';
-  final TextEditingController _infoController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
 
   // ── Services ──────────────────────────────────────────────────────────────
   final OrderService _orderService = OrderService();
@@ -427,8 +421,6 @@ class _SendPageState extends State<SendPage> {
   void dispose() {
     departureController.dispose();
     deliveryController.dispose();
-    _infoController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
@@ -589,7 +581,7 @@ class _SendPageState extends State<SendPage> {
             deliveryTime: _selectedTime!,
             currentUserId: currentUserId!,
             tripRequestService: _tripRequestService,
-            onSendRequest: (order) => _handleSendRequest(order),
+            onSendRequest: (_) {},
           ),
         ),
       );
@@ -629,41 +621,6 @@ class _SendPageState extends State<SendPage> {
         ),
       ),
     );
-  }
-
-  Future<void> _handleSendRequest(Order order) async {
-    if (currentUserId == null) {
-      _showSnackBar('User not found. Please log in.', Colors.red);
-      return;
-    }
-
-    try {
-      // API expects TripRequestSendRequest fields
-      final request = TripRequestSendRequest(
-        travelerId: currentUserId!,
-        orderId: order.id,
-        travelDate: '${_selectedDate}T$_selectedTime', // Updated to ISO format
-        info: _infoController.text.isEmpty ? selectedVehicle ?? 'Car' : _infoController.text,
-        number: _phoneController.text.isEmpty ? 'N/A' : _phoneController.text,
-        source: _fromText,
-        destination: _toText,
-        departureDatetime: '${_departureDate}T$_departureTime', // Updated to ISO format
-        comments: '',
-        vehicleType: selectedVehicle ?? 'Car',
-      );
-
-      final response = await _tripRequestService.sendTripRequest(request);
-
-      if (response != null) {
-        if (!mounted) return;
-        _showSnackBar('Trip request sent successfully!', Colors.green);
-        Navigator.pop(context); // Go back from search results
-      } else {
-        _showSnackBar('Failed to send trip request', Colors.red);
-      }
-    } catch (e) {
-      _showSnackBar('Error sending request: $e', Colors.red);
-    }
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -801,10 +758,6 @@ class _SendPageState extends State<SendPage> {
               _selectDeliveryDateTime),
           const SizedBox(height: 16),
           _buildVehicleDropdown(),
-          const SizedBox(height: 16),
-          _buildTextField(_infoController, 'Vehicle Info', 'Red Swift Dzire / Train Coach S3', Icons.info_outline),
-          const SizedBox(height: 16),
-          _buildTextField(_phoneController, 'Phone Number', '1234567890', Icons.phone),
           const SizedBox(height: 30),
           SizedBox(
             width: double.infinity,
