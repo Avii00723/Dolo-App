@@ -16,10 +16,27 @@ class ImageUploadResponse {
   });
 
   factory ImageUploadResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] is Map<String, dynamic>
+        ? json['data'] as Map<String, dynamic>
+        : null;
+    final imageUrl = json['imageUrl'] ??
+        json['image_url'] ??
+        json['photoURL'] ??
+        json['photoUrl'] ??
+        json['url'] ??
+        json['path'] ??
+        data?['imageUrl'] ??
+        data?['image_url'] ??
+        data?['photoURL'] ??
+        data?['photoUrl'] ??
+        data?['url'] ??
+        data?['path'] ??
+        '';
+
     return ImageUploadResponse(
       message: json['message'] ?? '',
-      imageUrl: json['imageUrl'] ?? json['image_url'] ?? '',
-      success: json['success'] ?? false,
+      imageUrl: imageUrl.toString(),
+      success: json['success'] ?? true,
     );
   }
 }
@@ -37,7 +54,7 @@ class ImageUploadService {
       print('┌─────────────────────────────────────');
       print('│ 📤 PROFILE IMAGE UPLOAD REQUEST');
       print('├─────────────────────────────────────');
-      print('│ URL: ${ApiConstants.baseUrl}/uploads/profile-picture');
+      print('│ URL: ${ApiConstants.uploadProfilePhoto}');
       print('│ User ID: $userId');
       print('│ File Path: ${imageFile.path}');
       print('│ File Name: ${imageFile.path.split('/').last}');
@@ -47,7 +64,7 @@ class ImageUploadService {
       // Create multipart request
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('${ApiConstants.baseUrl}/uploads/profile-picture'),
+        Uri.parse(ApiConstants.uploadProfilePhoto),
       );
 
       // Add userId field
@@ -74,7 +91,7 @@ class ImageUploadService {
       // Add file
       request.files.add(
         await http.MultipartFile.fromPath(
-          'profilePicture',
+          'photo',
           imageFile.path,
           contentType: contentType,
           filename: fileName,

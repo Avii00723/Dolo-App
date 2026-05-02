@@ -121,19 +121,28 @@ class _EnhancedLocationInputFieldState
 
   void _showLocationSearchScreen(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (context) => LocationSearchScreen(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 300),
+        reverseTransitionDuration: const Duration(milliseconds: 250),
+        pageBuilder: (ctx, animation, _) => LocationSearchScreen(
           isOrigin: widget.isOrigin,
           onLocationSelected: (position, address) {
+            Navigator.of(ctx).pop();
             setState(() {
               selectedPosition = position;
               widget.controller.text = address;
             });
             widget.onLocationSelected?.call(position);
-            Navigator.of(context).pop();
           },
         ),
+        transitionsBuilder: (ctx, animation, _, child) {
+          final slide = Tween<Offset>(
+            begin: const Offset(0, 0.08),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+          final fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+          return FadeTransition(opacity: fade, child: SlideTransition(position: slide, child: child));
+        },
       ),
     );
   }
@@ -401,15 +410,9 @@ config: const GoogleApiConfig(
                                   );
 
                                   final address = prediction.description ?? '';
+                                  // Pop first so the callback runs on an active context,
+                                  // then let the parent handle any feedback.
                                   widget.onLocationSelected(position, address);
-
-                                  if (mounted) {
-                                    _showSuccessSnackBar(
-                                        context,
-                                        widget.isOrigin
-                                            ? '✅ Origin location selected'
-                                            : '✅ Destination location selected');
-                                  }
                                 }
                               },
                               onSuggestionClicked: (prediction) {
@@ -543,14 +546,9 @@ config: const GoogleApiConfig(
         final displayAddress = address ??
             'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
 
+        // onLocationSelected pops this screen; call it last so we don't
+        // use a stale context after the pop.
         widget.onLocationSelected(position, displayAddress);
-
-        if (mounted) {
-          _showSuccessSnackBar(
-            context,
-            '✅ Current location obtained successfully!',
-          );
-        }
       } else {
         if (mounted) {
           _showSnackBar(

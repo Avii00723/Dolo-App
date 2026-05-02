@@ -287,6 +287,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   Position? destinationPosition;
 
   // ── Location overlay state ─────────────────────────────────────────────────
+  bool _locationViewMounted = false;
   bool _isLocationViewFocused = false;
   String? _focusedField;
 
@@ -377,18 +378,26 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   // ── Location overlay control ───────────────────────────────────────────────
 
   void _showLocationView(String field) {
+    // Mount the overlay first (hidden below screen), then animate it in next frame.
     setState(() {
-      _isLocationViewFocused = true;
+      _locationViewMounted = true;
       _focusedField = field;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _isLocationViewFocused = true);
     });
   }
 
   void _hideLocationView() {
-    setState(() {
-      _isLocationViewFocused = false;
-      _focusedField = null;
-    });
     FocusScope.of(context).unfocus();
+    setState(() => _isLocationViewFocused = false);
+    // Unmount after the slide-out animation finishes.
+    Future.delayed(const Duration(milliseconds: 320), () {
+      if (mounted) setState(() {
+        _locationViewMounted = false;
+        _focusedField = null;
+      });
+    });
   }
 
   void _onRecentSearch(String city) {
@@ -789,10 +798,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     }
 
     return PopScope(
-      canPop: !_isLocationViewFocused,
+      canPop: !_locationViewMounted,
       onPopInvoked: (didPop) {
         if (didPop) return;
-        if (_isLocationViewFocused) _hideLocationView();
+        if (_locationViewMounted) _hideLocationView();
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -803,7 +812,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black),
             onPressed: () {
-              if (_isLocationViewFocused) {
+              if (_locationViewMounted) {
                 _hideLocationView();
               } else if (_currentStep > 0) {
                 _previousStep();
@@ -824,7 +833,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             // ── Main multi-step form ─────────────────────────────────────────
             AnimatedOpacity(
               opacity: _isLocationViewFocused ? 0.0 : 1.0,
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 280),
               child: IgnorePointer(
                 ignoring: _isLocationViewFocused,
                 child: Column(
@@ -942,24 +951,34 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             // ── Location search overlay ──────────────────────────────────────
             // Mounts fresh each time → _PlacesField creates new
             // controller+focusNode on mount, disposes on unmount.
-            // No stale/disposed objects ever reach GooglePlaces.
-            if (_isLocationViewFocused)
-              _LocationSearchView(
-                pickupText: _pickupText,
-                dropText: _dropText,
-                recentSearches: _recentSearches,
-                focusedField: _focusedField,
-                onDone: _hideLocationView,
-                onFieldFocused: (f) => setState(() => _focusedField = f),
-                onPickupSelected: (text, pos) => setState(() {
-                  _pickupText = text;
-                  originPosition = pos;
-                }),
-                onDropSelected: (text, pos) => setState(() {
-                  _dropText = text;
-                  destinationPosition = pos;
-                }),
-                onRecentSearch: _onRecentSearch,
+            // Animates in (slide-up + fade) and out (slide-down + fade).
+            if (_locationViewMounted)
+              AnimatedSlide(
+                offset: _isLocationViewFocused ? Offset.zero : const Offset(0, 0.06),
+                duration: const Duration(milliseconds: 300),
+                curve: _isLocationViewFocused ? Curves.easeOutCubic : Curves.easeInCubic,
+                child: AnimatedOpacity(
+                  opacity: _isLocationViewFocused ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeInOut,
+                  child: _LocationSearchView(
+                    pickupText: _pickupText,
+                    dropText: _dropText,
+                    recentSearches: _recentSearches,
+                    focusedField: _focusedField,
+                    onDone: _hideLocationView,
+                    onFieldFocused: (f) => setState(() => _focusedField = f),
+                    onPickupSelected: (text, pos) => setState(() {
+                      _pickupText = text;
+                      originPosition = pos;
+                    }),
+                    onDropSelected: (text, pos) => setState(() {
+                      _dropText = text;
+                      destinationPosition = pos;
+                    }),
+                    onRecentSearch: _onRecentSearch,
+                  ),
+                ),
               ),
 
             // ── Success overlay ──────────────────────────────────────────────

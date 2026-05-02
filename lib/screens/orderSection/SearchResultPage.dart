@@ -259,6 +259,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
             _sendingOrderIds.remove(order.id);
             FocusManager.instance.primaryFocus?.unfocus();
             if (!mounted) return;
+            // Pop SendTripRequestPage, then _OrderDetailSheet — both from the
+            // same navigator context to avoid the black-screen race condition.
+            Navigator.pop(context);
             Navigator.pop(context);
             final r = _R.of(context);
             ScaffoldMessenger.of(context).showSnackBar(

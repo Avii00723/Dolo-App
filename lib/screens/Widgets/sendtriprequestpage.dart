@@ -205,9 +205,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
 
         if (response != null) {
           FocusManager.instance.primaryFocus?.unfocus();
-          await Future<void>.delayed(Duration.zero);
           if (!mounted) return;
-          Navigator.pop(context);
           widget.onSuccess(response.tripRequestId, widget.order.userName);
         } else {
           _showSnackBar('Failed to send request. Please check required fields.', Colors.red);

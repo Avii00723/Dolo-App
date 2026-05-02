@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../../Controllers/ordertrackingservice.dart';
+import '../../theme/app_theme.dart';
 import 'YourOrders.dart';
 
 class ModernSenderOrderCard extends StatelessWidget {
@@ -42,16 +43,16 @@ class ModernSenderOrderCard extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'in-transit':
       case 'in_transit':
-        return const Color(0xFFD4C88A);
+        return AppColors.heroBlue;
       case 'delivered':
-        return const Color(0xFFD4C88A);
+        return AppColors.sage;
       case 'pending':
-        return const Color(0xFFE8E0C8);
+        return AppColors.paleYellow;
       case 'accepted':
       case 'matched':
-        return const Color(0xFFD0E8D0);
+        return AppColors.sage;
       default:
-        return const Color(0xFFE8E0C8);
+        return AppColors.paleYellow;
     }
   }
 
@@ -59,16 +60,16 @@ class ModernSenderOrderCard extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'in-transit':
       case 'in_transit':
-        return const Color(0xFF5C4B00);
+        return AppColors.primaryBlueDark;
       case 'delivered':
-        return const Color(0xFF3A3A1A);
+        return AppColors.sageDark;
       case 'pending':
-        return const Color(0xFF6B5B00);
+        return AppColors.ink;
       case 'accepted':
       case 'matched':
-        return const Color(0xFF1A5C1A);
+        return AppColors.sageDark;
       default:
-        return const Color(0xFF6B5B00);
+        return AppColors.ink;
     }
   }
 
@@ -100,8 +101,18 @@ class ModernSenderOrderCard extends StatelessWidget {
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year.toString().substring(2)}';
     } catch (e) {
@@ -112,17 +123,20 @@ class ModernSenderOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progressStep = _getProgressStep();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return GestureDetector(
       onTap: () => _showOrderDetailsScreen(context),
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: AppColors.shadow,
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -137,7 +151,8 @@ class ModernSenderOrderCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.flight_takeoff, size: 20, color: Colors.black87),
+                  Icon(Icons.flight_takeoff,
+                      size: 20, color: colorScheme.primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -146,10 +161,10 @@ class ModernSenderOrderCard extends StatelessWidget {
                         // Origin (Line 1)
                         Text(
                           order.origin,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
-                            color: Colors.black,
+                            color: colorScheme.onSurface,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -160,7 +175,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                               '↓ ',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.black54,
+                                color: AppColors.mutedInk,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -168,10 +183,10 @@ class ModernSenderOrderCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 order.destination,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.black,
+                                  color: colorScheme.onSurface,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -187,7 +202,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                               _formatDisplayDate(order.date),
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey[600],
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.62),
                               ),
                             ),
                             if (order.deliveryTime != null) ...[
@@ -196,7 +212,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 _formatDisplayDate(order.deliveryTime!),
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey[600],
+                                  color: colorScheme.onSurface
+                                      .withValues(alpha: 0.62),
                                 ),
                               ),
                             ],
@@ -208,7 +225,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   // Status Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: _getStatusBgColor(order.status),
                       borderRadius: BorderRadius.circular(20),
@@ -228,12 +246,13 @@ class ModernSenderOrderCard extends StatelessWidget {
               const SizedBox(height: 14),
 
               // ── Traveler Info (if matched) ──
-              if (order.matchedTravellerId != null || order.status != 'pending') ...[
+              if (order.matchedTravellerId != null ||
+                  order.status != 'pending') ...[
                 Text(
                   'Traveler',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey[500],
+                    color: colorScheme.onSurface.withValues(alpha: 0.55),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -242,12 +261,13 @@ class ModernSenderOrderCard extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor: Colors.grey[300],
+                      backgroundColor: colorScheme.secondary,
                       backgroundImage: order.profileImageUrl != null
                           ? NetworkImage(order.profileImageUrl!)
                           : null,
                       child: order.profileImageUrl == null
-                          ? Icon(Icons.person, color: Colors.grey[600], size: 20)
+                          ? Icon(Icons.person,
+                              color: colorScheme.onSecondary, size: 20)
                           : null,
                     ),
                     const SizedBox(width: 10),
@@ -256,11 +276,13 @@ class ModernSenderOrderCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            order.userName != 'You' ? order.userName : 'Matched Traveler',
-                            style: const TextStyle(
+                            order.userName != 'You'
+                                ? order.userName
+                                : 'Matched Traveler',
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: Colors.black87,
+                              color: colorScheme.onSurface,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -271,11 +293,13 @@ class ModernSenderOrderCard extends StatelessWidget {
                                 'Verified',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey[500],
+                                  color: colorScheme.onSurface
+                                      .withValues(alpha: 0.55),
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              Icon(Icons.check, size: 12, color: Colors.grey[500]),
+                              Icon(Icons.check,
+                                  size: 12, color: colorScheme.secondary),
                             ],
                           ),
                         ],
@@ -288,29 +312,31 @@ class ModernSenderOrderCard extends StatelessWidget {
                   'Traveler',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey[500],
+                    color: colorScheme.onSurface.withValues(alpha: 0.55),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.orange[50],
+                    color: AppColors.paleYellow.withValues(alpha: 0.75),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange[200]!),
+                    border: Border.all(color: AppColors.sage),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.people_outline, color: Colors.orange[700], size: 14),
+                      const Icon(Icons.people_outline,
+                          color: AppColors.sageDark, size: 14),
                       const SizedBox(width: 6),
                       Text(
                         '${tripRequests!.length} Request${tripRequests!.length > 1 ? 's' : ''} — tap to review',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: Colors.orange[700],
+                          color: AppColors.sageDark,
                         ),
                       ),
                     ],
@@ -321,7 +347,7 @@ class ModernSenderOrderCard extends StatelessWidget {
               const SizedBox(height: 16),
 
               // ── Dotted Progress Tracker ──
-              _buildProgressDots(progressStep),
+              _buildProgressDots(context, progressStep),
             ],
           ),
         ),
@@ -329,7 +355,8 @@ class ModernSenderOrderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressDots(int activeStep) {
+  Widget _buildProgressDots(BuildContext context, int activeStep) {
+    final colorScheme = Theme.of(context).colorScheme;
     const totalSteps = 5;
     return Row(
       children: List.generate(totalSteps * 2 - 1, (i) {
@@ -341,9 +368,9 @@ class ModernSenderOrderCard extends StatelessWidget {
             height: 10,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isActive ? Colors.grey[600] : Colors.transparent,
+              color: isActive ? colorScheme.primary : Colors.transparent,
               border: Border.all(
-                color: isActive ? Colors.grey[600]! : Colors.grey[400]!,
+                color: isActive ? colorScheme.primary : AppColors.border,
                 width: 1.5,
               ),
             ),
@@ -358,7 +385,7 @@ class ModernSenderOrderCard extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
-                    color: isActive ? Colors.grey[600]! : Colors.grey[300]!,
+                    color: isActive ? colorScheme.primary : AppColors.border,
                     width: 1.5,
                     style: BorderStyle.solid,
                   ),
@@ -443,21 +470,46 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _isLoadingDetails = false;
 
   // Helpers that read from the /details API response
-  Map<String, dynamic>? get _tripInfo => _orderDetails?['trip'] as Map<String, dynamic>?;
-  String get _vehicleType => (_tripInfo?['vehicle_type'] as String?)?.isNotEmpty == true ? _tripInfo!['vehicle_type'] : '—';
-  String get _vehicleInfo => (_tripInfo?['info'] as String?)?.isNotEmpty == true ? _tripInfo!['info'] : '—';
-  String get _vehicleNumber => (_tripInfo?['number'] as String?)?.isNotEmpty == true ? _tripInfo!['number'] : '—';
+  Map<String, dynamic>? get _tripInfo =>
+      _orderDetails?['trip'] as Map<String, dynamic>?;
+  String get _vehicleType =>
+      (_tripInfo?['vehicle_type'] as String?)?.isNotEmpty == true
+          ? _tripInfo!['vehicle_type']
+          : '—';
+  String get _vehicleInfo => (_tripInfo?['info'] as String?)?.isNotEmpty == true
+      ? _tripInfo!['info']
+      : '—';
+  String get _vehicleNumber =>
+      (_tripInfo?['number'] as String?)?.isNotEmpty == true
+          ? _tripInfo!['number']
+          : '—';
 
-  String? get _apiPickupDate => (_orderDetails?['order'] as Map<String, dynamic>?)?['pickup_date'] as String?;
-  String? get _apiDeliveryDate => (_orderDetails?['order'] as Map<String, dynamic>?)?['delivery_date'] as String?;
-  String? get _apiImageUrl => (_orderDetails?['order'] as Map<String, dynamic>?)?['image_url'] as String?;
+  String? get _apiPickupDate =>
+      (_orderDetails?['order'] as Map<String, dynamic>?)?['pickup_date']
+          as String?;
+  String? get _apiDeliveryDate =>
+      (_orderDetails?['order'] as Map<String, dynamic>?)?['delivery_date']
+          as String?;
+  String? get _apiImageUrl =>
+      (_orderDetails?['order'] as Map<String, dynamic>?)?['image_url']
+          as String?;
 
   @override
   void initState() {
     super.initState();
     _order = widget.order;
     _fetchOrderDetails();
-    if (_order.status.toLowerCase() == 'arrived') {
+    const otpStatuses = [
+      'arrived',
+      'in-transit',
+      'in_transit',
+      'picked_up',
+      'confirmed',
+      'accepted',
+      'matched',
+      'booked'
+    ];
+    if (otpStatuses.contains(_order.status.toLowerCase())) {
       _fetchOtp();
     }
   }
@@ -487,7 +539,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       setState(() {
         _fetchedOtp = result?['otp']?.toString();
         final expiresRaw = result?['expires_at']?.toString();
-        _otpExpiresAt = expiresRaw != null ? DateTime.tryParse(expiresRaw) : null;
+        _otpExpiresAt =
+            expiresRaw != null ? DateTime.tryParse(expiresRaw) : null;
         _isLoadingOtp = false;
       });
     } catch (_) {
@@ -500,8 +553,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
@@ -513,8 +576,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
@@ -548,13 +621,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       });
       if (stage == 3) _fetchOtp();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status updated to $newStatus'), backgroundColor: Colors.green),
+        SnackBar(
+            content: Text('Status updated to $newStatus'),
+            backgroundColor: Colors.green),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isUpdatingStatus = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating status: $e'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('Error updating status: $e'),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -576,7 +653,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               label: const Text('Edit Order'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ),
@@ -590,7 +668,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 backgroundColor: Colors.red[600],
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 elevation: 0,
               ),
             ),
@@ -604,14 +683,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
         icon: _isUpdatingStatus
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.inventory_2_outlined, size: 18),
-        label: Text(_isUpdatingStatus ? 'Updating...' : 'Hand over: Mark as Picked Up'),
+        label: Text(
+            _isUpdatingStatus ? 'Updating...' : 'Hand over: Mark as Picked Up'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 2,
         ),
       );
@@ -619,29 +704,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
         icon: _isUpdatingStatus
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.location_on_outlined, size: 18),
         label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 2,
         ),
       );
-    } else if (order.status.toLowerCase() == 'in-transit' || order.status.toLowerCase() == 'in_transit') {
+    } else if (order.status.toLowerCase() == 'in-transit' ||
+        order.status.toLowerCase() == 'in_transit') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
         icon: _isUpdatingStatus
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.location_on_outlined, size: 18),
         label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 2,
         ),
       );
@@ -695,7 +791,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: CircleAvatar(
               radius: 18,
               backgroundColor: Colors.grey[200],
-              child: const Icon(Icons.headset_mic_outlined, color: Colors.black54, size: 18),
+              child: const Icon(Icons.headset_mic_outlined,
+                  color: Colors.black54, size: 18),
             ),
           ),
         ],
@@ -793,15 +890,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
             // ── Package Detail Section ──
             InkWell(
-              onTap: () => setState(() => _packageDetailExpanded = !_packageDetailExpanded),
+              onTap: () => setState(
+                  () => _packageDetailExpanded = !_packageDetailExpanded),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.inventory_2_outlined, size: 20, color: Colors.black87),
+                        const Icon(Icons.inventory_2_outlined,
+                            size: 20, color: Colors.black87),
                         const SizedBox(width: 10),
                         const Text(
                           'Package Detail',
@@ -827,7 +927,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       children: [
                         Text(
                           'Order ID',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -843,7 +944,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ),
                         if (order.isUrgent == true)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 3),
                             decoration: BoxDecoration(
                               color: Colors.red[600],
                               borderRadius: BorderRadius.circular(12),
@@ -880,7 +982,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ),
                         ],
                       ),
-                      if (order.imageUrl != null && order.imageUrl!.isNotEmpty) ...[
+                      if (order.imageUrl != null &&
+                          order.imageUrl!.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         const Text(
                           'Package Image',
@@ -898,21 +1001,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             height: 120,
                             width: 120,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
                               width: 80,
                               height: 80,
                               decoration: BoxDecoration(
                                 color: Colors.grey[200],
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(Icons.image_not_supported, color: Colors.grey[400]),
+                              child: Icon(Icons.image_not_supported,
+                                  color: Colors.grey[400]),
                             ),
                           ),
                         ),
                       ],
                       if (order.notes != null && order.notes!.isNotEmpty) ...[
                         const SizedBox(height: 14),
-                        _buildPackageDetailItem('Special Instructions', order.notes!),
+                        _buildPackageDetailItem(
+                            'Special Instructions', order.notes!),
                       ],
                     ],
                   ],
@@ -930,7 +1036,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.directions_car_outlined, size: 20, color: Colors.black87),
+                      const Icon(Icons.directions_car_outlined,
+                          size: 20, color: Colors.black87),
                       const SizedBox(width: 10),
                       const Text(
                         'Travel Detail',
@@ -954,10 +1061,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildFlightDetailItem('Vehicle Type', _vehicleType),
+                        child: _buildFlightDetailItem(
+                            'Vehicle Type', _vehicleType),
                       ),
                       Expanded(
-                        child: _buildFlightDetailItem('Vehicle Info', _vehicleInfo),
+                        child: _buildFlightDetailItem(
+                            'Vehicle Info', _vehicleInfo),
                       ),
                     ],
                   ),
@@ -965,7 +1074,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildFlightDetailItem('Vehicle No.', _vehicleNumber),
+                        child: _buildFlightDetailItem(
+                            'Vehicle No.', _vehicleNumber),
                       ),
                       Expanded(
                         child: _buildFlightDetailItem(
@@ -1007,7 +1117,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 20, color: Colors.black87),
+                      const Icon(Icons.location_on_outlined,
+                          size: 20, color: Colors.black87),
                       const SizedBox(width: 10),
                       const Text(
                         'Track Package',
@@ -1017,17 +1128,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           color: Colors.black,
                         ),
                       ),
+                      const Spacer(),
+                      if (_isLoadingOtp)
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else if (_fetchedOtp != null ||
+                          (_order.otp?.isNotEmpty == true))
+                        Text(
+                          'OTP: ${_displayOtp()}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black87,
+                            letterSpacing: 1,
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 20),
                   _buildTrackingTimeline(progressStep),
 
-                  // ── Status Update Buttons (added in Track Package section) ──
+                  // ── Status Update Buttons ──
                   if (order.status.toLowerCase() != 'delivered') ...[
                     const SizedBox(height: 24),
                     const Text(
                       'Update Track Package Status',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54),
                     ),
                     const SizedBox(height: 12),
                     _buildStatusUpdateButton(order),
@@ -1036,126 +1168,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
-
-            // ── Sender: Show OTP card when order is 'arrived' ──
-            if (order.status.toLowerCase() == 'arrived') ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.green[200]!),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.lock_open_outlined, color: Colors.green[700], size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Your Delivery OTP',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.green[800],
-                            ),
-                          ),
-                          if (_isLoadingOtp) ...[
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.green[700],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (_isLoadingOtp)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: CircularProgressIndicator(color: Colors.green[700]),
-                        )
-                      else
-                        Text(
-                          _displayOtp(),
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.green[800],
-                            letterSpacing: 12,
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Share this OTP with the traveler to confirm delivery.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: Colors.green[700]),
-                      ),
-                      if (_otpExpiresAt != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          'Expires at ${_otpExpiresAt!.toLocal().toString().substring(11, 16)}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.green[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // ── Sender: in-transit or other pre-arrival active stages ──
-            if (order.status.toLowerCase() == 'in-transit' || order.status.toLowerCase() == 'in_transit') ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.local_shipping_outlined, color: Colors.orange[700], size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Your package is on its way! Confirm arrival once it reaches the destination.',
-                          style: TextStyle(fontSize: 13, color: Colors.orange[800]),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
             // ── Pending actions ──
             if (order.status.toLowerCase() == 'pending') ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
-                    if (widget.tripRequests != null && widget.tripRequests!.isNotEmpty) ...[
-                      ...widget.tripRequests!.map((req) => _buildTripRequestCard(context, req)),
+                    if (widget.tripRequests != null &&
+                        widget.tripRequests!.isNotEmpty) ...[
+                      ...widget.tripRequests!
+                          .map((req) => _buildTripRequestCard(context, req)),
                       const SizedBox(height: 12),
                     ],
                   ],
@@ -1178,9 +1200,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         : null,
                     child: order.profileImageUrl == null
                         ? Text(
-                      order.userName.isNotEmpty ? order.userName[0].toUpperCase() : 'U',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    )
+                            order.userName.isNotEmpty
+                                ? order.userName[0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          )
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -1203,11 +1227,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline, color: Colors.black54),
+                    icon: const Icon(Icons.chat_bubble_outline,
+                        color: Colors.black54),
                     onPressed: () {},
                   ),
                   IconButton(
-                    icon: const Icon(Icons.call_outlined, color: Colors.black54),
+                    icon:
+                        const Icon(Icons.call_outlined, color: Colors.black54),
                     onPressed: () {},
                   ),
                 ],
@@ -1231,14 +1257,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: ElevatedButton.icon(
           onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
           icon: _isUpdatingStatus
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.inventory_2_outlined),
-          label: Text(_isUpdatingStatus ? 'Updating...' : 'Hand over: Mark as Picked Up'),
+          label: Text(_isUpdatingStatus
+              ? 'Updating...'
+              : 'Hand over: Mark as Picked Up'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black87,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       );
@@ -1248,31 +1280,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: ElevatedButton.icon(
           onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
           icon: _isUpdatingStatus
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.location_on_outlined),
           label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black87,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       );
-    } else if (order.status.toLowerCase() == 'in-transit' || order.status.toLowerCase() == 'in_transit') {
+    } else if (order.status.toLowerCase() == 'in-transit' ||
+        order.status.toLowerCase() == 'in_transit') {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
           icon: _isUpdatingStatus
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.location_on_outlined),
           label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black87,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       );
@@ -1291,7 +1332,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
+          style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
         ),
       ],
     );
@@ -1308,19 +1350,46 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+          style: const TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
         ),
       ],
     );
   }
 
+  String _stepShortDate(String date) {
+    try {
+      final d = DateTime.parse(date);
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ];
+      return '${d.day} ${months[d.month - 1]}, ${d.year.toString().substring(2)}';
+    } catch (_) {
+      return '';
+    }
+  }
+
   Widget _buildTrackingTimeline(int activeStep) {
+    final orderDate = _apiPickupDate ?? _order.date;
+    final delivDate = _apiDeliveryDate ?? _order.deliveryTime ?? _order.date;
+
     final steps = [
-      ('Order Confirmed', 'Order accepted'),
-      ('Picked Up', 'Package collected'),
-      ('In Transit', 'En-route to destination'),
-      ('Arrived', 'At destination'),
-      ('Delivered', 'Delivery complete'),
+      ('Order Confirmed', _stepShortDate(orderDate)),
+      ('Picked Up', _stepShortDate(orderDate)),
+      ('IN TRANSIT', _stepShortDate(orderDate)),
+      ('Arrived', _stepShortDate(delivDate)),
+      ('Delivered', _stepShortDate(delivDate)),
     ];
 
     return Column(
@@ -1328,52 +1397,60 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         final isActive = i <= activeStep;
         final isCurrent = i == activeStep;
         final isLast = i == steps.length - 1;
+        final connectorHeight = 32.0;
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              children: [
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isActive ? Colors.black87 : Colors.transparent,
-                    border: Border.all(
-                      color: isActive ? Colors.black87 : Colors.grey[400]!,
-                      width: 2,
-                    ),
-                  ),
-                ),
-                if (!isLast)
+            // ── Dot + dashed connector ──
+            SizedBox(
+              width: 20,
+              child: Column(
+                children: [
                   Container(
-                    width: 2,
-                    height: 36,
+                    width: 14,
+                    height: 14,
                     decoration: BoxDecoration(
-                      color: isActive ? Colors.grey[400] : Colors.grey[200],
+                      shape: BoxShape.circle,
+                      color: isActive ? Colors.black87 : Colors.transparent,
+                      border: Border.all(
+                        color: isActive ? Colors.black87 : Colors.grey[400]!,
+                        width: 2,
+                      ),
                     ),
                   ),
-              ],
+                  if (!isLast)
+                    SizedBox(
+                      width: 2,
+                      height: connectorHeight,
+                      child: CustomPaint(
+                          painter: _DashedLinePainter(isActive
+                              ? Colors.grey[500]!
+                              : Colors.grey[300]!)),
+                    ),
+                ],
+              ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
+            // ── Step content ──
             Expanded(
               child: Padding(
-                padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+                padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
                 child: Container(
                   padding: isCurrent
-                      ? const EdgeInsets.symmetric(horizontal: 14, vertical: 10)
-                      : EdgeInsets.zero,
+                      ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+                      : const EdgeInsets.symmetric(vertical: 0),
                   decoration: isCurrent
                       ? BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(10),
-                  )
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(10),
+                        )
                       : null,
                   child: Row(
                     children: [
                       if (isCurrent) ...[
-                        const Icon(Icons.chevron_right, size: 18, color: Colors.black54),
+                        const Icon(Icons.chevron_right,
+                            size: 18, color: Colors.black54),
                         const SizedBox(width: 4),
                       ],
                       Column(
@@ -1383,17 +1460,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             steps[i].$1,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                              color: isActive ? Colors.black87 : Colors.grey[400],
+                              fontWeight:
+                                  isCurrent ? FontWeight.w800 : FontWeight.w500,
+                              color:
+                                  isActive ? Colors.black87 : Colors.grey[400],
                             ),
                           ),
-                          Text(
-                            steps[i].$2,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isActive ? Colors.grey[600] : Colors.grey[400],
+                          if (steps[i].$2.isNotEmpty)
+                            Text(
+                              steps[i].$2,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isActive
+                                    ? Colors.grey[500]
+                                    : Colors.grey[400],
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ],
@@ -1407,7 +1489,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _buildTripRequestCard(BuildContext context, TripRequestDisplay request) {
+  Widget _buildTripRequestCard(
+      BuildContext context, TripRequestDisplay request) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -1452,41 +1535,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    widget.onAcceptRequest?.call(request, widget.order.id);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
-                  ),
-                  child: const Text('Accept', style: TextStyle(color: Colors.white)),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    widget.onDeclineRequest?.call(request, widget.order.id);
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: Colors.grey[400]!),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Decline', style: TextStyle(color: Colors.black54)),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -1498,7 +1546,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Order?', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Delete Order?',
+            style: TextStyle(fontWeight: FontWeight.w700)),
         content: Text(
           'Order #${widget.order.id} will be permanently deleted. This action cannot be undone.',
           style: const TextStyle(fontSize: 14, color: Colors.black54),
@@ -1506,7 +1555,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.black54)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1516,7 +1566,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red[600],
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
@@ -1528,19 +1579,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _showEditOrderDialog(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
     final originController = TextEditingController(text: widget.order.origin);
-    final destinationController = TextEditingController(text: widget.order.destination);
-    final itemDescController = TextEditingController(text: widget.order.itemDescription);
-    final weightController = TextEditingController(text: widget.order.weight.toString());
-    final priceController = TextEditingController(text: widget.order.expectedPrice?.toString() ?? '');
-    final notesController = TextEditingController(text: widget.order.notes ?? '');
-    DateTime selectedDate = DateTime.tryParse(widget.order.date) ?? DateTime.now();
+    final destinationController =
+        TextEditingController(text: widget.order.destination);
+    final itemDescController =
+        TextEditingController(text: widget.order.itemDescription);
+    final weightController =
+        TextEditingController(text: widget.order.weight.toString());
+    final priceController = TextEditingController(
+        text: widget.order.expectedPrice?.toString() ?? '');
+    final notesController =
+        TextEditingController(text: widget.order.notes ?? '');
+    DateTime selectedDate =
+        DateTime.tryParse(widget.order.date) ?? DateTime.now();
 
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           contentPadding: EdgeInsets.zero,
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
@@ -1588,31 +1646,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       key: formKey,
                       child: Column(
                         children: [
-                          _editField(originController, 'Origin *', Icons.radio_button_checked,
-                              validator: (v) => v?.isEmpty == true ? 'Required' : null),
+                          _editField(originController, 'Origin *',
+                              Icons.radio_button_checked,
+                              validator: (v) =>
+                                  v?.isEmpty == true ? 'Required' : null),
                           const SizedBox(height: 14),
-                          _editField(destinationController, 'Destination *', Icons.location_on,
-                              validator: (v) => v?.isEmpty == true ? 'Required' : null),
+                          _editField(destinationController, 'Destination *',
+                              Icons.location_on,
+                              validator: (v) =>
+                                  v?.isEmpty == true ? 'Required' : null),
                           const SizedBox(height: 14),
-                          _editField(itemDescController, 'Item Description', Icons.inventory_2_outlined,
+                          _editField(itemDescController, 'Item Description',
+                              Icons.inventory_2_outlined,
                               maxLines: 2),
                           const SizedBox(height: 14),
                           Row(
                             children: [
                               Expanded(
-                                child: _editField(weightController, 'Weight (kg) *', Icons.scale,
+                                child: _editField(weightController,
+                                    'Weight (kg) *', Icons.scale,
                                     keyboardType: TextInputType.number,
-                                    validator: (v) => v?.isEmpty == true ? 'Required' : null),
+                                    validator: (v) =>
+                                        v?.isEmpty == true ? 'Required' : null),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: _editField(priceController, 'Price (₹)', Icons.currency_rupee,
+                                child: _editField(priceController, 'Price (₹)',
+                                    Icons.currency_rupee,
                                     keyboardType: TextInputType.number),
                               ),
                             ],
                           ),
                           const SizedBox(height: 14),
-                          _editField(notesController, 'Notes', Icons.note_outlined, maxLines: 2),
+                          _editField(
+                              notesController, 'Notes', Icons.note_outlined,
+                              maxLines: 2),
                         ],
                       ),
                     ),
@@ -1631,7 +1699,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             side: BorderSide(color: Colors.grey[300]!),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                           child: const Text('Cancel'),
                         ),
@@ -1650,9 +1719,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 origin: originController.text.trim(),
                                 destination: destinationController.text.trim(),
                                 date: selectedDate.toIso8601String(),
-                                itemDescription: itemDescController.text.trim().isNotEmpty
-                                    ? itemDescController.text.trim()
-                                    : 'Package',
+                                itemDescription:
+                                    itemDescController.text.trim().isNotEmpty
+                                        ? itemDescController.text.trim()
+                                        : 'Package',
                                 weight: weightController.text.trim().isNotEmpty
                                     ? '${weightController.text.trim()} kg'
                                     : '0kg',
@@ -1665,14 +1735,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                     : null,
                                 originLatitude: widget.order.originLatitude,
                                 originLongitude: widget.order.originLongitude,
-                                destinationLatitude: widget.order.destinationLatitude,
-                                destinationLongitude: widget.order.destinationLongitude,
+                                destinationLatitude:
+                                    widget.order.destinationLatitude,
+                                destinationLongitude:
+                                    widget.order.destinationLongitude,
                                 orderType: widget.order.orderType,
-                                estimatedDistance: widget.order.estimatedDistance,
+                                estimatedDistance:
+                                    widget.order.estimatedDistance,
                                 requestStatus: widget.order.requestStatus,
                                 imageUrl: widget.order.imageUrl,
                                 profileImageUrl: widget.order.profileImageUrl,
-                                matchedTravellerId: widget.order.matchedTravellerId,
+                                matchedTravellerId:
+                                    widget.order.matchedTravellerId,
                                 otp: widget.order.otp,
                               );
                               Navigator.pop(context);
@@ -1682,12 +1756,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.black87,
                             padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                             elevation: 0,
                           ),
                           child: const Text(
                             'Save Changes',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
@@ -1703,13 +1780,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _editField(
-      TextEditingController controller,
-      String label,
-      IconData icon, {
-        String? Function(String?)? validator,
-        TextInputType? keyboardType,
-        int maxLines = 1,
-      }) {
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    String? Function(String?)? validator,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+  }) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
@@ -1727,4 +1804,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
     );
   }
+}
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  _DashedLinePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5;
+    const dashHeight = 4.0;
+    const gapHeight = 3.0;
+    double y = 0;
+    while (y < size.height) {
+      canvas.drawLine(Offset(size.width / 2, y),
+          Offset(size.width / 2, y + dashHeight), paint);
+      y += dashHeight + gapHeight;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedLinePainter old) => old.color != color;
 }
