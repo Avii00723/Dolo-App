@@ -538,29 +538,11 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   }
 
   Future<void> _acceptRequest(TripRequest request) async {
-    final TextEditingController priceController = TextEditingController();
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Accept Trip Request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Accept request from ${request.source} to ${request.destination}?'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Negotiated Price',
-                border: OutlineInputBorder(),
-                prefixText: '₹ ',
-              ),
-            ),
-          ],
-        ),
+        content: Text('Accept request from ${request.source} to ${request.destination}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -574,12 +556,12 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       ),
     );
 
-    if (confirmed == true && priceController.text.isNotEmpty) {
+    if (confirmed == true) {
       try {
         final acceptRequest = TripRequestAcceptRequest(
           orderCreatorId: _currentUserId!,
           tripRequestId: request.id,
-          negotiatedPrice: int.parse(priceController.text),
+          negotiatedPrice: 0,
         );
 
         final response = await _tripRequestService.acceptTripRequest(acceptRequest);

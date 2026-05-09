@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import '../../Controllers/ordertrackingservice.dart';
 import '../../theme/app_theme.dart';
+import 'RatingFeedbackDialog.dart';
 import 'YourOrders.dart';
 
 class ModernSenderOrderCard extends StatelessWidget {
@@ -470,6 +471,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _isLoadingDetails = false;
 
   // Helpers that read from the /details API response
+  Map<String, dynamic>? get _apiOrder =>
+      _orderDetails?['order'] as Map<String, dynamic>?;
   Map<String, dynamic>? get _tripInfo =>
       _orderDetails?['trip'] as Map<String, dynamic>?;
   String get _vehicleType =>
@@ -485,14 +488,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           : '—';
 
   String? get _apiPickupDate =>
-      (_orderDetails?['order'] as Map<String, dynamic>?)?['pickup_date']
-          as String?;
+      _apiOrder?['pickup_date'] as String?;
   String? get _apiDeliveryDate =>
-      (_orderDetails?['order'] as Map<String, dynamic>?)?['delivery_date']
-          as String?;
-  String? get _apiImageUrl =>
-      (_orderDetails?['order'] as Map<String, dynamic>?)?['image_url']
-          as String?;
+      _apiOrder?['delivery_date'] as String?;
+  String? get _apiImageUrl => _apiOrder?['image_url'] as String?;
+  String get _ratingOrderStatus =>
+      _apiOrder?['status']?.toString().trim().isNotEmpty == true
+          ? _apiOrder!['status'].toString().trim().toLowerCase()
+          : _order.status.toLowerCase();
+  String? get _ratingFeedbackStatus {
+    final raw = _apiOrder?['rating_feedback_status'] ??
+        _orderDetails?['rating_feedback_status'];
+    final value = raw?.toString().trim().toLowerCase();
+    return value == null || value.isEmpty || value == 'null' ? null : value;
+  }
+  bool get _canRateOrder =>
+      _ratingOrderStatus == 'delivered' &&
+      _ratingFeedbackStatus == 'pending';
+  bool get _hasCompletedRating =>
+      _ratingFeedbackStatus == 'completed';
+
+  String get _travellerName {
+    final tripName = _tripInfo?['traveler_name'] ??
+        _tripInfo?['traveller_name'] ??
+        _tripInfo?['name'];
+    final orderName = _apiOrder?['traveler_name'] ??
+        _apiOrder?['traveller_name'] ??
+        _apiOrder?['delivery_person_name'];
+    final resolved = tripName?.toString().trim().isNotEmpty == true
+        ? tripName.toString().trim()
+        : orderName?.toString().trim();
+    return resolved?.isNotEmpty == true ? resolved! : 'Traveller';
+  }
 
   @override
   void initState() {
@@ -636,6 +663,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  void _showRatingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => RatingFeedbackDialog(
+        orderId: _order.id,
+        isTraveller: false,
+        displayName: _travellerName,
+        ratedUserId: _order.matchedTravellerId,
+        orderDetails: _orderDetails,
+        onSubmitted: _onRatingSubmitted,
+      ),
+    );
+  }
+
+  void _onRatingSubmitted() {
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    final currentOrder = Map<String, dynamic>.from(_apiOrder ?? {});
+    currentOrder['rating_feedback_status'] = 'completed';
+    setState(() {
+      _orderDetails = {
+        ...?_orderDetails,
+        'order': currentOrder,
+        'rating_feedback_status': 'completed',
+      };
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Thank you for your feedback!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final order = _order;
@@ -643,7 +705,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     // ── Determine sticky action button based on status ──
     Widget? stickyButton;
-    if (order.status.toLowerCase() == 'pending') {
+    if (_canRateOrder) {
+      stickyButton = ElevatedButton.icon(
+        onPressed: _showRatingDialog,
+        icon: const Icon(Icons.star_outline, size: 18),
+        label: const Text('Rate & give feedback'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black87,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 0,
+        ),
+      );
+    } else if (_hasCompletedRating) {
+      stickyButton = _buildFeedbackThankYou();
+    } else if (order.status.toLowerCase() == 'pending') {
       stickyButton = Row(
         children: [
           Expanded(
@@ -1243,6 +1321,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFeedbackThankYou() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.green[200]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_outline, color: Colors.green[700], size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Thank you for your feedback',
+            style: TextStyle(
+              color: Colors.green[800],
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }

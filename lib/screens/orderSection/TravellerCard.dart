@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../Controllers/ordertrackingservice.dart';
+import 'RatingFeedbackDialog.dart';
 import 'YourOrders.dart';
 
 class ModernTravellerOrderCard extends StatelessWidget {
@@ -90,8 +91,18 @@ class ModernTravellerOrderCard extends StatelessWidget {
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year.toString().substring(2)}';
     } catch (e) {
@@ -127,7 +138,8 @@ class ModernTravellerOrderCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.flight_takeoff, size: 20, color: Colors.black87),
+                  const Icon(Icons.flight_takeoff,
+                      size: 20, color: Colors.black87),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -166,7 +178,8 @@ class ModernTravellerOrderCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           _formatDisplayDate(order.date),
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
                       ],
                     ),
@@ -174,9 +187,11 @@ class ModernTravellerOrderCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   // Status Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _getStatusBgColor(order.requestStatus ?? order.status),
+                      color: _getStatusBgColor(
+                          order.requestStatus ?? order.status),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -184,7 +199,8 @@ class ModernTravellerOrderCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: _getStatusTextColor(order.requestStatus ?? order.status),
+                        color: _getStatusTextColor(
+                            order.requestStatus ?? order.status),
                       ),
                     ),
                   ),
@@ -253,7 +269,8 @@ class ModernTravellerOrderCard extends StatelessWidget {
               shape: BoxShape.circle,
               color: isActive ? Colors.grey[600] : Colors.transparent,
               border: Border.all(
-                color: (isActive ? Colors.grey[600] : Colors.grey[400]) ?? Colors.grey,
+                color: (isActive ? Colors.grey[600] : Colors.grey[400]) ??
+                    Colors.grey,
                 width: 1.5,
               ),
             ),
@@ -268,7 +285,8 @@ class ModernTravellerOrderCard extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
-                    color: (isActive ? Colors.grey[600] : Colors.grey[300]) ?? Colors.grey,
+                    color: (isActive ? Colors.grey[600] : Colors.grey[300]) ??
+                        Colors.grey,
                     width: 1.5,
                   ),
                 ),
@@ -320,7 +338,8 @@ class TravellerOrderDetailScreen extends StatefulWidget {
       _TravellerOrderDetailScreenState();
 }
 
-class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen> {
+class _TravellerOrderDetailScreenState
+    extends State<TravellerOrderDetailScreen> {
   bool _packageDetailExpanded = false;
   bool _isUpdatingStatus = false;
   late OrderDisplay _order;
@@ -329,13 +348,77 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
   Map<String, dynamic>? _orderDetails;
   bool _isLoadingDetails = false;
 
-  Map<String, dynamic>? get _tripInfo => _orderDetails?['trip'] as Map<String, dynamic>?;
-  String get _vehicleType => (_tripInfo?['vehicle_type'] as String?)?.isNotEmpty == true ? _tripInfo!['vehicle_type'] : '—';
-  String get _vehicleInfo => (_tripInfo?['info'] as String?)?.isNotEmpty == true ? _tripInfo!['info'] : '—';
-  String get _vehicleNumber => (_tripInfo?['number'] as String?)?.isNotEmpty == true ? _tripInfo!['number'] : '—';
+  Map<String, dynamic>? get _apiOrder =>
+      _orderDetails?['order'] as Map<String, dynamic>?;
+  Map<String, dynamic>? get _tripInfo =>
+      _orderDetails?['trip'] as Map<String, dynamic>?;
+  String get _vehicleType =>
+      (_tripInfo?['vehicle_type'] as String?)?.isNotEmpty == true
+          ? _tripInfo!['vehicle_type']
+          : '—';
+  String get _vehicleInfo => (_tripInfo?['info'] as String?)?.isNotEmpty == true
+      ? _tripInfo!['info']
+      : '—';
+  String get _vehicleNumber =>
+      (_tripInfo?['number'] as String?)?.isNotEmpty == true
+          ? _tripInfo!['number']
+          : '—';
 
-  String? get _apiPickupDate => (_orderDetails?['order'] as Map<String, dynamic>?)?['pickup_date'] as String?;
-  String? get _apiDeliveryDate => (_orderDetails?['order'] as Map<String, dynamic>?)?['delivery_date'] as String?;
+  String? get _apiPickupDate =>
+      _apiOrder?['pickup_date'] as String?;
+  String? get _apiDeliveryDate =>
+      _apiOrder?['delivery_date'] as String?;
+  String get _ratingOrderStatus =>
+      _apiOrder?['status']?.toString().trim().isNotEmpty == true
+          ? _apiOrder!['status'].toString().trim().toLowerCase()
+          : _order.status.toLowerCase();
+  String? get _ratingFeedbackStatus {
+    final raw = _apiOrder?['rating_feedback_status'] ??
+        _orderDetails?['rating_feedback_status'];
+    final value = raw?.toString().trim().toLowerCase();
+    return value == null || value.isEmpty || value == 'null' ? null : value;
+  }
+  bool get _canRateOrder =>
+      _ratingOrderStatus == 'delivered' &&
+      _ratingFeedbackStatus == 'pending';
+  bool get _hasCompletedRating =>
+      _ratingFeedbackStatus == 'completed';
+
+  void _showRatingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => RatingFeedbackDialog(
+        orderId: _order.id,
+        isTraveller: true,
+        displayName:
+            _order.userName.isNotEmpty ? _order.userName : 'Order Creator',
+        ratedUserId: _order.userId == _order.id ? null : _order.userId,
+        orderDetails: _orderDetails,
+        onSubmitted: _onRatingSubmitted,
+      ),
+    );
+  }
+
+  void _onRatingSubmitted() {
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    final currentOrder = Map<String, dynamic>.from(_apiOrder ?? {});
+    currentOrder['rating_feedback_status'] = 'completed';
+    setState(() {
+      _orderDetails = {
+        ...?_orderDetails,
+        'order': currentOrder,
+        'rating_feedback_status': 'completed',
+      };
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Thank you for your feedback!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -364,8 +447,18 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
@@ -377,8 +470,18 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
@@ -397,15 +500,34 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
 
     // ── Determine which action button to show in the sticky bottom bar ──
     Widget? stickyButton;
-    if (order.status.toLowerCase() == 'confirmed' ||
+    if (_canRateOrder) {
+      stickyButton = ElevatedButton.icon(
+        onPressed: _showRatingDialog,
+        icon: const Icon(Icons.star_outline, size: 18),
+        label: const Text('Rate & give feedback'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black87,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } else if (_hasCompletedRating) {
+      stickyButton = _buildFeedbackThankYou();
+    } else if (order.status.toLowerCase() == 'confirmed' ||
         order.status.toLowerCase() == 'accepted' ||
         order.status.toLowerCase() == 'matched' ||
         order.status.toLowerCase() == 'booked') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
         icon: _isUpdatingStatus
-            ? const SizedBox(width: 16, height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.inventory_2_outlined, size: 18),
         label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as Picked Up'),
         style: ElevatedButton.styleFrom(
@@ -413,15 +535,19 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     } else if (order.status.toLowerCase() == 'picked_up') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
         icon: _isUpdatingStatus
-            ? const SizedBox(width: 16, height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.flight_land_outlined, size: 18),
         label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as Arrived'),
         style: ElevatedButton.styleFrom(
@@ -429,7 +555,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     } else if (order.status.toLowerCase() == 'in-transit' ||
@@ -437,8 +564,11 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
         icon: _isUpdatingStatus
-            ? const SizedBox(width: 16, height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.flight_land_outlined, size: 18),
         label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as Arrived'),
         style: ElevatedButton.styleFrom(
@@ -446,7 +576,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     } else if (order.status.toLowerCase() == 'arrived') {
@@ -459,7 +590,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     } else if (order.status.toLowerCase() == 'pending') {
@@ -471,10 +603,12 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
           side: BorderSide(color: Colors.red[300]!),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: Text('Withdraw Request',
-            style: TextStyle(color: Colors.red[600], fontWeight: FontWeight.w600)),
+            style:
+                TextStyle(color: Colors.red[600], fontWeight: FontWeight.w600)),
       );
     }
 
@@ -502,7 +636,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
             child: CircleAvatar(
               radius: 18,
               backgroundColor: Colors.grey[200],
-              child: const Icon(Icons.headset_mic_outlined, color: Colors.black54, size: 18),
+              child: const Icon(Icons.headset_mic_outlined,
+                  color: Colors.black54, size: 18),
             ),
           ),
         ],
@@ -510,14 +645,14 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
       // ── Sticky action button always visible at bottom ──
       bottomNavigationBar: stickyButton != null
           ? Container(
-        padding: EdgeInsets.fromLTRB(
-            20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Colors.grey[200]!)),
-        ),
-        child: SizedBox(width: double.infinity, child: stickyButton),
-      )
+              padding: EdgeInsets.fromLTRB(
+                  20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Colors.grey[200]!)),
+              ),
+              child: SizedBox(width: double.infinity, child: stickyButton),
+            )
           : null,
       body: SingleChildScrollView(
         child: Column(
@@ -590,15 +725,18 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
             ),
             const Divider(height: 1, color: Color(0xFFEEEEEE)),
             InkWell(
-              onTap: () => setState(() => _packageDetailExpanded = !_packageDetailExpanded),
+              onTap: () => setState(
+                  () => _packageDetailExpanded = !_packageDetailExpanded),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.inventory_2_outlined, size: 20, color: Colors.black87),
+                        const Icon(Icons.inventory_2_outlined,
+                            size: 20, color: Colors.black87),
                         const SizedBox(width: 10),
                         const Text(
                           'Package Detail',
@@ -622,7 +760,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                       children: [
                         Text(
                           'Order ID',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -638,7 +777,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                         ),
                         if (order.isUrgent == true)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 3),
                             decoration: BoxDecoration(
                               color: Colors.red[600],
                               borderRadius: BorderRadius.circular(12),
@@ -666,11 +806,13 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildDetailItem('Package Weight', order.weight),
+                            child: _buildDetailItem(
+                                'Package Weight', order.weight),
                           ),
                         ],
                       ),
-                      if (order.imageUrl != null && order.imageUrl!.isNotEmpty) ...[
+                      if (order.imageUrl != null &&
+                          order.imageUrl!.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         const Text(
                           'Package Image',
@@ -691,7 +833,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                                 color: Colors.grey[200],
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(Icons.image_not_supported, color: Colors.grey[400]),
+                              child: Icon(Icons.image_not_supported,
+                                  color: Colors.grey[400]),
                             ),
                           ),
                         ),
@@ -709,7 +852,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.directions_car_outlined, size: 20, color: Colors.black87),
+                      const Icon(Icons.directions_car_outlined,
+                          size: 20, color: Colors.black87),
                       const SizedBox(width: 10),
                       const Text(
                         'Travel Detail',
@@ -732,14 +876,20 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Expanded(child: _buildDetailItem('Vehicle Type', _vehicleType)),
-                      Expanded(child: _buildDetailItem('Vehicle Info', _vehicleInfo)),
+                      Expanded(
+                          child:
+                              _buildDetailItem('Vehicle Type', _vehicleType)),
+                      Expanded(
+                          child:
+                              _buildDetailItem('Vehicle Info', _vehicleInfo)),
                     ],
                   ),
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      Expanded(child: _buildDetailItem('Vehicle No.', _vehicleNumber)),
+                      Expanded(
+                          child:
+                              _buildDetailItem('Vehicle No.', _vehicleNumber)),
                       Expanded(
                         child: _buildDetailItem(
                           'Departure',
@@ -775,7 +925,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 20, color: Colors.black87),
+                      const Icon(Icons.location_on_outlined,
+                          size: 20, color: Colors.black87),
                       const SizedBox(width: 10),
                       const Text(
                         'Track Package',
@@ -786,7 +937,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                         ),
                       ),
                       const Spacer(),
-                      if (order.otp != null && order.status.toLowerCase() == 'arrived')
+                      if (order.otp != null &&
+                          order.status.toLowerCase() == 'arrived')
                         GestureDetector(
                           onTap: () {
                             Clipboard.setData(ClipboardData(text: order.otp!));
@@ -817,7 +969,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                const Icon(Icons.copy, size: 14, color: Colors.black54),
+                                const Icon(Icons.copy,
+                                    size: 14, color: Colors.black54),
                               ],
                             ),
                           ),
@@ -864,11 +1017,13 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline, color: Colors.black54),
+                    icon: const Icon(Icons.chat_bubble_outline,
+                        color: Colors.black54),
                     onPressed: () {},
                   ),
                   IconButton(
-                    icon: const Icon(Icons.call_outlined, color: Colors.black54),
+                    icon:
+                        const Icon(Icons.call_outlined, color: Colors.black54),
                     onPressed: () {},
                   ),
                 ],
@@ -877,6 +1032,32 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
             const SizedBox(height: 32),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFeedbackThankYou() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.green[200]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_outline, color: Colors.green[700], size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Thank you for your feedback',
+            style: TextStyle(
+              color: Colors.green[800],
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -917,11 +1098,16 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
 
   String _statusLabel(String status) {
     switch (status.toLowerCase()) {
-      case 'picked_up': return 'Picked Up';
-      case 'in-transit': return 'In Transit';
-      case 'arrived': return 'Arrived';
-      case 'delivered': return 'Delivered';
-      default: return status;
+      case 'picked_up':
+        return 'Picked Up';
+      case 'in-transit':
+        return 'In Transit';
+      case 'arrived':
+        return 'Arrived';
+      case 'delivered':
+        return 'Delivered';
+      default:
+        return status;
     }
   }
 
@@ -935,7 +1121,8 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: EdgeInsets.zero,
           content: Container(
             width: double.infinity,
@@ -950,12 +1137,16 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                     color: Colors.green[50],
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.lock_open_outlined, color: Colors.green[700], size: 28),
+                  child: Icon(Icons.lock_open_outlined,
+                      color: Colors.green[700], size: 28),
                 ),
                 const SizedBox(height: 16),
                 const Text(
                   'Enter Delivery OTP',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.black87),
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -977,21 +1168,29 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                   decoration: InputDecoration(
                     counterText: '',
                     hintText: '• • • • • •',
-                    hintStyle: TextStyle(letterSpacing: 6, color: Colors.grey[400], fontSize: 22),
+                    hintStyle: TextStyle(
+                        letterSpacing: 6,
+                        color: Colors.grey[400],
+                        fontSize: 22),
                     errorText: errorText,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.green[700]!, width: 2),
+                      borderSide:
+                          BorderSide(color: Colors.green[700]!, width: 2),
                     ),
                     errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                      borderSide:
+                          const BorderSide(color: Colors.red, width: 1.5),
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   onChanged: (_) {
-                    if (errorText != null) setDialogState(() => errorText = null);
+                    if (errorText != null) {
+                      setDialogState(() => errorText = null);
+                    }
                   },
                 ),
                 const SizedBox(height: 20),
@@ -999,13 +1198,17 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
+                        onPressed: isSubmitting
+                            ? null
+                            : () => Navigator.pop(dialogContext),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           side: BorderSide(color: Colors.grey[300]!),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
                         ),
-                        child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
+                        child: const Text('Cancel',
+                            style: TextStyle(color: Colors.black54)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1015,41 +1218,51 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                         onPressed: isSubmitting
                             ? null
                             : () async {
-                          final otp = otpController.text.trim();
-                          if (otp.length != 6) {
-                            setDialogState(() => errorText = 'Please enter a valid 6-digit OTP');
-                            return;
-                          }
-                          setDialogState(() => isSubmitting = true);
-                          try {
-                            await widget.onCompleteOrderWithOtp?.call(_order.id, otp);
-                            if (mounted) {
-                              Navigator.pop(dialogContext);
-                              setState(() {
-                                _order = _order.copyWith(status: 'delivered');
-                              });
-                            }
-                          } catch (e) {
-                            setDialogState(() {
-                              isSubmitting = false;
-                              errorText = 'Invalid OTP. Please try again.';
-                            });
-                          }
-                        },
+                                final otp = otpController.text.trim();
+                                if (otp.length != 6) {
+                                  setDialogState(() => errorText =
+                                      'Please enter a valid 6-digit OTP');
+                                  return;
+                                }
+                                setDialogState(() => isSubmitting = true);
+                                try {
+                                  await widget.onCompleteOrderWithOtp
+                                      ?.call(_order.id, otp);
+                                  if (mounted) {
+                                    if (dialogContext.mounted) {
+                                      Navigator.pop(dialogContext);
+                                    }
+                                    setState(() {
+                                      _order =
+                                          _order.copyWith(status: 'delivered');
+                                    });
+                                    _fetchOrderDetails();
+                                  }
+                                } catch (e) {
+                                  setDialogState(() {
+                                    isSubmitting = false;
+                                    errorText =
+                                        'Invalid OTP. Please try again.';
+                                  });
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green[700],
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
                         ),
                         child: isSubmitting
                             ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                            : const Text('Confirm Delivery', style: TextStyle(fontWeight: FontWeight.bold)),
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Confirm Delivery',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -1107,7 +1320,9 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                     shape: BoxShape.circle,
                     color: isActive ? Colors.black87 : Colors.transparent,
                     border: Border.all(
-                      color: isActive ? Colors.black87 : (Colors.grey[400] ?? Colors.grey),
+                      color: isActive
+                          ? Colors.black87
+                          : (Colors.grey[400] ?? Colors.grey),
                       width: 2,
                     ),
                   ),
@@ -1116,7 +1331,9 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                   Container(
                     width: 2,
                     height: 36,
-                    color: isActive ? (Colors.grey[400] ?? Colors.grey) : (Colors.grey[200] ?? Colors.grey),
+                    color: isActive
+                        ? (Colors.grey[400] ?? Colors.grey)
+                        : (Colors.grey[200] ?? Colors.grey),
                   ),
               ],
             ),
@@ -1130,14 +1347,15 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                       : EdgeInsets.zero,
                   decoration: isCurrent
                       ? BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(10),
-                  )
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(10),
+                        )
                       : null,
                   child: Row(
                     children: [
                       if (isCurrent) ...[
-                        const Icon(Icons.chevron_right, size: 18, color: Colors.black54),
+                        const Icon(Icons.chevron_right,
+                            size: 18, color: Colors.black54),
                         const SizedBox(width: 4),
                       ],
                       Column(
@@ -1147,15 +1365,20 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
                             steps[i].$1,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                              color: isActive ? Colors.black87 : (Colors.grey[400] ?? Colors.grey),
+                              fontWeight:
+                                  isCurrent ? FontWeight.w700 : FontWeight.w500,
+                              color: isActive
+                                  ? Colors.black87
+                                  : (Colors.grey[400] ?? Colors.grey),
                             ),
                           ),
                           Text(
                             steps[i].$2,
                             style: TextStyle(
                               fontSize: 11,
-                              color: isActive ? (Colors.grey[600] ?? Colors.grey) : (Colors.grey[400] ?? Colors.grey),
+                              color: isActive
+                                  ? (Colors.grey[600] ?? Colors.grey)
+                                  : (Colors.grey[400] ?? Colors.grey),
                             ),
                           ),
                         ],
@@ -1171,4 +1394,3 @@ class _TravellerOrderDetailScreenState extends State<TravellerOrderDetailScreen>
     );
   }
 }
-

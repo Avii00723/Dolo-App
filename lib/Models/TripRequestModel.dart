@@ -174,8 +174,14 @@ class TripRequest {
   factory TripRequest.fromJson(Map<String, dynamic> json) {
     return TripRequest(
       id: json['hashed_id']?.toString() ?? '',
-      travelerId: json['traveler_id']?.toString() ?? '',
-      orderId: json['order_id']?.toString() ?? '',
+      travelerId: json['traveler_hashed_id']?.toString() ??
+          json['traveller_hashed_id']?.toString() ??
+          json['traveler_id']?.toString() ??
+          json['traveller_id']?.toString() ??
+          '',
+      orderId: json['order_hashed_id']?.toString() ??
+          json['order_id']?.toString() ??
+          '',
       travelDate: json['travel_date']?.toString() ?? '',
       vehicleInfo: json['vehicle_info']?.toString() ?? '',
       source: json['source']?.toString() ?? '',
