@@ -4,24 +4,24 @@
 /// Request model for submitting a rating
 class RatingRequest {
   final String orderId; // Order being rated
-  final String raterUserId; // User submitting the rating (order creator)
-  final String ratedUserId; // User being rated (traveler who delivered)
+  final String travellerId; // Traveller assigned to the order
+  final String raterId; // User submitting the rating
   final int rating; // Rating value: 1-5 stars (mandatory)
   final String? feedback; // Optional feedback text
 
   RatingRequest({
     required this.orderId,
-    required this.raterUserId,
-    required this.ratedUserId,
+    required this.travellerId,
+    required this.raterId,
     required this.rating,
     this.feedback,
   }) : assert(rating >= 1 && rating <= 5, 'Rating must be between 1 and 5');
 
   Map<String, dynamic> toJson() {
     final map = {
-      'orderId': orderId,
-      'raterUserId': raterUserId,
-      'ratedUserId': ratedUserId,
+      'order_id': orderId,
+      'traveller_id': travellerId,
+      'rater_id': raterId,
       'rating': rating,
     };
 
@@ -37,8 +37,8 @@ class RatingRequest {
   /// Validate rating data before submission
   bool isValid() {
     return orderId.isNotEmpty &&
-        raterUserId.isNotEmpty &&
-        ratedUserId.isNotEmpty &&
+        travellerId.isNotEmpty &&
+        raterId.isNotEmpty &&
         rating >= 1 &&
         rating <= 5;
   }
@@ -46,22 +46,33 @@ class RatingRequest {
 
 /// Response model after submitting a rating
 class RatingResponse {
+  final bool success;
   final String message;
+  final String? error;
 
-  RatingResponse({required this.message});
+  RatingResponse({
+    required this.success,
+    required this.message,
+    this.error,
+  });
 
   factory RatingResponse.fromJson(Map<String, dynamic> json) {
     return RatingResponse(
-      message: json['message'] ?? 'Rating submitted successfully',
+      success: json['success'] == true,
+      message: json['message']?.toString() ?? 'Rating submitted successfully',
+      error: json['error']?.toString(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'success': success,
       'message': message,
+      if (error != null) 'error': error,
     };
   }
 }
+
 
 /// Rating model for displaying rating data
 class Rating {
@@ -86,12 +97,18 @@ class Rating {
   factory Rating.fromJson(Map<String, dynamic> json) {
     return Rating(
       id: json['id']?.toString() ?? '',
-      orderId: json['orderId']?.toString() ?? '',
-      raterUserId: json['raterUserId']?.toString() ?? '',
-      ratedUserId: json['ratedUserId']?.toString() ?? '',
+      orderId:
+          json['order_id']?.toString() ?? json['orderId']?.toString() ?? '',
+      raterUserId:
+          json['rater_id']?.toString() ?? json['raterUserId']?.toString() ?? '',
+      ratedUserId: json['rated_user_id']?.toString() ??
+          json['ratedUserId']?.toString() ??
+          json['traveller_id']?.toString() ??
+          '',
       rating: _parseInt(json['rating']),
       feedback: json['feedback'],
-      createdAt: json['createdAt']?.toString() ?? json['created_at']?.toString() ?? '',
+      createdAt:
+          json['createdAt']?.toString() ?? json['created_at']?.toString() ?? '',
     );
   }
 
@@ -144,7 +161,8 @@ class UserRatingStats {
       final distData = json['ratingDistribution'] as Map<String, dynamic>;
       distData.forEach((key, value) {
         final starCount = int.tryParse(key) ?? 0;
-        final count = value is int ? value : int.tryParse(value.toString()) ?? 0;
+        final count =
+            value is int ? value : int.tryParse(value.toString()) ?? 0;
         distribution[starCount] = count;
       });
     }

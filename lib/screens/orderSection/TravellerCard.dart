@@ -364,10 +364,8 @@ class _TravellerOrderDetailScreenState
           ? _tripInfo!['number']
           : '—';
 
-  String? get _apiPickupDate =>
-      _apiOrder?['pickup_date'] as String?;
-  String? get _apiDeliveryDate =>
-      _apiOrder?['delivery_date'] as String?;
+  String? get _apiPickupDate => _apiOrder?['pickup_date'] as String?;
+  String? get _apiDeliveryDate => _apiOrder?['delivery_date'] as String?;
   String get _ratingOrderStatus =>
       _apiOrder?['status']?.toString().trim().isNotEmpty == true
           ? _apiOrder!['status'].toString().trim().toLowerCase()
@@ -378,11 +376,10 @@ class _TravellerOrderDetailScreenState
     final value = raw?.toString().trim().toLowerCase();
     return value == null || value.isEmpty || value == 'null' ? null : value;
   }
+
   bool get _canRateOrder =>
-      _ratingOrderStatus == 'delivered' &&
-      _ratingFeedbackStatus == 'pending';
-  bool get _hasCompletedRating =>
-      _ratingFeedbackStatus == 'completed';
+      _ratingOrderStatus == 'delivered' && _ratingFeedbackStatus == 'pending';
+  bool get _hasCompletedRating => _ratingFeedbackStatus == 'completed';
 
   void _showRatingDialog() {
     showDialog(
@@ -393,7 +390,7 @@ class _TravellerOrderDetailScreenState
         isTraveller: true,
         displayName:
             _order.userName.isNotEmpty ? _order.userName : 'Order Creator',
-        ratedUserId: _order.userId == _order.id ? null : _order.userId,
+        travellerId: null,
         orderDetails: _orderDetails,
         onSubmitted: _onRatingSubmitted,
       ),

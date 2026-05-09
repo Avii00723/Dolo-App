@@ -6,7 +6,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
+import '../../Controllers/AuthService.dart';
 import '../../Controllers/ordertrackingservice.dart';
+import '../../Controllers/ratingservice.dart';
+import '../../Models/RatingModel.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
@@ -38,7 +41,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   // Tracking state
   String _trackingStatus = 'pending';
-  int _trackingStage = 0; // 0=confirmed, 1=picked_up, 2=in_transit, 3=arrived, 4=delivered
+  int _trackingStage =
+      0; // 0=confirmed, 1=picked_up, 2=in_transit, 3=arrived, 4=delivered
   double _progressPercentage = 0.0;
   bool _isDelivered = false;
   bool _isUpdatingStatus = false;
@@ -462,10 +466,35 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       builder: (context) => RatingFeedbackDialog(
         orderId: widget.orderId,
         deliveryPersonName:
-        widget.orderData['delivery_person_name'] ?? 'Delivery Person',
+            widget.orderData['delivery_person_name'] ?? 'Delivery Person',
+        isTraveller: widget.isTraveller,
+        travellerId: _resolveTravellerIdFromOrderData(),
         onSubmitted: _onRatingSubmitted,
       ),
     );
+  }
+
+  String? _resolveTravellerIdFromOrderData() {
+    const keys = [
+      'traveller_id',
+      'traveler_id',
+      'traveller_hashed_id',
+      'traveler_hashed_id',
+      'matched_traveller_id',
+      'matched_traveler_id',
+      'accepted_traveller_id',
+      'accepted_traveler_id',
+      'delivery_person_id',
+      'delivery_person_hashed_id',
+    ];
+
+    for (final key in keys) {
+      final value = widget.orderData[key]?.toString().trim();
+      if (value != null && value.isNotEmpty && value != 'null') {
+        return value;
+      }
+    }
+    return null;
   }
 
   void _onRatingSubmitted() {
@@ -512,7 +541,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+                    const BorderRadius.vertical(top: Radius.circular(20)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.1),
@@ -586,7 +615,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
     final primary = Theme.of(context).colorScheme.primary;
     final inactive =
-    Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2);
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2);
 
     return Row(
       children: List.generate(stages.length, (i) {
@@ -613,9 +642,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         color: isActive
                             ? Colors.white
                             : Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.35),
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.35),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -624,13 +653,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight:
-                        isActive ? FontWeight.w700 : FontWeight.w400,
+                            isActive ? FontWeight.w700 : FontWeight.w400,
                         color: isActive
                             ? primary
                             : Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.4),
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.4),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -687,13 +716,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         onPressed: _isUpdatingStatus ? null : _updateStatus,
         icon: _isUpdatingStatus
             ? const SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-        )
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
             : Icon(_getNextStatusIcon()),
         label: Text(
           _isUpdatingStatus ? 'Updating…' : _getNextStatusLabel(),
@@ -703,7 +732,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 2,
         ),
       ),
@@ -725,7 +754,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
           shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 2,
         ),
       ),
@@ -741,13 +770,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           decoration: BoxDecoration(
             color: Colors.orange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border:
-            Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+            border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
-              const Icon(Icons.delivery_dining,
-                  color: Colors.orange, size: 20),
+              const Icon(Icons.delivery_dining, color: Colors.orange, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -776,8 +803,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             style: OutlinedButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.primary,
               side: BorderSide(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 1.5),
+                  color: Theme.of(context).colorScheme.primary, width: 1.5),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
@@ -791,8 +817,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color:
-        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -800,10 +825,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           Icon(
             Icons.info_outline,
             size: 16,
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.5),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -925,8 +948,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.my_location,
-                      size: 16, color: Colors.green[600]),
+                  Icon(Icons.my_location, size: 16, color: Colors.green[600]),
                   const SizedBox(width: 4),
                   Text(
                     'From',
@@ -995,8 +1017,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   void _fitMapToMarkers() {
     if (_markers.length > 1 && _mapController != null) {
-      final bounds =
-      _calculateBounds(_markers.map((m) => m.position).toList());
+      final bounds = _calculateBounds(_markers.map((m) => m.position).toList());
       _mapController!.animateCamera(
         CameraUpdate.newLatLngBounds(bounds, 100.0),
       );
@@ -1054,7 +1075,7 @@ class CompleteOrderBottomSheet extends StatefulWidget {
 
 class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
   final List<TextEditingController> _otpControllers =
-  List.generate(6, (_) => TextEditingController());
+      List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
   bool _isVerifying = false;
   String? _errorMessage;
@@ -1083,8 +1104,7 @@ class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
 
   Future<void> _verifyAndComplete() async {
     if (_otpValue.length != 6) {
-      setState(
-              () => _errorMessage = 'Please enter the complete 6-digit OTP');
+      setState(() => _errorMessage = 'Please enter the complete 6-digit OTP');
       return;
     }
 
@@ -1095,7 +1115,8 @@ class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
 
     try {
       // Use the verified API endpoint provided in the prompt
-      await widget.trackingService.verifyOtpAndComplete(widget.orderId, _otpValue);
+      await widget.trackingService
+          .verifyOtpAndComplete(widget.orderId, _otpValue);
 
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -1198,13 +1219,13 @@ class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
                       counterText: '',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor),
+                        borderSide:
+                            BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                            color: Theme.of(context).dividerColor),
+                        borderSide:
+                            BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -1232,8 +1253,8 @@ class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
             if (_errorMessage != null) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
@@ -1246,8 +1267,7 @@ class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
                     Expanded(
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(
-                            color: Colors.red, fontSize: 13),
+                        style: const TextStyle(color: Colors.red, fontSize: 13),
                       ),
                     ),
                   ],
@@ -1265,14 +1285,14 @@ class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
                 onPressed: _isVerifying ? null : _verifyAndComplete,
                 icon: _isVerifying
                     ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor:
-                    AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
                     : const Icon(Icons.check_circle_outline),
                 label: Text(
                   _isVerifying ? 'Verifying…' : 'Confirm Delivery',
@@ -1310,8 +1330,7 @@ class OtpDisplayDialog extends StatelessWidget {
     final digits = otp.padRight(6, '-').split('');
 
     return Dialog(
-      shape:
-      RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(
@@ -1369,9 +1388,9 @@ class OtpDisplayDialog extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         color: d == '-'
                             ? Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.2)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.2)
                             : primary,
                       ),
                     ),
@@ -1383,8 +1402,7 @@ class OtpDisplayDialog extends StatelessWidget {
 
             // Security note
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.amber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
@@ -1392,8 +1410,7 @@ class OtpDisplayDialog extends StatelessWidget {
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.shield_outlined,
-                      color: Colors.amber, size: 16),
+                  Icon(Icons.shield_outlined, color: Colors.amber, size: 16),
                   SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -1419,8 +1436,8 @@ class OtpDisplayDialog extends StatelessWidget {
                   elevation: 0,
                 ),
                 child: const Text('Got it',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -1437,12 +1454,16 @@ class OtpDisplayDialog extends StatelessWidget {
 class RatingFeedbackDialog extends StatefulWidget {
   final String orderId;
   final String deliveryPersonName;
+  final bool isTraveller;
+  final String? travellerId;
   final VoidCallback onSubmitted;
 
   const RatingFeedbackDialog({
     super.key,
     required this.orderId,
     required this.deliveryPersonName,
+    required this.isTraveller,
+    this.travellerId,
     required this.onSubmitted,
   });
 
@@ -1451,6 +1472,7 @@ class RatingFeedbackDialog extends StatefulWidget {
 }
 
 class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
+  final RatingService _ratingService = RatingService();
   int _selectedRating = 0;
   final TextEditingController _feedbackController = TextEditingController();
   bool _isSubmitting = false;
@@ -1476,28 +1498,28 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
     setState(() => _isSubmitting = true);
 
     try {
-      await FirebaseFirestore.instance
-          .collection('order_ratings')
-          .doc(widget.orderId)
-          .set({
-        'order_id': widget.orderId,
-        'user_id': FirebaseAuth.instance.currentUser?.uid,
-        'rating': _selectedRating,
-        'feedback': _feedbackController.text.trim(),
-        'created_at': FieldValue.serverTimestamp(),
-      });
+      final raterUserId = await AuthService.getUserId();
+      final travellerId =
+          widget.isTraveller ? raterUserId : widget.travellerId?.trim();
 
-      await FirebaseFirestore.instance
-          .collection('orders')
-          .doc(widget.orderId)
-          .update({
-        'rating': _selectedRating,
-        'feedback': _feedbackController.text.trim(),
-        'rated_at': FieldValue.serverTimestamp(),
-      });
+      if (raterUserId == null ||
+          raterUserId.isEmpty ||
+          travellerId == null ||
+          travellerId.isEmpty) {
+        throw Exception('Unable to find rating user details');
+      }
+
+      await _ratingService.submitRating(
+        RatingRequest(
+          orderId: widget.orderId,
+          travellerId: travellerId,
+          raterId: raterUserId,
+          rating: _selectedRating,
+          feedback: _feedbackController.text.trim(),
+        ),
+      );
 
       if (!mounted) return;
-      Navigator.of(context).pop();
       widget.onSubmitted();
     } catch (e) {
       if (!mounted) return;
@@ -1531,8 +1553,7 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape:
-      RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -1559,7 +1580,9 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
               ),
               child: Center(
                 child: Text(
-                  widget.deliveryPersonName.isNotEmpty ? widget.deliveryPersonName.substring(0, 2).toUpperCase() : 'DP',
+                  widget.deliveryPersonName.isNotEmpty
+                      ? widget.deliveryPersonName.substring(0, 2).toUpperCase()
+                      : 'DP',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -1607,9 +1630,9 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
                       color: _selectedRating >= starIndex
                           ? Colors.amber
                           : Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.25),
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.25),
                     ),
                   ),
                 );
@@ -1642,18 +1665,16 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
                         .withValues(alpha: 0.35)),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                  BorderSide(color: Theme.of(context).dividerColor),
+                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.primary),
+                  borderSide:
+                      BorderSide(color: Theme.of(context).colorScheme.primary),
                 ),
                 filled: true,
                 fillColor: Theme.of(context).colorScheme.surface,
@@ -1675,19 +1696,19 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
                 ),
                 child: _isSubmitting
                     ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor:
-                    AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
                     : const Text(
-                  'Done',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                        'Done',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],

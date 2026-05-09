@@ -487,10 +487,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ? _tripInfo!['number']
           : '—';
 
-  String? get _apiPickupDate =>
-      _apiOrder?['pickup_date'] as String?;
-  String? get _apiDeliveryDate =>
-      _apiOrder?['delivery_date'] as String?;
+  String? get _apiPickupDate => _apiOrder?['pickup_date'] as String?;
+  String? get _apiDeliveryDate => _apiOrder?['delivery_date'] as String?;
   String? get _apiImageUrl => _apiOrder?['image_url'] as String?;
   String get _ratingOrderStatus =>
       _apiOrder?['status']?.toString().trim().isNotEmpty == true
@@ -502,11 +500,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final value = raw?.toString().trim().toLowerCase();
     return value == null || value.isEmpty || value == 'null' ? null : value;
   }
+
   bool get _canRateOrder =>
-      _ratingOrderStatus == 'delivered' &&
-      _ratingFeedbackStatus == 'pending';
-  bool get _hasCompletedRating =>
-      _ratingFeedbackStatus == 'completed';
+      _ratingOrderStatus == 'delivered' && _ratingFeedbackStatus == 'pending';
+  bool get _hasCompletedRating => _ratingFeedbackStatus == 'completed';
 
   String get _travellerName {
     final tripName = _tripInfo?['traveler_name'] ??
@@ -671,7 +668,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         orderId: _order.id,
         isTraveller: false,
         displayName: _travellerName,
-        ratedUserId: _order.matchedTravellerId,
+        travellerId: _order.matchedTravellerId,
         orderDetails: _orderDetails,
         onSubmitted: _onRatingSubmitted,
       ),

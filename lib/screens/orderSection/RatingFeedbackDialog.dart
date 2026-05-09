@@ -8,7 +8,7 @@ class RatingFeedbackDialog extends StatefulWidget {
   final String orderId;
   final bool isTraveller;
   final String displayName;
-  final String? ratedUserId;
+  final String? travellerId;
   final Map<String, dynamic>? orderDetails;
   final VoidCallback? onSubmitted;
 
@@ -17,7 +17,7 @@ class RatingFeedbackDialog extends StatefulWidget {
     required this.orderId,
     required this.isTraveller,
     required this.displayName,
-    this.ratedUserId,
+    this.travellerId,
     this.orderDetails,
     this.onSubmitted,
   });
@@ -88,7 +88,8 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
     return null;
   }
 
-  Map<String, dynamic>? _readMap(Map<String, dynamic>? source, List<String> keys) {
+  Map<String, dynamic>? _readMap(
+      Map<String, dynamic>? source, List<String> keys) {
     if (source == null) return null;
     for (final key in keys) {
       final value = source[key];
@@ -97,8 +98,8 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
     return null;
   }
 
-  String? _resolveRatedUserId() {
-    final explicit = widget.ratedUserId?.trim();
+  String? _resolveTravellerId(String raterUserId) {
+    final explicit = widget.travellerId?.trim();
     if (explicit != null && explicit.isNotEmpty) return explicit;
 
     final details = widget.orderDetails;
@@ -116,26 +117,11 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
     ]);
 
     if (widget.isTraveller) {
-      return _readAny(order, const [
-            'order_creator_hashed_id',
-            'creator_hashed_id',
-            'user_hashed_id',
-            'user_id',
-            'order_creator_id',
-            'creator_id',
-          ]) ??
-        _readAny(details, const [
-            'order_creator_hashed_id',
-            'creator_hashed_id',
-            'order_hashed_id',
-            'user_hashed_id',
-            'order_creator_id',
-            'sender_hashed_id',
-            'sender_id',
-          ]);
+      return raterUserId;
     }
 
     return _readAny(trip, const [
+          // Common traveller id keys
           'traveler_hashed_id',
           'traveller_hashed_id',
           'travelerHashedId',
@@ -144,6 +130,16 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
           'traveller_id',
           'user_hashed_id',
           'user_id',
+          // Some backends may send delivery person id in trip section
+          'delivery_person_id',
+          'delivery_person_hashed_id',
+          // Matched/accepted variations
+          'matched_traveler_id',
+          'matched_traveller_id',
+          'matchedTravellerId',
+          'accepted_traveler_id',
+          'accepted_traveller_id',
+          'acceptedTravellerId',
         ]) ??
         _readAny(order, const [
           'traveler_hashed_id',
@@ -155,8 +151,12 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
           'matchedTravellerId',
           'accepted_traveler_id',
           'accepted_traveller_id',
+          'acceptedTravellerId',
           'delivery_person_id',
           'delivery_person_hashed_id',
+          // Flat keys sometimes used in order details
+          'matchedTravellerId',
+          'deliveryPersonId',
         ]) ??
         _readAny(details, const [
           'traveler_hashed_id',
@@ -168,8 +168,10 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
           'matchedTravellerId',
           'accepted_traveler_id',
           'accepted_traveller_id',
+          'acceptedTravellerId',
           'delivery_person_id',
           'delivery_person_hashed_id',
+          'deliveryPersonId',
         ]);
   }
 
@@ -228,9 +230,13 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
     }
 
     final raterUserId = await AuthService.getUserId();
-    final ratedUserId = _resolveRatedUserId();
+    final travellerId =
+        raterUserId == null ? null : _resolveTravellerId(raterUserId);
 
-    if (raterUserId == null || raterUserId.isEmpty || ratedUserId == null) {
+    if (raterUserId == null ||
+        raterUserId.isEmpty ||
+        travellerId == null ||
+        travellerId.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to find rating user details')),
@@ -244,8 +250,8 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
       await _ratingService.submitRating(
         RatingRequest(
           orderId: widget.orderId,
-          raterUserId: raterUserId,
-          ratedUserId: ratedUserId,
+          travellerId: travellerId,
+          raterId: raterUserId,
           rating: _selectedRating,
           feedback: _feedbackController.text.trim(),
         ),
@@ -332,39 +338,36 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
               alignment: WrapAlignment.center,
               spacing: 8,
               runSpacing: 8,
-              children: _chips
-                  .map(
-                    (chip) {
-                      final selected = _isSuggestionSelected(chip);
-                      return InkWell(
+              children: _chips.map(
+                (chip) {
+                  final selected = _isSuggestionSelected(chip);
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => _toggleSuggestion(chip),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFF686868)
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(14),
-                        onTap: () => _toggleSuggestion(chip),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? const Color(0xFF686868)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(14),
-                            border:
-                                Border.all(color: const Color(0xFFD0D0D0)),
-                          ),
-                          child: Text(
-                            chip,
-                            style: TextStyle(
-                              color: selected ? Colors.white : Colors.black87,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        border: Border.all(color: const Color(0xFFD0D0D0)),
+                      ),
+                      child: Text(
+                        chip,
+                        style: TextStyle(
+                          color: selected ? Colors.white : Colors.black87,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
                         ),
-                      );
-                    },
-                  )
-                  .toList(),
+                      ),
+                    ),
+                  );
+                },
+              ).toList(),
             ),
             const SizedBox(height: 22),
             const Divider(height: 1),
