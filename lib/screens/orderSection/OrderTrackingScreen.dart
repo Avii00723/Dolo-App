@@ -34,8 +34,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   GoogleMapController? _mapController;
 
   // Location variables
-  LatLng? _currentPosition;
-  LatLng? _pickupLocation;
+  LatLng? _currentPosition; LatLng? _pickupLocation;
   LatLng? _dropoffLocation;
   LatLng? _deliveryPersonLocation;
 

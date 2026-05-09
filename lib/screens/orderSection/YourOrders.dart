@@ -45,6 +45,8 @@ class OrderDisplay {
   final bool? isUrgent;
   final String? createdAt;
   final String? otp; // Added otp field
+  final String? myRatingStatus;
+  final String? otherUserRatingStatus;
 
   OrderDisplay({
     required this.id,
@@ -76,17 +78,23 @@ class OrderDisplay {
     this.isUrgent,
     this.createdAt,
     this.otp, // Added to constructor
+    this.myRatingStatus,
+    this.otherUserRatingStatus,
   });
 
   OrderDisplay copyWith({
+    String? userName,
     String? status,
     String? requestStatus,
+    String? matchedTravellerId,
     String? otp,
+    String? myRatingStatus,
+    String? otherUserRatingStatus,
   }) {
     return OrderDisplay(
       id: id,
       userId: userId,
-      userName: userName,
+      userName: userName ?? this.userName,
       senderInitial: senderInitial,
       origin: origin,
       destination: destination,
@@ -96,7 +104,7 @@ class OrderDisplay {
       weight: weight,
       status: status ?? this.status,
       profileImageUrl: profileImageUrl,
-      matchedTravellerId: matchedTravellerId,
+      matchedTravellerId: matchedTravellerId ?? this.matchedTravellerId,
       originLatitude: originLatitude,
       originLongitude: originLongitude,
       destinationLatitude: destinationLatitude,
@@ -113,6 +121,9 @@ class OrderDisplay {
       isUrgent: isUrgent,
       createdAt: createdAt,
       otp: otp ?? this.otp,
+      myRatingStatus: myRatingStatus ?? this.myRatingStatus,
+      otherUserRatingStatus:
+          otherUserRatingStatus ?? this.otherUserRatingStatus,
     );
   }
 }
@@ -269,11 +280,26 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         ));
       }
 
-      if (orders.isNotEmpty) {
-        await _loadTripRequestsForOrders(orders.map((o) => o.id).toList());
-      }
+      final acceptedRequestsByOrder = orders.isNotEmpty
+          ? (await _loadTripRequestsForOrders(
+                  orders.map((o) => o.id).toList())) ??
+              <String, TripRequest>{}
+          : <String, TripRequest>{};
 
-      final trackedOrders = await _applyTrackingStatus(displayOrders);
+      final namedOrders = displayOrders.map((order) {
+        final acceptedRequest = acceptedRequestsByOrder[order.id];
+        final travellerName = acceptedRequest?.travelerName?.trim();
+        return acceptedRequest == null
+            ? order
+            : order.copyWith(
+                userName: travellerName?.isNotEmpty == true
+                    ? travellerName
+                    : acceptedRequest.travelerId,
+                matchedTravellerId: acceptedRequest.travelerId,
+              );
+      }).toList();
+
+      final trackedOrders = await _applyTrackingStatus(namedOrders);
 
       if (mounted) {
         setState(() {
@@ -291,20 +317,29 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     }
   }
 
-  Future<void> _loadTripRequestsForOrders(List<String> orderIds) async {
-    if (currentUserId == null) return;
+  Future<Map<String, TripRequest>?> _loadTripRequestsForOrders(
+      List<String> orderIds) async {
+    if (currentUserId == null) return null;
     try {
       final allRequests =
       await _tripRequestService.getTripRequestsForMyOrders(currentUserId!);
       Map<String, List<TripRequestDisplay>> requestsByOrder = {};
+      Map<String, TripRequest> acceptedRequestsByOrder = {};
 
       for (var request in allRequests) {
-        if (request.status == 'pending' && orderIds.contains(request.orderId)) {
+        final requestStatus = request.status.toLowerCase();
+        if (requestStatus == 'accepted' && orderIds.contains(request.orderId)) {
+          acceptedRequestsByOrder[request.orderId] = request;
+        }
+
+        if (requestStatus == 'pending' && orderIds.contains(request.orderId)) {
           final displayRequest = TripRequestDisplay(
             id: request.id,
             orderId: request.orderId,
             travellerId: request.travelerId,
-            travellerName: request.travelerName ?? request.travelerId,
+            travellerName: request.travelerName?.trim().isNotEmpty == true
+                ? request.travelerName!
+                : request.travelerId,
             vehicleInfo: request.vehicleInfo,
             departureDatetime: request.departureDatetime,
             travelDate: request.travelDate,
@@ -324,8 +359,10 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           tripRequestsByOrder = requestsByOrder;
         });
       }
+      return acceptedRequestsByOrder;
     } catch (e) {
       debugPrint('❌ Error loading trip requests: $e');
+      return null;
     }
   }
 
@@ -342,13 +379,16 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       for (var request in tripRequests) {
         if (processedOrderIds.contains(request.orderId)) continue;
         processedOrderIds.add(request.orderId);
+        final orderCreatorName = request.counterpartName?.trim();
 
         displayOrders.add(OrderDisplay(
           id: request.orderId,
           userId: request.orderId,
-          userName: request.counterpartName ?? 'Order Creator',
-          senderInitial: (request.counterpartName != null && request.counterpartName!.isNotEmpty)
-              ? request.counterpartName![0].toUpperCase()
+          userName: orderCreatorName?.isNotEmpty == true
+              ? orderCreatorName!
+              : 'Order Creator',
+          senderInitial: orderCreatorName?.isNotEmpty == true
+              ? orderCreatorName![0].toUpperCase()
               : 'O',
           origin: request.source,
           destination: request.destination,
@@ -593,14 +633,30 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     _loadAllData(silent: true);
   }
 
-  Future<List<OrderDisplay>> _applyTrackingStatus(List<OrderDisplay> orders) async {
+  String? _readStatus(Map<String, dynamic>? source, String key) {
+    final value = source?[key]?.toString().trim().toLowerCase();
+    return value == null || value.isEmpty || value == 'null' ? null : value;
+  }
+
+  Future<List<OrderDisplay>> _applyTrackingStatus(
+      List<OrderDisplay> orders) async {
     return Future.wait(orders.map((order) async {
-      final status = await _trackingService.getCurrentStatus(order.id);
-      if (status == null) return order;
+      final details = await _trackingService.getOrderDetails(order.id);
+      final apiOrder = details?['order'] is Map
+          ? Map<String, dynamic>.from(details!['order'] as Map)
+          : null;
+      final status = _readStatus(apiOrder, 'status') ??
+          await _trackingService.getCurrentStatus(order.id);
 
       return order.copyWith(
-        status: status,
-        requestStatus: order.requestStatus == null ? null : status,
+        status: status ?? order.status,
+        requestStatus:
+            order.requestStatus == null ? null : status ?? order.requestStatus,
+        myRatingStatus: _readStatus(apiOrder, 'my_rating_status') ??
+            _readStatus(details, 'my_rating_status'),
+        otherUserRatingStatus:
+            _readStatus(apiOrder, 'other_user_rating_status') ??
+                _readStatus(details, 'other_user_rating_status'),
       );
     }));
   }

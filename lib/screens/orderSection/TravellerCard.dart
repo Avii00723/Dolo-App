@@ -110,6 +110,11 @@ class ModernTravellerOrderCard extends StatelessWidget {
     }
   }
 
+  bool get _isDelivered =>
+      (order.requestStatus ?? order.status).toLowerCase() == 'delivered';
+  bool get _hasCompletedCardRating =>
+      order.myRatingStatus?.toLowerCase() == 'completed';
+
   @override
   Widget build(BuildContext context) {
     final progressStep = _getProgressStep();
@@ -248,9 +253,59 @@ class ModernTravellerOrderCard extends StatelessWidget {
 
               // ── Dotted Progress Tracker ──
               _buildProgressDots(progressStep),
+
+              if (_isDelivered) ...[
+                const SizedBox(height: 14),
+                _hasCompletedCardRating
+                    ? _buildCardFeedbackThankYou()
+                    : SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showTravellerDetailScreen(context),
+                          icon: const Icon(Icons.star_outline, size: 18),
+                          label: const Text('Rate & give feedback'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black87,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+              ],
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildCardFeedbackThankYou() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green[200]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_outline, color: Colors.green[700], size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Thank you for your feedback',
+            style: TextStyle(
+              color: Colors.green[800],
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -371,15 +426,17 @@ class _TravellerOrderDetailScreenState
           ? _apiOrder!['status'].toString().trim().toLowerCase()
           : _order.status.toLowerCase();
   String? get _ratingFeedbackStatus {
-    final raw = _apiOrder?['rating_feedback_status'] ??
+    final raw = _apiOrder?['my_rating_status'] ??
+        _orderDetails?['my_rating_status'] ??
+        _apiOrder?['rating_feedback_status'] ??
         _orderDetails?['rating_feedback_status'];
     final value = raw?.toString().trim().toLowerCase();
     return value == null || value.isEmpty || value == 'null' ? null : value;
   }
 
-  bool get _canRateOrder =>
-      _ratingOrderStatus == 'delivered' && _ratingFeedbackStatus == 'pending';
   bool get _hasCompletedRating => _ratingFeedbackStatus == 'completed';
+  bool get _canRateOrder =>
+      _ratingOrderStatus == 'delivered' && !_hasCompletedRating;
 
   void _showRatingDialog() {
     showDialog(
@@ -401,11 +458,13 @@ class _TravellerOrderDetailScreenState
     if (!mounted) return;
     Navigator.of(context).pop();
     final currentOrder = Map<String, dynamic>.from(_apiOrder ?? {});
+    currentOrder['my_rating_status'] = 'completed';
     currentOrder['rating_feedback_status'] = 'completed';
     setState(() {
       _orderDetails = {
         ...?_orderDetails,
         'order': currentOrder,
+        'my_rating_status': 'completed',
         'rating_feedback_status': 'completed',
       };
     });
@@ -444,18 +503,8 @@ class _TravellerOrderDetailScreenState
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December'
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
@@ -467,18 +516,8 @@ class _TravellerOrderDetailScreenState
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec'
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
@@ -1007,7 +1046,7 @@ class _TravellerOrderDetailScreenState
                         ),
                       ),
                       Text(
-                        'Traveler',
+                        'Order Creator',
                         style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
                     ],

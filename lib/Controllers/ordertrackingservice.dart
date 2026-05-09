@@ -1,4 +1,5 @@
 import '../Constants/ApiService.dart';
+import 'AuthService.dart';
 
 class OrderTrackingService {
   static const String developmentDeliveryOtp = '123456';
@@ -173,12 +174,20 @@ class OrderTrackingService {
   // Returns order info, tracking history, and accepted trip vehicle details.
   // ─────────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>?> getOrderDetails(String orderHashedId) async {
+  Future<Map<String, dynamic>?> getOrderDetails(
+    String orderHashedId, {
+    String? userHashedId,
+  }) async {
     final endpoint =
         '/order-tracking/track/${Uri.encodeComponent(orderHashedId)}/details';
     try {
+      final currentUserHashedId = userHashedId ?? await AuthService.getUserId();
       final response = await _api.get(
         endpoint,
+        queryParameters: {
+          if (currentUserHashedId != null && currentUserHashedId.isNotEmpty)
+            'userHashedId': currentUserHashedId,
+        },
         parser: (json) => json,
       );
       if (response.success) return response.data;

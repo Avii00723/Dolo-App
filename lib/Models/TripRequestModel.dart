@@ -183,7 +183,8 @@ class TripRequest {
           json['order_id']?.toString() ??
           '',
       travelDate: json['travel_date']?.toString() ?? '',
-      vehicleInfo: json['vehicle_info']?.toString() ?? '',
+      vehicleInfo:
+          json['vehicle_info']?.toString() ?? json['info']?.toString() ?? '',
       source: json['source']?.toString() ?? '',
       destination: json['destination']?.toString() ?? '',
       departureDatetime: json['departure_datetime']?.toString() ?? '',
@@ -191,8 +192,12 @@ class TripRequest {
       origin: json['origin']?.toString(),
       createdAt: json['created_at']?.toString(),
       comments: json['comments']?.toString(),
-      counterpartName: json['counterpartName']?.toString(),
-      travelerName: json['travelerName']?.toString(),
+      counterpartName: json['counterpart_name']?.toString() ??
+          json['counterpartName']?.toString() ??
+          json['order_creator_name']?.toString(),
+      travelerName: json['traveler_name']?.toString() ??
+          json['travelerName']?.toString() ??
+          json['traveller_name']?.toString(),
     );
   }
 
