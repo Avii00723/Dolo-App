@@ -578,13 +578,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
                       const SizedBox(height: 16),
 
-                      // Stage progress stepper
-                      _buildStageStepper(),
+                      // Route info
+                      _buildRouteInfo(),
 
                       const SizedBox(height: 16),
 
-                      // Route info
-                      _buildRouteInfo(),
+                      // Stage progress stepper
+                      _buildStageStepper(),
 
                       const SizedBox(height: 16),
 

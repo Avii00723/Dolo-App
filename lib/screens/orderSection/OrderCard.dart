@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../Controllers/ordertrackingservice.dart';
 import '../../theme/app_theme.dart';
+import '../SupportSection/SupportScreen.dart';
 import 'RatingFeedbackDialog.dart';
 import 'YourOrders.dart';
 
@@ -482,7 +483,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
-      return date.split('T').first;
+      return date
+          .split('T')
+          .first;
     }
   }
 
@@ -495,7 +498,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
-      return date.split('T').first;
+      return date
+          .split('T')
+          .first;
     }
   }
 
@@ -516,13 +521,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _isUpdatingStatus = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status updated to $newStatus'), backgroundColor: Colors.green),
+        SnackBar(content: Text('Status updated to $newStatus'),
+            backgroundColor: Colors.green),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isUpdatingStatus = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating status: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error updating status: $e'),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -544,7 +551,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               label: const Text('Edit Order'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ),
@@ -558,7 +566,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 backgroundColor: Colors.red[600],
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 elevation: 0,
               ),
             ),
@@ -571,14 +580,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(1),
         icon: _isUpdatingStatus
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            ? const SizedBox(width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.inventory_2_outlined, size: 18),
-        label: Text(_isUpdatingStatus ? 'Updating...' : 'Hand over: Mark as Picked Up'),
+        label: Text(
+            _isUpdatingStatus ? 'Updating...' : 'Hand over: Mark as Picked Up'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
           elevation: 2,
         ),
       );
@@ -586,29 +600,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
         icon: _isUpdatingStatus
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            ? const SizedBox(width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.local_shipping_outlined, size: 18),
         label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as In Transit'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
           elevation: 2,
         ),
       );
-    } else if (order.status.toLowerCase() == 'in-transit' || order.status.toLowerCase() == 'in_transit') {
+    } else if (order.status.toLowerCase() == 'in-transit' ||
+        order.status.toLowerCase() == 'in_transit') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
         icon: _isUpdatingStatus
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            ? const SizedBox(width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.location_on_outlined, size: 18),
         label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
           elevation: 2,
         ),
       );
@@ -621,7 +644,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           backgroundColor: Colors.green[700],
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
           elevation: 2,
         ),
       );
@@ -648,17 +672,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.grey[200],
-              child: const Icon(Icons.headset_mic_outlined, color: Colors.black54, size: 18),
+            child: IconButton(
+              icon: CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.grey[200],
+                child: const Icon(Icons.headset_mic_outlined,
+                    color: Colors.black54, size: 18),
+              ),
+              onPressed: () =>
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SupportScreen()),
+                  ),
             ),
           ),
         ],
       ),
       bottomNavigationBar: stickyButton != null
           ? Container(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
+        padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery
+            .of(context)
+            .padding
+            .bottom + 12),
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: Colors.grey[200]!)),
@@ -747,17 +782,63 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
             const Divider(height: 1, color: Color(0xFFEEEEEE)),
 
+            // ── Track Package Section ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined, size: 20,
+                          color: Colors.black87),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Track Package',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _buildTrackingTimeline(progressStep),
+
+                  // ── Status Update Buttons (added in Track Package section) ──
+                  if (order.status.toLowerCase() != 'delivered') ...[
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Update Track Package Status',
+                      style: TextStyle(fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildStatusUpdateButton(order),
+                  ],
+                ],
+              ),
+            ),
+
+            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+
             // ── Package Detail Section ──
             InkWell(
-              onTap: () => setState(() => _packageDetailExpanded = !_packageDetailExpanded),
+              onTap: () =>
+                  setState(() =>
+              _packageDetailExpanded = !_packageDetailExpanded),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.inventory_2_outlined, size: 20, color: Colors.black87),
+                        const Icon(Icons.inventory_2_outlined, size: 20,
+                            color: Colors.black87),
                         const SizedBox(width: 10),
                         const Text(
                           'Package Detail',
@@ -783,7 +864,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       children: [
                         Text(
                           'Order ID',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style: TextStyle(fontSize: 12, color: Colors
+                              .grey[600]),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -799,7 +881,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ),
                         if (order.isUrgent == true)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 10,
+                                vertical: 3),
                             decoration: BoxDecoration(
                               color: Colors.red[600],
                               borderRadius: BorderRadius.circular(12),
@@ -836,7 +919,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ),
                         ],
                       ),
-                      if (order.imageUrl != null && order.imageUrl!.isNotEmpty) ...[
+                      if (order.imageUrl != null &&
+                          order.imageUrl!.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         const Text(
                           'Package Image',
@@ -854,21 +938,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             height: 120,
                             width: 120,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(Icons.image_not_supported, color: Colors.grey[400]),
-                            ),
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(Icons.image_not_supported,
+                                      color: Colors.grey[400]),
+                                ),
                           ),
                         ),
                       ],
                       if (order.notes != null && order.notes!.isNotEmpty) ...[
                         const SizedBox(height: 14),
-                        _buildPackageDetailItem('Special Instructions', order.notes!),
+                        _buildPackageDetailItem('Special Instructions', order
+                            .notes!),
                       ],
                     ],
                   ],
@@ -886,7 +973,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.flight_takeoff, size: 20, color: Colors.black87),
+                      const Icon(Icons.flight_takeoff, size: 20,
+                          color: Colors.black87),
                       const SizedBox(width: 10),
                       const Text(
                         'Flight Detail',
@@ -944,43 +1032,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
             const Divider(height: 1, color: Color(0xFFEEEEEE)),
 
-            // ── Track Package Section ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined, size: 20, color: Colors.black87),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Track Package',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTrackingTimeline(progressStep),
-
-                  // ── Status Update Buttons (added in Track Package section) ──
-                  if (order.status.toLowerCase() != 'delivered') ...[
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Update Track Package Status',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildStatusUpdateButton(order),
-                  ],
-                ],
-              ),
-            ),
-
             const SizedBox(height: 16),
 
             // ── Sender: Show OTP card when order is 'arrived' ──
@@ -1000,7 +1051,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.lock_open_outlined, color: Colors.green[700], size: 20),
+                          Icon(Icons.lock_open_outlined, color: Colors
+                              .green[700], size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'Your Delivery OTP',
@@ -1026,7 +1078,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       Text(
                         'Share this OTP with the traveler to confirm delivery.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: Colors.green[700]),
+                        style: TextStyle(fontSize: 12, color: Colors
+                            .green[700]),
                       ),
                     ],
                   ),
@@ -1036,7 +1089,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ],
 
             // ── Sender: in-transit or other pre-arrival active stages ──
-            if (order.status.toLowerCase() == 'in-transit' || order.status.toLowerCase() == 'in_transit') ...[
+            if (order.status.toLowerCase() == 'in-transit' ||
+                order.status.toLowerCase() == 'in_transit') ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
@@ -1049,12 +1103,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.local_shipping_outlined, color: Colors.orange[700], size: 20),
+                      Icon(Icons.local_shipping_outlined,
+                          color: Colors.orange[700], size: 20),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'Your package is on its way! Confirm arrival once it reaches the destination.',
-                          style: TextStyle(fontSize: 13, color: Colors.orange[800]),
+                          style: TextStyle(
+                              fontSize: 13, color: Colors.orange[800]),
                         ),
                       ),
                     ],
@@ -1070,8 +1126,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
-                    if (widget.tripRequests != null && widget.tripRequests!.isNotEmpty) ...[
-                      ...widget.tripRequests!.map((req) => _buildTripRequestCard(context, req)),
+                    if (widget.tripRequests != null &&
+                        widget.tripRequests!.isNotEmpty) ...[
+                      ...widget.tripRequests!.map((req) =>
+                          _buildTripRequestCard(context, req)),
                       const SizedBox(height: 12),
                     ],
                   ],
@@ -1094,7 +1152,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         : null,
                     child: order.profileImageUrl == null
                         ? Text(
-                      order.userName.isNotEmpty ? order.userName[0].toUpperCase() : 'U',
+                      order.userName.isNotEmpty ? order.userName[0]
+                          .toUpperCase() : 'U',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     )
                         : null,
@@ -1119,12 +1178,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline, color: Colors.black54),
-                    onPressed: () {},
+                    icon: const Icon(
+                        Icons.chat_bubble_outline, color: Colors.black54),
+                    onPressed: () {
+                      // TODO: wire to your existing chat screen / chatId logic
+                      // Keeping navigation placeholder to avoid build errors
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SizedBox.shrink(),
+                        ),
+                      );
+                    },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.call_outlined, color: Colors.black54),
-                    onPressed: () {},
+                    icon: const Icon(
+                        Icons.call_outlined, color: Colors.black54),
+                    onPressed: () {
+                      // Phone number is not available on OrderDisplay in this codebase
+                      // Keeping placeholder to avoid build errors.
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Phone not available')),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -1147,14 +1223,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: ElevatedButton.icon(
           onPressed: _isUpdatingStatus ? null : () => _updateStatus(1),
           icon: _isUpdatingStatus
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.inventory_2_outlined),
-          label: Text(_isUpdatingStatus ? 'Updating...' : 'Hand over: Mark as Picked Up'),
+          label: Text(_isUpdatingStatus
+              ? 'Updating...'
+              : 'Hand over: Mark as Picked Up'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black87,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
           ),
         ),
       );
@@ -1164,31 +1245,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: ElevatedButton.icon(
           onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
           icon: _isUpdatingStatus
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.local_shipping_outlined),
           label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as In Transit'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black87,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
           ),
         ),
       );
-    } else if (order.status.toLowerCase() == 'in-transit' || order.status.toLowerCase() == 'in_transit') {
+    } else if (order.status.toLowerCase() == 'in-transit' ||
+        order.status.toLowerCase() == 'in_transit') {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
           icon: _isUpdatingStatus
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.location_on_outlined),
           label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black87,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
           ),
         ),
       );
@@ -1203,7 +1291,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             backgroundColor: Colors.green[700],
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
           ),
         ),
       );
@@ -1222,7 +1311,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
+          style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
         ),
       ],
     );
@@ -1239,7 +1329,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+          style: const TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
         ),
       ],
     );
@@ -1298,15 +1389,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   decoration: i < activeStep
                       ? null
                       : isCurrent
-                          ? BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(10),
-                            )
-                          : null,
+                      ? BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(10),
+                  )
+                      : null,
                   child: Row(
                     children: [
                       if (isCurrent) ...[
-                        const Icon(Icons.chevron_right, size: 18, color: Colors.black54),
+                        const Icon(Icons.chevron_right, size: 18,
+                            color: Colors.black54),
                         const SizedBox(width: 4),
                       ],
                       Column(
@@ -1316,15 +1408,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             steps[i].$1,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                              color: isActive ? Colors.black87 : Colors.grey[400],
+                              fontWeight: isCurrent
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: isActive ? Colors.black87 : Colors
+                                  .grey[400],
                             ),
                           ),
                           Text(
                             steps[i].$2,
                             style: TextStyle(
                               fontSize: 11,
-                              color: isActive ? Colors.grey[600] : Colors.grey[400],
+                              color: isActive ? Colors.grey[600] : Colors
+                                  .grey[400],
                             ),
                           ),
                         ],
@@ -1347,133 +1443,160 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          contentPadding: EdgeInsets.zero,
-          content: Container(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.lock_open_outlined, color: Colors.green[700], size: 28),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Confirm Delivery',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.black87),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Enter the OTP provided by the traveler to confirm delivery.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _otpController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 10,
-                  ),
-                  decoration: InputDecoration(
-                    counterText: '',
-                    hintText: '• • • • • •',
-                    hintStyle: TextStyle(letterSpacing: 6, color: Colors.grey[400], fontSize: 22),
-                    errorText: errorText,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.green[700]!, width: 2),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.red, width: 1.5),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  onChanged: (_) {
-                    if (errorText != null) setDialogState(() => errorText = null);
-                  },
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          side: BorderSide(color: Colors.grey[300]!),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      builder: (_) =>
+          StatefulBuilder(
+            builder: (dialogContext, setDialogState) =>
+                AlertDialog(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  contentPadding: EdgeInsets.zero,
+                  content: Container(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.lock_open_outlined,
+                              color: Colors.green[700], size: 28),
                         ),
-                        child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: isSubmitting
-                            ? null
-                            : () async {
-                          final otp = _otpController.text.trim();
-                          if (otp.length < 4) {
-                            setDialogState(() => errorText = 'Please enter a valid OTP');
-                            return;
-                          }
-                          setDialogState(() => isSubmitting = true);
-                          try {
-                            await widget.onCompleteOrderWithOtp?.call(widget.order.id, otp);
-                            if (mounted) {
-                              Navigator.pop(dialogContext);
-                              Navigator.pop(context);
-                            }
-                          } catch (e) {
-                            setDialogState(() {
-                              isSubmitting = false;
-                              errorText = 'Invalid OTP. Please try again.';
-                            });
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[700],
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Confirm Delivery',
+                          style: TextStyle(fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.black87),
                         ),
-                        child: isSubmitting
-                            ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                            : const Text('Confirm Delivery', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Enter the OTP provided by the traveler to confirm delivery.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 13, color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 20),
+                        TextField(
+                          controller: _otpController,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 10,
+                          ),
+                          decoration: InputDecoration(
+                            counterText: '',
+                            hintText: '• • • • • •',
+                            hintStyle: TextStyle(letterSpacing: 6,
+                                color: Colors.grey[400],
+                                fontSize: 22),
+                            errorText: errorText,
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.green[700]!,
+                                  width: 2),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Colors.red, width: 1.5),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                vertical: 16),
+                          ),
+                          onChanged: (_) {
+                            if (errorText != null) setDialogState(() =>
+                            errorText = null);
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: isSubmitting ? null : () =>
+                                    Navigator.pop(dialogContext),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 13),
+                                  side: BorderSide(color: Colors.grey[300]!),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                ),
+                                child: const Text('Cancel', style: TextStyle(
+                                    color: Colors.black54)),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () async {
+                                  final otp = _otpController.text.trim();
+                                  if (otp.length < 4) {
+                                    setDialogState(() =>
+                                    errorText = 'Please enter a valid OTP');
+                                    return;
+                                  }
+                                  setDialogState(() => isSubmitting = true);
+                                  try {
+                                    await widget.onCompleteOrderWithOtp?.call(
+                                        widget.order.id, otp);
+                                    if (mounted) {
+                                      Navigator.pop(dialogContext);
+                                      Navigator.pop(context);
+                                    }
+                                  } catch (e) {
+                                    setDialogState(() {
+                                      isSubmitting = false;
+                                      errorText =
+                                      'Invalid OTP. Please try again.';
+                                    });
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green[700],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 13),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                ),
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white),
+                                )
+                                    : const Text('Confirm Delivery',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ],
-            ),
           ),
-        ),
-      ),
     );
   }
 
-  Widget _buildTripRequestCard(BuildContext context, TripRequestDisplay request) {
+  Widget _buildTripRequestCard(BuildContext context,
+      TripRequestDisplay request) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -1527,214 +1650,281 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Order?', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text(
-          'Order #${widget.order.id} will be permanently deleted. This action cannot be undone.',
-          style: const TextStyle(fontSize: 14, color: Colors.black54),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-              widget.onDeleteOrder?.call(widget.order.id);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[600],
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      builder: (context) =>
+          AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Text(
+                'Delete Order?', style: TextStyle(fontWeight: FontWeight.w700)),
+            content: Text(
+              'Order #${widget.order
+                  .id} will be permanently deleted. This action cannot be undone.',
+              style: const TextStyle(fontSize: 14, color: Colors.black54),
             ),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                    'Cancel', style: TextStyle(color: Colors.black54)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                  widget.onDeleteOrder?.call(widget.order.id);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[600],
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text(
+                    'Delete', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   Future<void> _showEditOrderDialog(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
     final originController = TextEditingController(text: widget.order.origin);
-    final destinationController = TextEditingController(text: widget.order.destination);
-    final itemDescController = TextEditingController(text: widget.order.itemDescription);
-    final weightController = TextEditingController(text: widget.order.weight.toString());
-    final priceController = TextEditingController(text: widget.order.expectedPrice?.toString() ?? '');
-    final notesController = TextEditingController(text: widget.order.notes ?? '');
-    DateTime selectedDate = DateTime.tryParse(widget.order.date) ?? DateTime.now();
+    final destinationController = TextEditingController(
+        text: widget.order.destination);
+    final itemDescController = TextEditingController(
+        text: widget.order.itemDescription);
+    final weightController = TextEditingController(
+        text: widget.order.weight.toString());
+    final priceController = TextEditingController(
+        text: widget.order.expectedPrice?.toString() ?? '');
+    final notesController = TextEditingController(
+        text: widget.order.notes ?? '');
+    DateTime selectedDate = DateTime.tryParse(widget.order.date) ??
+        DateTime.now();
 
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          contentPadding: EdgeInsets.zero,
-          content: Container(
-            width: MediaQuery.of(context).size.width * 0.9,
-            constraints: const BoxConstraints(maxWidth: 450, maxHeight: 600),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    color: Colors.black87,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.edit, color: Colors.white, size: 20),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'Edit Order',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+      builder: (context) =>
+          StatefulBuilder(
+            builder: (context, setStateDialog) =>
+                AlertDialog(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  contentPadding: EdgeInsets.zero,
+                  content: Container(
+                    width: MediaQuery
+                        .of(context)
+                        .size
+                        .width * 0.9,
+                    constraints: const BoxConstraints(
+                        maxWidth: 450, maxHeight: 600),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: const BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(16),
+                              topRight: Radius.circular(16),
+                            ),
                           ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Form(
-                      key: formKey,
-                      child: Column(
-                        children: [
-                          _editField(originController, 'Origin *', Icons.radio_button_checked,
-                              validator: (v) => v?.isEmpty == true ? 'Required' : null),
-                          const SizedBox(height: 14),
-                          _editField(destinationController, 'Destination *', Icons.location_on,
-                              validator: (v) => v?.isEmpty == true ? 'Required' : null),
-                          const SizedBox(height: 14),
-                          _editField(itemDescController, 'Item Description', Icons.inventory_2_outlined,
-                              maxLines: 2),
-                          const SizedBox(height: 14),
-                          Row(
+                          child: Row(
                             children: [
-                              Expanded(
-                                child: _editField(weightController, 'Weight (kg) *', Icons.scale,
-                                    keyboardType: TextInputType.number,
-                                    validator: (v) => v?.isEmpty == true ? 'Required' : null),
+                              const Icon(
+                                  Icons.edit, color: Colors.white, size: 20),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text(
+                                  'Edit Order',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _editField(priceController, 'Price (₹)', Icons.currency_rupee,
-                                    keyboardType: TextInputType.number),
+                              IconButton(
+                                icon: const Icon(Icons.close,
+                                    color: Colors.white),
+                                onPressed: () => Navigator.pop(context),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 14),
-                          _editField(notesController, 'Notes', Icons.note_outlined, maxLines: 2),
-                        ],
-                      ),
+                        ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(20),
+                            child: Form(
+                              key: formKey,
+                              child: Column(
+                                children: [
+                                  _editField(originController, 'Origin *',
+                                      Icons.radio_button_checked,
+                                      validator: (v) =>
+                                      v?.isEmpty == true
+                                          ? 'Required'
+                                          : null),
+                                  const SizedBox(height: 14),
+                                  _editField(
+                                      destinationController, 'Destination *',
+                                      Icons.location_on,
+                                      validator: (v) =>
+                                      v?.isEmpty == true
+                                          ? 'Required'
+                                          : null),
+                                  const SizedBox(height: 14),
+                                  _editField(
+                                      itemDescController, 'Item Description',
+                                      Icons.inventory_2_outlined,
+                                      maxLines: 2),
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _editField(
+                                            weightController, 'Weight (kg) *',
+                                            Icons.scale,
+                                            keyboardType: TextInputType.number,
+                                            validator: (v) =>
+                                            v?.isEmpty == true
+                                                ? 'Required'
+                                                : null),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _editField(
+                                            priceController, 'Price (₹)',
+                                            Icons.currency_rupee,
+                                            keyboardType: TextInputType.number),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 14),
+                                  _editField(notesController, 'Notes',
+                                      Icons.note_outlined, maxLines: 2),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border(top: BorderSide(color: Colors
+                                .grey[200]!)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 13),
+                                    side: BorderSide(color: Colors.grey[300]!),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                            10)),
+                                  ),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    if (formKey.currentState!.validate()) {
+                                      final updated = OrderDisplay(
+                                        id: widget.order.id,
+                                        userId: widget.order.userId,
+                                        userName: widget.order.userName,
+                                        senderInitial: widget.order
+                                            .senderInitial,
+                                        origin: originController.text.trim(),
+                                        destination: destinationController.text
+                                            .trim(),
+                                        date: selectedDate.toIso8601String(),
+                                        itemDescription: itemDescController.text
+                                            .trim()
+                                            .isNotEmpty
+                                            ? itemDescController.text.trim()
+                                            : 'Package',
+                                        weight: weightController.text
+                                            .trim()
+                                            .isNotEmpty
+                                            ? '${weightController.text
+                                            .trim()} kg'
+                                            : '0kg',
+                                        status: widget.order.status,
+                                        expectedPrice: priceController.text
+                                            .isNotEmpty
+                                            ? int.tryParse(priceController.text)
+                                            : null,
+                                        notes: notesController.text
+                                            .trim()
+                                            .isNotEmpty
+                                            ? notesController.text.trim()
+                                            : null,
+                                        originLatitude: widget.order
+                                            .originLatitude,
+                                        originLongitude: widget.order
+                                            .originLongitude,
+                                        destinationLatitude: widget.order
+                                            .destinationLatitude,
+                                        destinationLongitude: widget.order
+                                            .destinationLongitude,
+                                        orderType: widget.order.orderType,
+                                        estimatedDistance: widget.order
+                                            .estimatedDistance,
+                                        requestStatus: widget.order
+                                            .requestStatus,
+                                        imageUrl: widget.order.imageUrl,
+                                        profileImageUrl: widget.order
+                                            .profileImageUrl,
+                                        matchedTravellerId: widget.order
+                                            .matchedTravellerId,
+                                        otp: widget.order.otp,
+                                      );
+                                      Navigator.pop(context);
+                                      widget.onUpdateOrder?.call(updated);
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.black87,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 13),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                            10)),
+                                    elevation: 0,
+                                  ),
+                                  child: const Text(
+                                    'Save Changes',
+                                    style: TextStyle(color: Colors.white,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: Colors.grey[200]!)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            side: BorderSide(color: Colors.grey[300]!),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          child: const Text('Cancel'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (formKey.currentState!.validate()) {
-                              final updated = OrderDisplay(
-                                id: widget.order.id,
-                                userId: widget.order.userId,
-                                userName: widget.order.userName,
-                                senderInitial: widget.order.senderInitial,
-                                origin: originController.text.trim(),
-                                destination: destinationController.text.trim(),
-                                date: selectedDate.toIso8601String(),
-                                itemDescription: itemDescController.text.trim().isNotEmpty
-                                    ? itemDescController.text.trim()
-                                    : 'Package',
-                                weight: weightController.text.trim().isNotEmpty
-                                    ? '${weightController.text.trim()} kg'
-                                    : '0kg',
-                                status: widget.order.status,
-                                expectedPrice: priceController.text.isNotEmpty
-                                    ? int.tryParse(priceController.text)
-                                    : null,
-                                notes: notesController.text.trim().isNotEmpty
-                                    ? notesController.text.trim()
-                                    : null,
-                                originLatitude: widget.order.originLatitude,
-                                originLongitude: widget.order.originLongitude,
-                                destinationLatitude: widget.order.destinationLatitude,
-                                destinationLongitude: widget.order.destinationLongitude,
-                                orderType: widget.order.orderType,
-                                estimatedDistance: widget.order.estimatedDistance,
-                                requestStatus: widget.order.requestStatus,
-                                imageUrl: widget.order.imageUrl,
-                                profileImageUrl: widget.order.profileImageUrl,
-                                matchedTravellerId: widget.order.matchedTravellerId,
-                                otp: widget.order.otp,
-                              );
-                              Navigator.pop(context);
-                              widget.onUpdateOrder?.call(updated);
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black87,
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Save Changes',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ),
-        ),
-      ),
     );
   }
 
-  Widget _editField(
-      TextEditingController controller,
+
+  Widget _editField(TextEditingController controller,
       String label,
       IconData icon, {
         String? Function(String?)? validator,

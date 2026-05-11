@@ -1,9 +1,15 @@
+
 // Modern Traveller Order Card - Redesigned to match new UI design
 // Traveler sees OTP CODE displayed (not enter OTP)
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'package:dolo/screens/Inbox Section/ChatScreen.dart';
+
 import '../../Controllers/ordertrackingservice.dart';
+import '../SupportSection/SupportScreen.dart';
 import 'RatingFeedbackDialog.dart';
 import 'YourOrders.dart';
 
@@ -253,59 +259,9 @@ class ModernTravellerOrderCard extends StatelessWidget {
 
               // ── Dotted Progress Tracker ──
               _buildProgressDots(progressStep),
-
-              if (_isDelivered) ...[
-                const SizedBox(height: 14),
-                _hasCompletedCardRating
-                    ? _buildCardFeedbackThankYou()
-                    : SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _showTravellerDetailScreen(context),
-                          icon: const Icon(Icons.star_outline, size: 18),
-                          label: const Text('Rate & give feedback'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black87,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-              ],
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCardFeedbackThankYou() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.green[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green[200]!),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.check_circle_outline, color: Colors.green[700], size: 18),
-          const SizedBox(width: 8),
-          Text(
-            'Thank you for your feedback',
-            style: TextStyle(
-              color: Colors.green[800],
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -667,13 +623,19 @@ class _TravellerOrderDetailScreenState
         ),
         centerTitle: true,
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.grey[200],
-              child: const Icon(Icons.headset_mic_outlined,
-                  color: Colors.black54, size: 18),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: IconButton(
+              icon: CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.grey[200],
+                child: const Icon(Icons.headset_mic_outlined,
+                    color: Colors.black54, size: 18),
+              ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SupportScreen()),
+              ),
             ),
           ),
         ],
@@ -756,6 +718,71 @@ class _TravellerOrderDetailScreenState
                       ),
                     ],
                   ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined,
+                          size: 20, color: Colors.black87),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Track Package',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (order.otp != null &&
+                          order.status.toLowerCase() == 'arrived')
+                        GestureDetector(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: order.otp!));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('OTP copied to clipboard'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'OTP: ${order.otp}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(Icons.copy,
+                                    size: 14, color: Colors.black54),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _buildTrackingTimeline(progressStep),
                 ],
               ),
             ),
@@ -953,71 +980,6 @@ class _TravellerOrderDetailScreenState
                 ],
               ),
             ),
-            const Divider(height: 1, color: Color(0xFFEEEEEE)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined,
-                          size: 20, color: Colors.black87),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Track Package',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (order.otp != null &&
-                          order.status.toLowerCase() == 'arrived')
-                        GestureDetector(
-                          onTap: () {
-                            Clipboard.setData(ClipboardData(text: order.otp!));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('OTP copied to clipboard'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  'OTP: ${order.otp}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black87,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Icon(Icons.copy,
-                                    size: 14, color: Colors.black54),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTrackingTimeline(progressStep),
-                ],
-              ),
-            ),
             const SizedBox(height: 16),
             // ── Action buttons are now in the sticky bottomNavigationBar ──
             const Divider(height: 1, color: Color(0xFFEEEEEE)),
@@ -1055,12 +1017,36 @@ class _TravellerOrderDetailScreenState
                   IconButton(
                     icon: const Icon(Icons.chat_bubble_outline,
                         color: Colors.black54),
-                    onPressed: () {},
+                    onPressed: () {
+                      // Navigate to chat between order creator and traveler.
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(
+                            chatId: _getChatIdForOrder(order),
+                            orderId: order.id,
+                            otherUserName: order.userName,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   IconButton(
                     icon:
                         const Icon(Icons.call_outlined, color: Colors.black54),
-                    onPressed: () {},
+                    onPressed: () async {
+                      final details = await _trackingService.getOrderDetails(order.id);
+                      final rawPhone = details?['order']?['user_phone'] ?? details?['order']?['phone'];
+                      final phone = rawPhone?.toString();
+                      if (phone == null || phone.trim().isEmpty) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Phone number not available')),
+                        );
+                        return;
+                      }
+                      await _launchPhoneCall(phone);
+                    },
                   ),
                 ],
               ),
@@ -1327,6 +1313,30 @@ class _TravellerOrderDetailScreenState
         ),
       ],
     );
+  }
+
+  String _getChatIdForOrder(OrderDisplay order) {
+    // Fallback implementation: if your backend uses a dedicated chat id,
+    // replace this with the proper field (e.g., order.chatId).
+    // Using order id as a stable chatId prevents crashes.
+    return order.id.toString();
+  }
+
+  Future<void> _launchPhoneCall(String phoneNumber) async {
+    final cleaned = phoneNumber.replaceAll(RegExp(r'\s+'), '');
+    if (cleaned.isEmpty) return;
+    final uri = Uri.parse('tel:$cleaned');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to open phone app'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildTrackingTimeline(int activeStep) {
