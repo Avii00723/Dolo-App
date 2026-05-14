@@ -151,8 +151,9 @@ class TripRequest {
   final String? origin; // Additional field from API (same as source typically)
   final String? createdAt;
   final String? comments;
-  final String? counterpartName;
+  final String? counterpartName; // The "other person's" name based on my_role
   final String? travelerName;
+  final String? orderCreatorName; // Explicit order creator name from API
 
   TripRequest({
     required this.id,
@@ -169,6 +170,7 @@ class TripRequest {
     this.comments,
     this.counterpartName,
     this.travelerName,
+    this.orderCreatorName,
   });
 
   factory TripRequest.fromJson(Map<String, dynamic> json) {
@@ -193,11 +195,11 @@ class TripRequest {
       createdAt: json['created_at']?.toString(),
       comments: json['comments']?.toString(),
       counterpartName: json['counterpart_name']?.toString() ??
-          json['counterpartName']?.toString() ??
-          json['order_creator_name']?.toString(),
+          json['counterpartName']?.toString(),
       travelerName: json['traveler_name']?.toString() ??
           json['travelerName']?.toString() ??
           json['traveller_name']?.toString(),
+      orderCreatorName: json['order_creator_name']?.toString(),
     );
   }
 
@@ -217,6 +219,7 @@ class TripRequest {
       'comments': comments,
       'counterpartName': counterpartName,
       'travelerName': travelerName,
+      'order_creator_name': orderCreatorName,
     };
   }
 }

@@ -9,7 +9,7 @@ import '../SupportSection/SupportScreen.dart';
 import 'RatingFeedbackDialog.dart';
 import 'YourOrders.dart';
 
-class ModernSenderOrderCard extends StatelessWidget {
+class ModernSenderOrderCard extends StatefulWidget {
   final OrderDisplay order;
   final List<TripRequestDisplay>? tripRequests;
   final Function(TripRequestDisplay, String)? onAcceptRequest;
@@ -37,9 +37,123 @@ class ModernSenderOrderCard extends StatelessWidget {
     this.onUpdateStatus,
   });
 
+  @override
+  State<ModernSenderOrderCard> createState() => _ModernSenderOrderCardState();
+}
+
+class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
+  Map<String, dynamic>? _orderDetails;
+  bool _isLoadingDetails = false;
+
+  Map<String, dynamic>? get _apiOrder =>
+      _orderDetails?['order'] as Map<String, dynamic>?;
+
+  String get _vehicleType {
+    final trip = _orderDetails?['trip'] as Map<String, dynamic>?;
+    final fromTrip = trip?['vehicle_type'] as String?;
+    if (fromTrip?.isNotEmpty == true) return fromTrip!;
+    final fromApi = _apiOrder?['vehicle_type'] as String?;
+    return fromApi?.isNotEmpty == true ? fromApi! : '—';
+  }
+
+  String get _vehicleInfo {
+    final trip = _orderDetails?['trip'] as Map<String, dynamic>?;
+    final fromTrip = trip?['info'] as String?;
+    if (fromTrip?.isNotEmpty == true) return fromTrip!;
+    final fromApi = _apiOrder?['vehicle_info'] as String?;
+    return fromApi?.isNotEmpty == true ? fromApi! : '—';
+  }
+
+  String get _vehicleNumber {
+    final trip = _orderDetails?['trip'] as Map<String, dynamic>?;
+    final fromTrip = trip?['number'] as String?;
+    if (fromTrip?.isNotEmpty == true) return fromTrip!;
+    final fromApi = _apiOrder?['vehicle_number'] as String?;
+    return fromApi?.isNotEmpty == true ? fromApi! : '—';
+  }
+
+  String? get _apiPickupDate =>
+      _apiOrder?['pickup_date'] as String? ??
+          (_orderDetails?['trip'] as Map<String, dynamic>?)?['pickup_date']
+          as String?;
+  String? get _apiDeliveryDate => _apiOrder?['delivery_date'] as String?;
+
+  String get _travellerName => widget.order.travelerName ?? _apiOrder?['traveller_name'] ?? _orderDetails?['traveller_name'] ?? 'Traveller';
+  String? get _travellerProfileImageUrl => _apiOrder?['traveller_profile_image_url'] ?? _orderDetails?['traveller_profile_image_url'];
+
+  String get _ratingOrderStatus =>
+      _apiOrder?['status'] ?? _orderDetails?['status'] ?? widget.order.status;
+
+  String? get _ratingFeedbackStatus {
+    final raw = _apiOrder?['my_rating_status'] ??
+        _orderDetails?['my_rating_status'] ??
+        _apiOrder?['rating_feedback_status'] ??
+        _orderDetails?['rating_feedback_status'];
+    return raw;
+  }
+
+  bool get _hasCompletedRating => _ratingFeedbackStatus == 'completed';
+
+  bool get _shouldShowRating =>
+      _ratingOrderStatus == 'delivered' && !_hasCompletedRating;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrderDetails();
+  }
+
+  Future<void> _loadOrderDetails() async {
+    if (widget.order.status.toLowerCase() == 'pending') return;
+
+    setState(() => _isLoadingDetails = true);
+    try {
+      final details = await OrderTrackingService().getOrderDetails(widget.order.id);
+      if (mounted) {
+        setState(() {
+          _orderDetails = details;
+          _isLoadingDetails = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingDetails = false);
+      }
+    }
+  }
+
+  void _showRatingDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => RatingFeedbackDialog(
+        orderId: widget.order.id,
+        isTraveller: false, // Sender rating traveller
+        displayName: _travellerName,
+        travellerId: widget.order.matchedTravellerId,
+        orderDetails: _orderDetails,
+        onSubmitted: _onRatingSubmitted,
+      ),
+    );
+  }
+
+  void _onRatingSubmitted() {
+    if (!mounted) return;
+    final currentOrder = Map<String, dynamic>.from(_apiOrder ?? {});
+    currentOrder['my_rating_status'] = 'completed';
+    currentOrder['rating_feedback_status'] = 'completed';
+    setState(() {
+      _orderDetails = {
+        ...?_orderDetails,
+        'order': currentOrder,
+        'my_rating_status': 'completed',
+        'rating_feedback_status': 'completed',
+      };
+    });
+  }
+
   // Map status to progress step (0-4 for 5 dots)
   int _getProgressStep() {
-    return OrderTrackingService.progressStepFromStatus(order.status);
+    return OrderTrackingService.progressStepFromStatus(widget.order.status);
   }
 
   Color _getStatusBgColor(String status) {
@@ -153,7 +267,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                       children: [
                         // Origin (Line 1)
                         Text(
-                          order.origin,
+                          widget.order.origin,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -175,7 +289,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                             // Destination (Line 2)
                             Expanded(
                               child: Text(
-                                order.destination,
+                                widget.order.destination,
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
@@ -192,17 +306,17 @@ class ModernSenderOrderCard extends StatelessWidget {
                         Row(
                           children: [
                             Text(
-                              _formatDisplayDate(order.date),
+                              _formatDisplayDate(widget.order.date),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: colorScheme.onSurface
                                     .withValues(alpha: 0.62),
                               ),
                             ),
-                            if (order.deliveryTime != null) ...[
+                            if (widget.order.deliveryTime != null) ...[
                               const SizedBox(width: 12),
                               Text(
-                                _formatDisplayDate(order.deliveryTime!),
+                                _formatDisplayDate(widget.order.deliveryTime!),
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: colorScheme.onSurface
@@ -219,17 +333,17 @@ class ModernSenderOrderCard extends StatelessWidget {
                   // Status Badge
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _getStatusBgColor(order.status),
+                      color: _getStatusBgColor(widget.order.status),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      _getStatusLabel(order.status),
+                      _getStatusLabel(widget.order.status),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: _getStatusTextColor(order.status),
+                        color: _getStatusTextColor(widget.order.status),
                       ),
                     ),
                   ),
@@ -239,8 +353,8 @@ class ModernSenderOrderCard extends StatelessWidget {
               const SizedBox(height: 14),
 
               // ── Traveler Info (if matched) ──
-              if (order.matchedTravellerId != null ||
-                  order.status != 'pending') ...[
+              if (widget.order.matchedTravellerId != null ||
+                  widget.order.status != 'pending') ...[
                 Text(
                   'Traveler',
                   style: TextStyle(
@@ -255,12 +369,12 @@ class ModernSenderOrderCard extends StatelessWidget {
                     CircleAvatar(
                       radius: 18,
                       backgroundColor: colorScheme.secondary,
-                      backgroundImage: order.profileImageUrl != null
-                          ? NetworkImage(order.profileImageUrl!)
+                      backgroundImage: widget.order.profileImageUrl != null
+                          ? NetworkImage(widget.order.profileImageUrl!)
                           : null,
-                      child: order.profileImageUrl == null
+                      child: widget.order.profileImageUrl == null
                           ? Icon(Icons.person,
-                              color: colorScheme.onSecondary, size: 20)
+                          color: colorScheme.onSecondary, size: 20)
                           : null,
                     ),
                     const SizedBox(width: 10),
@@ -269,8 +383,8 @@ class ModernSenderOrderCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            order.userName != 'You'
-                                ? order.userName
+                            widget.order.userName != 'You'
+                                ? widget.order.userName
                                 : 'Matched Traveler',
                             style: TextStyle(
                               fontSize: 13,
@@ -300,7 +414,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              ] else if (tripRequests != null && tripRequests!.isNotEmpty) ...[
+              ] else if (widget.tripRequests != null && widget.tripRequests!.isNotEmpty) ...[
                 Text(
                   'Traveler',
                   style: TextStyle(
@@ -312,7 +426,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppColors.paleYellow.withValues(alpha: 0.75),
                     borderRadius: BorderRadius.circular(8),
@@ -325,7 +439,7 @@ class ModernSenderOrderCard extends StatelessWidget {
                           color: AppColors.sageDark, size: 14),
                       const SizedBox(width: 6),
                       Text(
-                        '${tripRequests!.length} Request${tripRequests!.length > 1 ? 's' : ''} — tap to review',
+                        '${widget.tripRequests!.length} Request${widget.tripRequests!.length > 1 ? 's' : ''} — tap to review',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -337,7 +451,73 @@ class ModernSenderOrderCard extends StatelessWidget {
                 ),
               ],
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // ── Travel Detail Summary (vehicle & dates) ──
+              if (!_isLoadingDetails &&
+                  (_orderDetails != null ||
+                      widget.order.status.toLowerCase() != 'pending')) ...[
+                Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.directions_car_outlined,
+                          size: 14,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.55)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _vehicleType.isNotEmpty && _vehicleType != '—'
+                              ? _vehicleType
+                              : 'Travel details loading...',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.65),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_apiPickupDate != null) ...[
+                        const SizedBox(width: 8),
+                        Icon(Icons.calendar_today_outlined,
+                            size: 12,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.45)),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDisplayDate(_apiPickupDate!),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                const SizedBox(height: 4),
+              ],
 
               // ── Dotted Progress Tracker ──
               _buildProgressDots(context, progressStep),
@@ -397,19 +577,40 @@ class ModernSenderOrderCard extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (_) => OrderDetailScreen(
-          order: order,
-          tripRequests: tripRequests,
-          onAcceptRequest: onAcceptRequest,
-          onDeclineRequest: onDeclineRequest,
-          onTrackOrder: onTrackOrder,
-          onMarkReceived: onMarkReceived,
-          onCompleteOrder: onCompleteOrder,
-          onUpdateOrder: onUpdateOrder,
-          onDeleteOrder: onDeleteOrder,
-          onCompleteOrderWithOtp: onCompleteOrderWithOtp,
-          onUpdateStatus: onUpdateStatus,
+          order: widget.order,
+          tripRequests: widget.tripRequests,
+          onAcceptRequest: widget.onAcceptRequest,
+          onDeclineRequest: widget.onDeclineRequest,
+          onTrackOrder: widget.onTrackOrder,
+          onMarkReceived: widget.onMarkReceived,
+          onCompleteOrder: widget.onCompleteOrder,
+          onUpdateOrder: widget.onUpdateOrder,
+          onDeleteOrder: widget.onDeleteOrder,
+          onCompleteOrderWithOtp: widget.onCompleteOrderWithOtp,
+          onUpdateStatus: widget.onUpdateStatus,
         ),
       ),
+    );
+  }
+
+  Widget _buildDetailItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -455,6 +656,80 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late OrderDisplay _order;
   bool _isUpdatingStatus = false;
 
+  // ── Travel & rating state (mirrors TravellerOrderDetailScreen) ──
+  final _trackingService = OrderTrackingService();
+  Map<String, dynamic>? _orderDetails;
+  bool _isLoadingDetails = false;
+
+  Map<String, dynamic>? get _apiOrder =>
+      _orderDetails?['order'] as Map<String, dynamic>?;
+  Map<String, dynamic>? get _tripInfo =>
+      _orderDetails?['trip'] as Map<String, dynamic>?;
+
+  String get _vehicleType =>
+      (_tripInfo?['vehicle_type'] as String?)?.isNotEmpty == true
+          ? _tripInfo!['vehicle_type']
+          : (_apiOrder?['vehicle_type'] as String?)?.isNotEmpty == true
+          ? _apiOrder!['vehicle_type']
+          : '—';
+  String get _vehicleInfo =>
+      (_tripInfo?['info'] as String?)?.isNotEmpty == true
+          ? _tripInfo!['info']
+          : (_apiOrder?['vehicle_info'] as String?)?.isNotEmpty == true
+          ? _apiOrder!['vehicle_info']
+          : '—';
+  String get _vehicleNumber =>
+      (_tripInfo?['number'] as String?)?.isNotEmpty == true
+          ? _tripInfo!['number']
+          : (_apiOrder?['vehicle_number'] as String?)?.isNotEmpty == true
+          ? _apiOrder!['vehicle_number']
+          : '—';
+
+  String? get _apiPickupDate =>
+      _apiOrder?['pickup_date'] as String? ??
+          _tripInfo?['pickup_date'] as String?;
+  String? get _apiDeliveryDate =>
+      _apiOrder?['delivery_date'] as String? ??
+          _tripInfo?['delivery_date'] as String?;
+
+  // Traveller name from API details
+  String get _travellerName =>
+      widget.order.travelerName?.isNotEmpty == true
+          ? widget.order.travelerName!
+          : _apiOrder?['traveller_name']?.toString().isNotEmpty == true
+          ? _apiOrder!['traveller_name']
+          : _orderDetails?['traveller_name']?.toString().isNotEmpty == true
+          ? _orderDetails!['traveller_name']
+          : widget.order.userName;
+
+  String? get _travellerInitial {
+    final name = _travellerName;
+    return name.isNotEmpty ? name[0].toUpperCase() : null;
+  }
+
+  String? get _travellerProfileImageUrl =>
+      _apiOrder?['traveller_profile_image_url'] as String? ??
+          _orderDetails?['traveller_profile_image_url'] as String?;
+
+  // Rating logic (mirrors TravellerOrderDetailScreen)
+  String get _ratingOrderStatus =>
+      _apiOrder?['status']?.toString().trim().isNotEmpty == true
+          ? _apiOrder!['status'].toString().trim().toLowerCase()
+          : _order.status.toLowerCase();
+
+  String? get _ratingFeedbackStatus {
+    final raw = _apiOrder?['my_rating_status'] ??
+        _orderDetails?['my_rating_status'] ??
+        _apiOrder?['rating_feedback_status'] ??
+        _orderDetails?['rating_feedback_status'];
+    final value = raw?.toString().trim().toLowerCase();
+    return value == null || value.isEmpty || value == 'null' ? null : value;
+  }
+
+  bool get _hasCompletedRating => _ratingFeedbackStatus == 'completed';
+  bool get _canRateOrder =>
+      _ratingOrderStatus == 'delivered' && !_hasCompletedRating;
+
   static const _stageToStatus = {
     1: 'picked_up',
     2: 'in-transit',
@@ -466,6 +741,86 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void initState() {
     super.initState();
     _order = widget.order;
+    _fetchOrderDetails();
+  }
+
+  Future<void> _fetchOrderDetails() async {
+    if (!mounted) return;
+    setState(() => _isLoadingDetails = true);
+    try {
+      final details = await _trackingService.getOrderDetails(_order.id);
+      if (mounted) {
+        setState(() {
+          _orderDetails = details;
+          _isLoadingDetails = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingDetails = false);
+    }
+  }
+
+  void _showRatingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => RatingFeedbackDialog(
+        orderId: _order.id,
+        isTraveller: false, // Sender rating traveller
+        displayName: _travellerName.isNotEmpty ? _travellerName : 'Traveller',
+        travellerId: _order.matchedTravellerId,
+        orderDetails: _orderDetails,
+        onSubmitted: _onRatingSubmitted,
+      ),
+    );
+  }
+
+  void _onRatingSubmitted() {
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    final currentOrder = Map<String, dynamic>.from(_apiOrder ?? {});
+    currentOrder['my_rating_status'] = 'completed';
+    currentOrder['rating_feedback_status'] = 'completed';
+    setState(() {
+      _orderDetails = {
+        ...?_orderDetails,
+        'order': currentOrder,
+        'my_rating_status': 'completed',
+        'rating_feedback_status': 'completed',
+      };
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Thank you for your feedback!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Widget _buildFeedbackThankYou() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.green[200]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_outline, color: Colors.green[700], size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Thank you for your feedback',
+            style: TextStyle(
+              color: Colors.green[800],
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -541,7 +896,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     // ── Determine sticky action button based on status ──
     Widget? stickyButton;
-    if (order.status.toLowerCase() == 'pending') {
+    if (_canRateOrder) {
+      stickyButton = ElevatedButton.icon(
+        onPressed: _showRatingDialog,
+        icon: const Icon(Icons.star_outline, size: 18),
+        label: const Text('Rate & give feedback'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black87,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          elevation: 0,
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } else if (_hasCompletedRating) {
+      stickyButton = _buildFeedbackThankYou();
+    } else if (order.status.toLowerCase() == 'pending') {
       stickyButton = Row(
         children: [
           Expanded(
@@ -828,7 +1199,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             InkWell(
               onTap: () =>
                   setState(() =>
-              _packageDetailExpanded = !_packageDetailExpanded),
+                  _packageDetailExpanded = !_packageDetailExpanded),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 20, vertical: 16),
@@ -919,6 +1290,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ),
                         ],
                       ),
+                      if (order.actualWeight != null ||
+                          (order.customCategory?.isNotEmpty == true)) ...[
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildPackageDetailItem(
+                                'Actual Weight',
+                                order.actualWeight != null
+                                    ? order.actualWeight.toString()
+                                    : 'Not specified',
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildPackageDetailItem(
+                                'Custom Category',
+                                order.customCategory?.isNotEmpty == true
+                                    ? order.customCategory!
+                                    : 'Not specified',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       if (order.imageUrl != null &&
                           order.imageUrl!.isNotEmpty) ...[
                         const SizedBox(height: 14),
@@ -965,7 +1361,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
             const Divider(height: 1, color: Color(0xFFEEEEEE)),
 
-            // ── Flight Detail Section ──
+            // ── Travel Detail Section ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Column(
@@ -973,34 +1369,50 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.flight_takeoff, size: 20,
-                          color: Colors.black87),
+                      const Icon(Icons.directions_car_outlined,
+                          size: 20, color: Colors.black87),
                       const SizedBox(width: 10),
                       const Text(
-                        'Flight Detail',
+                        'Travel Detail',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: Colors.black,
                         ),
                       ),
+                      if (_isLoadingDetails) ...[
+                        const SizedBox(width: 8),
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
-                        child: _buildFlightDetailItem(
-                          'Departure Date',
-                          _formatShortDate(order.date),
-                        ),
-                      ),
+                          child: _buildFlightDetailItem(
+                              'Vehicle Type', _vehicleType)),
+                      Expanded(
+                          child: _buildFlightDetailItem(
+                              'Vehicle Info', _vehicleInfo)),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                          child: _buildFlightDetailItem(
+                              'Vehicle No.', _vehicleNumber)),
                       Expanded(
                         child: _buildFlightDetailItem(
-                          'Arrival Date',
-                          order.deliveryTime != null
-                              ? _formatShortDate(order.deliveryTime!)
-                              : '—',
+                          'Departure',
+                          _apiPickupDate != null
+                              ? _formatShortDate(_apiPickupDate!)
+                              : _formatShortDate(order.date),
                         ),
                       ),
                     ],
@@ -1010,20 +1422,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     children: [
                       Expanded(
                         child: _buildFlightDetailItem(
-                          'Airline Name',
-                          order.notes?.isNotEmpty == true
-                              ? (order.preferenceTransport?.isNotEmpty == true
-                              ? order.preferenceTransport!.first
-                              : '—')
+                          'Delivery Date',
+                          _apiDeliveryDate != null
+                              ? _formatShortDate(_apiDeliveryDate!)
+                              : order.deliveryTime != null
+                              ? _formatShortDate(order.deliveryTime!)
                               : '—',
                         ),
                       ),
-                      Expanded(
-                        child: _buildFlightDetailItem(
-                          'Flight no.',
-                          '—',
-                        ),
-                      ),
+                      const Expanded(child: SizedBox.shrink()),
                     ],
                   ),
                 ],
@@ -1138,7 +1545,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const SizedBox(height: 16),
             ],
 
-            // ── Order Creator Info ──
+            // ── Traveller Info ──
             const Divider(height: 1, color: Color(0xFFEEEEEE)),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -1147,13 +1554,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   CircleAvatar(
                     radius: 20,
                     backgroundColor: Colors.grey[300],
-                    backgroundImage: order.profileImageUrl != null
+                    backgroundImage: _travellerProfileImageUrl != null
+                        ? NetworkImage(_travellerProfileImageUrl!)
+                        : (order.profileImageUrl != null
                         ? NetworkImage(order.profileImageUrl!)
-                        : null,
-                    child: order.profileImageUrl == null
+                        : null),
+                    child: (_travellerProfileImageUrl == null &&
+                        order.profileImageUrl == null)
                         ? Text(
-                      order.userName.isNotEmpty ? order.userName[0]
-                          .toUpperCase() : 'U',
+                      _travellerInitial ?? 'T',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     )
                         : null,
@@ -1163,7 +1572,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order.userName,
+                        _travellerName,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -1171,7 +1580,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ),
                       ),
                       Text(
-                        'Order creator',
+                        'Traveller',
                         style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
                     ],
@@ -1182,7 +1591,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         Icons.chat_bubble_outline, color: Colors.black54),
                     onPressed: () {
                       // TODO: wire to your existing chat screen / chatId logic
-                      // Keeping navigation placeholder to avoid build errors
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -1194,11 +1602,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   IconButton(
                     icon: const Icon(
                         Icons.call_outlined, color: Colors.black54),
-                    onPressed: () {
-                      // Phone number is not available on OrderDisplay in this codebase
-                      // Keeping placeholder to avoid build errors.
+                    onPressed: () async {
+                      final details =
+                      await _trackingService.getOrderDetails(order.id);
+                      final rawPhone =
+                          details?['order']?['traveller_phone'] ??
+                              details?['order']?['phone'];
+                      final phone = rawPhone?.toString();
+                      if (phone == null || phone.trim().isEmpty) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Phone number not available')),
+                        );
+                        return;
+                      }
+                      // Launch phone call
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Phone not available')),
+                        SnackBar(content: Text('Calling $phone...')),
                       );
                     },
                   ),

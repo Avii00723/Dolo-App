@@ -23,6 +23,8 @@ class Order {
   final String status;
   final String? category; // API values: "technology", "documents", "clothing", "fragile", "food", "other"
   final String? subcategory;
+  final double? actualWeight;
+  final String? customCategory;
   final double? distanceKm;
   final double? calculatedPrice;
   final String? createdAt;
@@ -55,6 +57,8 @@ class Order {
     required this.status,
     this.category,
     this.subcategory,
+    this.actualWeight,
+    this.customCategory,
     this.distanceKm,
     this.calculatedPrice,
     this.createdAt,
@@ -195,6 +199,11 @@ class Order {
       status: json['status'] ?? '',
       category: apiCategory,
       subcategory: json['subcategory'],
+      actualWeight: json['actual_weight'] != null
+          ? _parseDouble(json['actual_weight'])
+          : null,
+      customCategory: json['custom_category']?.toString() ??
+          json['customCategory']?.toString(),
       distanceKm: json['distance_km'] != null
           ? _parseDouble(json['distance_km'])
           : null,
@@ -267,6 +276,8 @@ class Order {
       'transport_mode': transportMode,
       'preference_transport': preferenceTransport,
       'is_urgent': isUrgent,
+      'actual_weight': actualWeight,
+      'custom_category': customCategory,
       'delivery_otp': deliveryOtp,
     };
   }

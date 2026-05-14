@@ -398,7 +398,7 @@ class _TravellerOrderDetailScreenState
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => RatingFeedbackDialog(
+        builder: (_) => RatingFeedbackDialog(
         orderId: _order.id,
         isTraveller: true,
         displayName:

@@ -6,7 +6,7 @@ import '../../Models/RatingModel.dart';
 
 class RatingFeedbackDialog extends StatefulWidget {
   final String orderId;
-  final bool isTraveller;
+  final bool isTraveller; // true = Traveller rating Sender, false = Sender rating Traveller
   final String displayName;
   final String? travellerId;
   final Map<String, dynamic>? orderDetails;
@@ -45,11 +45,18 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
     return 'How was ${widget.displayName}\'s delivery?';
   }
 
+  String get _subtitle {
+    if (widget.isTraveller) {
+      return 'Your feedback helps us improve future orders.';
+    }
+    return 'Your feedback helps us improve future deliveries.';
+  }
+
   List<String> get _chips {
     if (widget.isTraveller) {
       return const [
         'Safe Order',
-        'Well Organised',
+        'Well-Organised',
         'Good Communication',
         'Clear Instructions',
         'Parcel secured',
@@ -58,7 +65,7 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
     return const [
       'Safe Driver',
       'Punctual',
-      'Comfortable drive',
+      'Comfortable driver',
       'Good Driver',
       'Parcel secured',
     ];
@@ -121,7 +128,6 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
     }
 
     return _readAny(trip, const [
-          // Common traveller id keys
           'traveler_hashed_id',
           'traveller_hashed_id',
           'travelerHashedId',
@@ -130,10 +136,8 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
           'traveller_id',
           'user_hashed_id',
           'user_id',
-          // Some backends may send delivery person id in trip section
           'delivery_person_id',
           'delivery_person_hashed_id',
-          // Matched/accepted variations
           'matched_traveler_id',
           'matched_traveller_id',
           'matchedTravellerId',
@@ -154,7 +158,6 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
           'acceptedTravellerId',
           'delivery_person_id',
           'delivery_person_hashed_id',
-          // Flat keys sometimes used in order details
           'matchedTravellerId',
           'deliveryPersonId',
         ]) ??
@@ -167,7 +170,7 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
           'matched_traveller_id',
           'matchedTravellerId',
           'accepted_traveler_id',
-          'accepted_traveller_id',
+          'accepted_traveler_id',
           'acceptedTravellerId',
           'delivery_person_id',
           'delivery_person_hashed_id',
@@ -276,153 +279,169 @@ class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
     final textColor = Theme.of(context).colorScheme.onSurface;
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 34, 18, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor: const Color(0xFFD8D8D8),
-              child: Text(
-                _initials,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      child: Stack(
+        children: [
+          Positioned(
+            right: 12,
+            top: 12,
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Color(0xFF999999), size: 24),
+              onPressed: () => Navigator.of(context).pop(),
             ),
-            const SizedBox(height: 18),
-            Text(
-              _title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Your feedback helps us improve future orders.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: textColor.withValues(alpha: 0.55),
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                final value = index + 1;
-                return IconButton(
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => setState(() => _selectedRating = value),
-                  icon: Icon(
-                    _selectedRating >= value ? Icons.star : Icons.star,
-                    color: _selectedRating >= value
-                        ? const Color(0xFFFFC107)
-                        : const Color(0xFFDADADA),
-                    size: 30,
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
-              children: _chips.map(
-                (chip) {
-                  final selected = _isSuggestionSelected(chip);
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => _toggleSuggestion(chip),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFF686868)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFD0D0D0)),
-                      ),
-                      child: Text(
-                        chip,
-                        style: TextStyle(
-                          color: selected ? Colors.white : Colors.black87,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                        ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: const Color(0xFFD8D8D8),
+                    child: Text(
+                      _initials,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                  );
-                },
-              ).toList(),
-            ),
-            const SizedBox(height: 22),
-            const Divider(height: 1),
-            const SizedBox(height: 18),
-            TextField(
-              controller: _feedbackController,
-              minLines: 3,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: 'Write a feedback',
-                hintStyle: TextStyle(
-                  color: textColor.withValues(alpha: 0.35),
-                  fontSize: 11,
-                ),
-                filled: true,
-                fillColor: const Color(0xFFE9E9E9),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.all(14),
-              ),
-            ),
-            const SizedBox(height: 26),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submitRating,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF686868),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
                   ),
-                ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                  const SizedBox(height: 32),
+                  Text(
+                    _title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _subtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: textColor.withOpacity(0.55),
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final value = index + 1;
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedRating = value),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Icon(
+                            Icons.star,
+                            color: _selectedRating >= value
+                                ? const Color(0xFFFFC107)
+                                : const Color(0xFFE5E5E5),
+                            size: 44,
+                          ),
                         ),
-                      )
-                    : const Text(
-                        'Done',
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w700),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 32),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: _chips.map(
+                      (chip) {
+                        final selected = _isSuggestionSelected(chip);
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => _toggleSuggestion(chip),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? const Color(0xFF4A4A4A)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFFD0D0D0)),
+                            ),
+                            child: Text(
+                              chip,
+                              style: TextStyle(
+                                color: selected ? Colors.white : Colors.black87,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ).toList(),
+                  ),
+                  const SizedBox(height: 32),
+                  const Divider(height: 1),
+                  const SizedBox(height: 32),
+                  TextField(
+                    controller: _feedbackController,
+                    minLines: 3,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Write a feedback',
+                      hintStyle: TextStyle(
+                        color: textColor.withOpacity(0.35),
+                        fontSize: 13,
                       ),
+                      filled: true,
+                      fillColor: const Color(0xFFF2F2F2),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.all(20),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting ? null : _submitRating,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4A4A4A),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(27),
+                        ),
+                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Done',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w700),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

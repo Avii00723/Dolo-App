@@ -16,6 +16,10 @@ import 'TravellerCard.dart';
 import '../CustomRouteMapScreen.dart';
 
 class OrderDisplay {
+  // Compatibility getter: some UI widgets expect `order.travelerName`.
+  // In this app, the most relevant available name for the card is `userName`.
+  String? get travelerName => userName;
+
   final String id;
   final String userId;
   final String userName;
@@ -41,6 +45,8 @@ class OrderDisplay {
   final String? imageUrl;
   final String? tripRequestId;
   final String? category;
+  final double? actualWeight;
+  final String? customCategory;
   final List<String>? preferenceTransport;
   final bool? isUrgent;
   final String? createdAt;
@@ -74,6 +80,8 @@ class OrderDisplay {
     this.imageUrl,
     this.tripRequestId,
     this.category,
+    this.actualWeight,
+    this.customCategory,
     this.preferenceTransport,
     this.isUrgent,
     this.createdAt,
@@ -84,6 +92,7 @@ class OrderDisplay {
 
   OrderDisplay copyWith({
     String? userName,
+    String? senderInitial,
     String? status,
     String? requestStatus,
     String? matchedTravellerId,
@@ -95,7 +104,7 @@ class OrderDisplay {
       id: id,
       userId: userId,
       userName: userName ?? this.userName,
-      senderInitial: senderInitial,
+      senderInitial: senderInitial ?? this.senderInitial,
       origin: origin,
       destination: destination,
       date: date,
@@ -117,6 +126,8 @@ class OrderDisplay {
       imageUrl: imageUrl,
       tripRequestId: tripRequestId,
       category: category,
+      actualWeight: actualWeight,
+      customCategory: customCategory,
       preferenceTransport: preferenceTransport,
       isUrgent: isUrgent,
       createdAt: createdAt,
@@ -288,13 +299,17 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
       final namedOrders = displayOrders.map((order) {
         final acceptedRequest = acceptedRequestsByOrder[order.id];
-        final travellerName = acceptedRequest?.travelerName?.trim();
+        // For Sender view, the traveler is the counterpart
+        final travellerName = acceptedRequest?.counterpartName?.trim() ?? acceptedRequest?.travelerName?.trim();
         return acceptedRequest == null
             ? order
             : order.copyWith(
                 userName: travellerName?.isNotEmpty == true
                     ? travellerName
                     : acceptedRequest.travelerId,
+                senderInitial: travellerName?.isNotEmpty == true 
+                    ? travellerName![0].toUpperCase() 
+                    : acceptedRequest.travelerId.substring(0, 1).toUpperCase(),
                 matchedTravellerId: acceptedRequest.travelerId,
               );
       }).toList();
@@ -337,9 +352,9 @@ class _YourOrdersPageState extends State<YourOrdersPage>
             id: request.id,
             orderId: request.orderId,
             travellerId: request.travelerId,
-            travellerName: request.travelerName?.trim().isNotEmpty == true
-                ? request.travelerName!
-                : request.travelerId,
+            travellerName: request.counterpartName?.trim().isNotEmpty == true
+                ? request.counterpartName!
+                : (request.travelerName?.trim().isNotEmpty == true ? request.travelerName! : request.travelerId),
             vehicleInfo: request.vehicleInfo,
             departureDatetime: request.departureDatetime,
             travelDate: request.travelDate,
@@ -379,7 +394,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       for (var request in tripRequests) {
         if (processedOrderIds.contains(request.orderId)) continue;
         processedOrderIds.add(request.orderId);
-        final orderCreatorName = request.counterpartName?.trim();
+        // For a traveler view, counterpart is the order creator
+        final orderCreatorName = request.orderCreatorName?.trim() ?? request.counterpartName?.trim();
 
         displayOrders.add(OrderDisplay(
           id: request.orderId,
