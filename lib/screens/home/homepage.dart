@@ -29,12 +29,19 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   final GlobalKey _ordersButtonKey = GlobalKey();
   final GlobalKey _inboxButtonKey = GlobalKey();
 
+  // ── Tab indices ──────────────────────────────────────────────────
+  static const int _tabHome = 0;
+  static const int _tabSearch = 1;
+  static const int _tabCreate = 2;
+  static const int _tabOrders = 3;
+  static const int _tabInbox = 4;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _motionTabBarController = MotionTabBarController(
-      initialIndex: 0,
+      initialIndex: _tabHome,
       length: 5,
       vsync: this,
     );
@@ -48,18 +55,41 @@ class _HomePageWithNavState extends State<HomePageWithNav>
     super.dispose();
   }
 
-  void switchToOrdersTab() {
-    _motionTabBarController?.index = 3;
+  // ── Public tab-switch helpers ────────────────────────────────────
+  void switchToOrdersTab() => _switchTab(_tabOrders);
+  void switchToCreateTab() => _switchTab(_tabCreate);
+  void switchToSearchTab() => _switchTab(_tabSearch);
+
+  void _switchTab(int index) {
+    if (_motionTabBarController == null) return;
+    setState(() => _motionTabBarController!.index = index);
   }
 
+  // ── Pages ────────────────────────────────────────────────────────
+  // Built lazily so callbacks are always fresh.
   List<Widget> get _pages => [
-    const ModernHomeScreen(),
+    // Tab 0 – Home: pass tab-switch callbacks so the home screen
+    // can navigate to Create / Search / Orders / Inbox from its buttons.
+    ModernHomeScreen(
+      onGoToCreate: switchToCreateTab,
+      onGoToSearch: switchToSearchTab,
+      onGoToOrders: switchToOrdersTab,
+    ),
+
+    // Tab 1 – Search
     const SendPage(),
+
+    // Tab 2 – Create
     CreateOrderPage(onOrderCreated: switchToOrdersTab),
+
+    // Tab 3 – Orders
     const YourOrdersPage(),
+
+    // Tab 4 – Inbox
     const InboxScreen(),
   ];
 
+  // ── Tutorial ─────────────────────────────────────────────────────
   Future<void> _checkAndShowTutorial() async {
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
@@ -123,10 +153,11 @@ class _HomePageWithNavState extends State<HomePageWithNav>
     _tutorialCoachMark?.show(context: context);
   }
 
+  // ── Build ────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false, // 🔥 KEY FIX
+      resizeToAvoidBottomInset: false,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
       body: TabBarView(
@@ -135,7 +166,6 @@ class _HomePageWithNavState extends State<HomePageWithNav>
         children: _pages,
       ),
 
-      // 🔒 FIXED BOTTOM NAVIGATION
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),
@@ -159,7 +189,7 @@ class _HomePageWithNavState extends State<HomePageWithNav>
               Icons.search,
               Icons.add,
               Icons.receipt_long_outlined,
-              Icons.chat_bubble_outline
+              Icons.chat_bubble_outline,
             ],
             labelAlwaysVisible: true,
             tabIconColor: Colors.grey,

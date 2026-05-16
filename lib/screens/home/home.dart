@@ -5,8 +5,21 @@ import 'package:dolo/screens/ProfileSection/profilescreen.dart';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 
+import 'Hometrackordersection.dart';
+
 class ModernHomeScreen extends StatefulWidget {
-  const ModernHomeScreen({super.key});
+  /// Optional callbacks injected by HomePageWithNav so the home screen
+  /// can switch to the correct bottom-nav tab.
+  final VoidCallback? onGoToCreate;
+  final VoidCallback? onGoToOrders;
+  final VoidCallback? onGoToSearch;
+
+  const ModernHomeScreen({
+    super.key,
+    this.onGoToCreate,
+    this.onGoToOrders,
+    this.onGoToSearch,
+  });
 
   @override
   State<ModernHomeScreen> createState() => _ModernHomeScreenState();
@@ -102,7 +115,17 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                     const SizedBox(height: 24),
                     _buildActionButtons(theme, colorScheme),
                     const SizedBox(height: 24),
-                    _buildTrackOrdersButton(theme, colorScheme),
+
+                    // ── TRACK YOUR ORDERS SECTION ──────────────────────────
+                    // Replaces the old static _buildTrackOrdersButton.
+                    // Shows empty-state, live tracking card, or rating card
+                    // depending on the user's active orders.
+                    HomeTrackOrdersSection(
+                      onCreateOrder: widget.onGoToCreate,
+                      onViewOrders: widget.onGoToOrders,
+                    ),
+                    // ───────────────────────────────────────────────────────
+
                     const SizedBox(height: 32),
                     _buildHowItWorksSection(theme, colorScheme),
                     const SizedBox(height: 32),
@@ -124,7 +147,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
   Widget _buildHeader(ThemeData theme, ColorScheme colorScheme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      // Use card colour so it lifts slightly from scaffold in both modes
       color: theme.cardColor,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -150,7 +172,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           // Icons
           Row(
             children: [
-              // Notification
               IconButton(
                 icon: Icon(Icons.notifications_outlined,
                     color: colorScheme.onSurface),
@@ -200,8 +221,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                         decoration: BoxDecoration(
                           color: Colors.green,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                              color: theme.cardColor, width: 1.5),
+                          border:
+                          Border.all(color: theme.cardColor, width: 1.5),
                         ),
                       ),
                     ),
@@ -265,14 +286,19 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           ),
           items: _carouselItems.asMap().entries.map((entry) {
             final item = entry.value;
-            // Rotate through brand palette
             final gradients = [
-              [colorScheme.primary.withValues(alpha: isDark ? 0.35 : 0.12),
-                colorScheme.secondary.withValues(alpha: isDark ? 0.2 : 0.06)],
-              [colorScheme.secondary.withValues(alpha: isDark ? 0.35 : 0.15),
-                colorScheme.primary.withValues(alpha: isDark ? 0.15 : 0.05)],
-              [colorScheme.tertiary.withValues(alpha: isDark ? 0.35 : 0.2),
-                colorScheme.primary.withValues(alpha: isDark ? 0.15 : 0.05)],
+              [
+                colorScheme.primary.withValues(alpha: isDark ? 0.35 : 0.12),
+                colorScheme.secondary.withValues(alpha: isDark ? 0.2 : 0.06)
+              ],
+              [
+                colorScheme.secondary.withValues(alpha: isDark ? 0.35 : 0.15),
+                colorScheme.primary.withValues(alpha: isDark ? 0.15 : 0.05)
+              ],
+              [
+                colorScheme.tertiary.withValues(alpha: isDark ? 0.35 : 0.2),
+                colorScheme.primary.withValues(alpha: isDark ? 0.15 : 0.05)
+              ],
             ];
             final grad = gradients[entry.key % gradients.length];
 
@@ -355,7 +381,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
   }
 
   // ────────────────────────────────────────────────────────────────
-  // Action Buttons
+  // Action Buttons  (Send Parcel / Find Parcel)
   // ────────────────────────────────────────────────────────────────
   Widget _buildActionButtons(ThemeData theme, ColorScheme colorScheme) {
     return Padding(
@@ -364,21 +390,23 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
         children: [
           Expanded(
             child: _buildActionButton(
-              theme, colorScheme,
+              theme,
+              colorScheme,
               'Send Parcel',
               Icons.send_outlined,
               isPrimary: true,
-              onTap: () {},
+              onTap: widget.onGoToCreate ?? () {},
             ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: _buildActionButton(
-              theme, colorScheme,
+              theme,
+              colorScheme,
               'Find Parcel',
               Icons.search,
               isPrimary: false,
-              onTap: () {},
+              onTap: widget.onGoToSearch ?? () {},
             ),
           ),
         ],
@@ -399,13 +427,9 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       child: Container(
         height: 100,
         decoration: BoxDecoration(
-          color: isPrimary
-              ? colorScheme.primary
-              : colorScheme.surface,
+          color: isPrimary ? colorScheme.primary : colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: isPrimary
-              ? null
-              : Border.all(color: theme.dividerColor),
+          border: isPrimary ? null : Border.all(color: theme.dividerColor),
           boxShadow: isPrimary
               ? [
             BoxShadow(
@@ -421,58 +445,17 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           children: [
             Icon(icon,
                 size: 30,
-                color: isPrimary
-                    ? Colors.white
-                    : colorScheme.primary),
+                color: isPrimary ? Colors.white : colorScheme.primary),
             const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: isPrimary
-                    ? Colors.white
-                    : colorScheme.onSurface,
+                color: isPrimary ? Colors.white : colorScheme.onSurface,
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // ────────────────────────────────────────────────────────────────
-  // Track Orders
-  // ────────────────────────────────────────────────────────────────
-  Widget _buildTrackOrdersButton(ThemeData theme, ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GestureDetector(
-        onTap: () {},
-        child: Container(
-          width: double.infinity,
-          height: 56,
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.dividerColor),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.my_location_outlined,
-                  size: 20, color: colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Track Orders',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -498,59 +481,106 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Step circles
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: _howItWorksSteps.map((step) {
-              final index = _howItWorksSteps.indexOf(step);
-              final isActive = index == _currentStep;
-
-              return GestureDetector(
-                onTap: () => setState(() => _currentStep = index),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? colorScheme.primary
-                        : colorScheme.surface,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isActive
-                          ? colorScheme.primary
-                          : theme.dividerColor,
-                      width: 1.5,
-                    ),
-                    boxShadow: isActive
-                        ? [
-                      BoxShadow(
-                        color: colorScheme.primary
-                            .withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      )
-                    ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: Text(
-                      step['step']!,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isActive
-                            ? Colors.white
-                            : colorScheme.onSurface.withValues(alpha: 0.5),
+          // How-it-works slideshow (replaces 1-2-3-4 numbered circles)
+          SizedBox(
+            height: 240,
+            child: PageView.builder(
+              itemCount: _howItWorksSteps.length,
+              controller: PageController(initialPage: _currentStep),
+              onPageChanged: (i) => setState(() => _currentStep = i),
+              itemBuilder: (context, index) {
+                final step = _howItWorksSteps[index];
+                final isActive = index == _currentStep;
+                return AnimatedOpacity(
+                  duration: const Duration(milliseconds: 250),
+                  opacity: isActive ? 1 : 0.95,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: theme.cardColor,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: isActive ? colorScheme.primary.withValues(alpha: 0.35) : theme.dividerColor,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: colorScheme.primary.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.slideshow_rounded,
+                                  color: colorScheme.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                step['title']!,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            step['description']!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: colorScheme.onSurface.withValues(alpha: 0.55),
+                            ),
+                          ),
+                          const Spacer(),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(_howItWorksSteps.length, (dotIndex) {
+                              final active = dotIndex == _currentStep;
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                width: active ? 20 : 8,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(3),
+                                  color: active ? colorScheme.primary : theme.dividerColor,
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              },
+            ),
           ),
 
           const SizedBox(height: 20),
+
 
           // Step description card
           Container(
@@ -600,10 +630,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     return Center(
       child: Column(
         children: [
-          // Logo box
           Container(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             decoration: BoxDecoration(
               color: colorScheme.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
@@ -621,7 +649,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
 
           const SizedBox(height: 20),
 
-          // Illustration grid
           Container(
             width: 200,
             height: 120,
@@ -668,7 +695,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
 
           const SizedBox(height: 16),
 
-          // Tagline
           Text(
             'Smarter Logistics.',
             style: TextStyle(

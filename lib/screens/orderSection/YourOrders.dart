@@ -11,6 +11,7 @@ import '../Inbox Section/indoxscreen.dart';
 import '../../Models/OrderModel.dart' as OrderModels;
 import '../../Models/TripRequestModel.dart';
 import '../../screens/orderSection/OrderCard.dart';
+import '../../screens/orderSection/OrderTrackingScreen.dart';
 import '../../widgets/NotificationBellIcon.dart';
 import 'TravellerCard.dart';
 import '../CustomRouteMapScreen.dart';
@@ -440,21 +441,86 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
   // ── ACTION HANDLERS ──
 
+  bool _isTrackingStatus(String? status) {
+    final s = status?.toLowerCase().trim();
+    if (s == null || s.isEmpty) return false;
+    return const {
+      'order confirmed',
+      'confirmed',
+      'picked up',
+      'picked_up',
+      'in transit',
+      'in-transit',
+      'in_transit',
+      'delivered',
+    }.contains(s);
+  }
+
   void _viewRoute(OrderDisplay order) {
+    final status = order.status.toLowerCase().trim();
+    final isTracking = _isTrackingStatus(status);
+
+    // When order is pending, go to Order Details UI.
+    // When order is confirmed/picked up/in-transit/delivered, go to Order Tracking UI.
+    if (isTracking) {
+      // Note: OrderTrackingScreen expects:
+      // - isTraveller=true when the current user is the delivery person.
+      // In `YourOrders.dart` (packages sent), the current user is the sender.
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OrderTrackingScreen(
+            orderId: order.id,
+            orderData: {
+              // Keep this map flexible; OrderTrackingScreen reads many optional keys.
+              'origin': order.origin,
+              'destination': order.destination,
+              'origin_latitude': order.originLatitude,
+              'origin_longitude': order.originLongitude,
+              'destination_latitude': order.destinationLatitude,
+              'destination_longitude': order.destinationLongitude,
+              'pickup_coordinates': {
+                'latitude': order.originLatitude,
+                'longitude': order.originLongitude,
+              },
+              'dropoff_coordinates': {
+                'latitude': order.destinationLatitude,
+                'longitude': order.destinationLongitude,
+              },
+              'status': order.status,
+              'order_type': order.orderType,
+              'traveller_id': order.matchedTravellerId,
+              'otp': order.otp,
+            },
+            isTraveller: false,
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CustomRouteMapScreen(
-          originCity: order.origin,
-          destinationCity: order.destination,
-          originLatitude: order.originLatitude,
-          originLongitude: order.originLongitude,
-          destinationLatitude: order.destinationLatitude,
-          destinationLongitude: order.destinationLongitude,
+        builder: (context) => OrderDetailScreen(
+          order: order,
+          tripRequests: tripRequestsByOrder[order.id],
+          onAcceptRequest: _acceptTripRequest,
+          onDeclineRequest: _declineTripRequest,
+          onTrackOrder: () => _viewRoute(order),
+          onMarkReceived: () => _markOrderReceived(order),
+          onCompleteOrder: () => _completeOrder(order),
+          onUpdateOrder: _updateOrder,
+          onDeleteOrder: _deleteOrder,
+          onCompleteOrderWithOtp: (orderId, otp) =>
+              _completeTravellerOrderWithOtp(orderId, otp),
+          onUpdateStatus: _updateTravellerStatus,
         ),
       ),
     );
   }
+
+
 
   Future<void> _acceptTripRequest(
       TripRequestDisplay request, String orderId) async {

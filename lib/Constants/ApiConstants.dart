@@ -2,6 +2,11 @@ class ApiConstants {
   static const String baseUrl = 'http://15.206.190.2:3000/api';
   static const String imagebaseUrl = 'http://15.206.190.2:3000';
 
+  // Public profiles
+  // Backend: GET /publicProfile/{userHashedId}
+  static const String publicProfileBaseUrl = '$baseUrl/publicProfile';
+
+
   // User
   static const String login = '$baseUrl/users/login';
   static const String verifyOtp = '$baseUrl/users/verify-otp';
