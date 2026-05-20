@@ -1,89 +1,101 @@
+import 'dart:io';
+import '../Constants/ApiConstants.dart';
+
 class SupportTicket {
-  final String id;
+  final String ticketId;
   final String issueType;
-  final String orderId;
-  final String status; // 'open' | 'closed' | 'submitted'
+  final String description;
+  final String? attachmentUrl;
+  final String status; // 'submitted', 'in_progress', 'resolved', 'closed'
   final DateTime createdAt;
-  final List<SupportMessage> messages;
+  final String? orderId;
+  final String? origin;
+  final String? destination;
 
   const SupportTicket({
-    required this.id,
+    required this.ticketId,
     required this.issueType,
-    required this.orderId,
+    required this.description,
+    this.attachmentUrl,
     required this.status,
     required this.createdAt,
-    required this.messages,
+    this.orderId,
+    this.origin,
+    this.destination,
   });
+
+  String? get fullAttachmentUrl {
+    if (attachmentUrl == null || attachmentUrl!.isEmpty) return null;
+    if (attachmentUrl!.startsWith('http')) return attachmentUrl;
+    return '${ApiConstants.imagebaseUrl}$attachmentUrl';
+  }
+
+  factory SupportTicket.fromJson(Map<String, dynamic> json) {
+    return SupportTicket(
+      ticketId: json['ticket_id']?.toString() ?? '',
+      issueType: json['issue_type']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      attachmentUrl: json['attachment_url']?.toString(),
+      status: json['status']?.toString() ?? 'submitted',
+      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
+      orderId: json['order_id']?.toString(),
+      origin: json['origin']?.toString(),
+      destination: json['destination']?.toString(),
+    );
+  }
 }
 
 class SupportMessage {
-  final String text;
-  final bool isUser; // true = sent by user, false = support agent
-  final DateTime time;
+  final int id;
+  final String ticketId;
+  final String userId;
+  final String? message;
+  final String? attachmentUrl;
+  final DateTime createdAt;
+  final bool isUser; 
 
   const SupportMessage({
-    required this.text,
+    required this.id,
+    required this.ticketId,
+    required this.userId,
+    this.message,
+    this.attachmentUrl,
+    required this.createdAt,
     required this.isUser,
-    required this.time,
   });
+
+  String? get fullAttachmentUrl {
+    if (attachmentUrl == null || attachmentUrl!.isEmpty) return null;
+    if (attachmentUrl!.startsWith('http')) return attachmentUrl;
+    return '${ApiConstants.imagebaseUrl}$attachmentUrl';
+  }
+
+  factory SupportMessage.fromJson(Map<String, dynamic> json, String currentUserId) {
+    final senderId = json['user_id']?.toString();
+    return SupportMessage(
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      ticketId: json['ticket_id']?.toString() ?? '',
+      userId: senderId ?? '',
+      message: json['message'],
+      attachmentUrl: json['attachment_url'],
+      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
+      isUser: senderId == currentUserId,
+    );
+  }
 }
 
-// ── Hardcoded sample data ──
-final List<SupportTicket> hardcodedTickets = [
-  SupportTicket(
-    id: 'TKT-001',
-    issueType: 'Late Delivery',
-    orderId: 'ORD-4821',
-    status: 'open',
-    createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-    messages: [
-      SupportMessage(
-        text: 'My order #ORD-4821 has not arrived yet. It was supposed to be delivered yesterday.',
-        isUser: true,
-        time: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-      SupportMessage(
-        text: 'Hi! We are sorry for the inconvenience. We are looking into this right away. Could you share the traveller name?',
-        isUser: false,
-        time: DateTime.now().subtract(const Duration(hours: 2, minutes: 45)),
-      ),
-      SupportMessage(
-        text: 'The traveller name is Rahul Sharma.',
-        isUser: true,
-        time: DateTime.now().subtract(const Duration(hours: 2, minutes: 30)),
-      ),
-      SupportMessage(
-        text: 'Thank you. We have flagged this to the traveller and will update you within 2 hours.',
-        isUser: false,
-        time: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-    ],
-  ),
-  SupportTicket(
-    id: 'TKT-002',
-    issueType: 'Wrong Item Received',
-    orderId: 'ORD-3910',
-    status: 'closed',
-    createdAt: DateTime.now().subtract(const Duration(days: 3)),
-    messages: [
-      SupportMessage(
-        text: 'I received a wrong item in my order #ORD-3910.',
-        isUser: true,
-        time: DateTime.now().subtract(const Duration(days: 3)),
-      ),
-      SupportMessage(
-        text: 'We sincerely apologise. A replacement has been initiated. Please allow 24-48 hours.',
-        isUser: false,
-        time: DateTime.now().subtract(const Duration(days: 2, hours: 22)),
-      ),
-    ],
-  ),
-];
+class CreateTicketRequest {
+  final String userId;
+  final String? orderId;
+  final String issueType;
+  final String description;
+  final File? attachment;
 
-const List<String> faqItemsData = [
-  'I want to contact the seller/traveller',
-  'How do I track my package?',
-  'What happens if my delivery is delayed?',
-  'How do I cancel an order?',
-  'I want to report a damaged item',
-];
+  CreateTicketRequest({
+    required this.userId,
+    this.orderId,
+    required this.issueType,
+    required this.description,
+    this.attachment,
+  });
+}

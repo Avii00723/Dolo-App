@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:dolo/Models/SupportTicketModel.dart';
+import 'package:dolo/Controllers/SupportService.dart';
 import 'SupportFormScreen.dart';
 import 'SupportChatScreen.dart';
 
 class ChatSupportScreen extends StatefulWidget {
-  const ChatSupportScreen({super.key});
+  final String? orderId;
+  const ChatSupportScreen({super.key, this.orderId});
 
   @override
   State<ChatSupportScreen> createState() => _ChatSupportScreenState();
@@ -13,11 +15,42 @@ class ChatSupportScreen extends StatefulWidget {
 class _ChatSupportScreenState extends State<ChatSupportScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final SupportService _supportService = SupportService();
+  
+  List<SupportTicket> _ongoing = [];
+  List<SupportTicket> _previous = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadTickets();
+  }
+
+  Future<void> _loadTickets() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final res = await _supportService.getMyTickets();
+      if (mounted) {
+        setState(() {
+          _ongoing = res['ongoing'] ?? [];
+          _previous = res['previous'] ?? [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load tickets';
+        });
+      }
+    }
   }
 
   @override
@@ -28,11 +61,6 @@ class _ChatSupportScreenState extends State<ChatSupportScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Public variable from SupportTicketModel.dart
-    final ongoing = hardcodedTickets.where((t) => t.status == 'open').toList();
-    final previous =
-        hardcodedTickets.where((t) => t.status == 'closed').toList();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -51,6 +79,12 @@ class _ChatSupportScreenState extends State<ChatSupportScreen>
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black54),
+            onPressed: _loadTickets,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -60,12 +94,15 @@ class _ChatSupportScreenState extends State<ChatSupportScreen>
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SupportFormScreen(isChatMode: true),
-                  ),
-                ),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SupportFormScreen(isChatMode: true, orderId: widget.orderId),
+                    ),
+                  );
+                  _loadTickets();
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black87,
@@ -109,13 +146,21 @@ class _ChatSupportScreenState extends State<ChatSupportScreen>
           ),
 
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _TicketList(tickets: ongoing, emptyMessage: 'No ongoing reports'),
-                _TicketList(tickets: previous, emptyMessage: 'No previous reports'),
-              ],
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Text(_error!))
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _TicketList(
+                              tickets: _ongoing,
+                              emptyMessage: 'No ongoing reports'),
+                          _TicketList(
+                              tickets: _previous,
+                              emptyMessage: 'No previous reports'),
+                        ],
+                      ),
           ),
         ],
       ),
@@ -172,7 +217,7 @@ class _TicketList extends StatelessWidget {
                     color: Colors.grey[200],
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.person_outline,
+                  child: const Icon(Icons.confirmation_number_outlined,
                       size: 22, color: Colors.black54),
                 ),
                 const SizedBox(width: 14),
@@ -181,7 +226,7 @@ class _TicketList extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Issue Type: ${ticket.issueType}',
+                        'Issue: ${ticket.issueType}',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -190,10 +235,10 @@ class _TicketList extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'Status: ${_capitalize(ticket.status)}',
+                        'ID: ${ticket.ticketId} • Status: ${_capitalize(ticket.status)}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: ticket.status == 'open'
+                          color: ticket.status == 'submitted' || ticket.status == 'in_progress'
                               ? Colors.green[700]
                               : Colors.black45,
                         ),

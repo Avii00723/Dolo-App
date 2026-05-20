@@ -634,7 +634,9 @@ class _TravellerOrderDetailScreenState
               ),
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const SupportScreen()),
+                MaterialPageRoute(
+                  builder: (_) => SupportScreen(orderId: _order.id),
+                ),
               ),
             ),
           ),

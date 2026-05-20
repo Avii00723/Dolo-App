@@ -29,6 +29,7 @@ class ApiConstants {
   static const String myOrders = '$baseUrl/orders/myorders';
   static const String completeOrder = '$baseUrl/orders/complete';
   static const String deleteOrder = '$baseUrl/orders/delete';
+  static const String getHomeTracking = '$baseUrl/orders/home-tracking';
 
   // Trip Requests
   static const String sendTripRequest = '$baseUrl/trip-requests/send';
@@ -52,6 +53,12 @@ class ApiConstants {
 
   // Device Tokens
   static const String saveDeviceToken = '$baseUrl/device/save';
+
+  // Support
+  static const String createSupportTicket = '$baseUrl/support/create-ticket';
+  static const String getMySupportTickets = '$baseUrl/support/my-tickets';
+  static const String sendSupportMessage = '$baseUrl/support/send-message';
+  static const String getSupportMessages = '$baseUrl/support/messages';
 
   // Media - TTS
   static const String ttsStreamUrl = 'https://api.dzdx.in/v1/media/tts/stream';

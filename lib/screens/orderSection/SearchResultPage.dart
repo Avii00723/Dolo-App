@@ -6,6 +6,7 @@ import '../../Models/OrderModel.dart';
 import '../../Controllers/TripRequestService.dart';
 
 import '../Widgets/sendtriprequestpage.dart';
+import '../UserProfileScreen.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Responsive Helper
@@ -822,64 +823,86 @@ class _OrderCard extends StatelessWidget {
                     horizontal: r.sp16, vertical: r.sp12),
                 child: Row(
                   children: [
-                    // Avatar
-                    Container(
-                      width: r.avatarSM,
-                      height: r.avatarSM,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.primary.withValues(alpha: 0.7),
-                            AppColors.primary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          (order.ownerName?.isNotEmpty == true
-                              ? order.ownerName![0]
-                              : 'U')
-                              .toUpperCase(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: r.fontLG,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: r.sp10),
+                    // Avatar + Name/Rating Column
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            order.ownerName ?? 'Unknown',
-                            style: TextStyle(
-                              fontSize: r.fontMD,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Row(
-                            children: [
-                              Icon(Icons.star_rounded,
-                                  size: r.iconSM,
-                                  color: const Color(0xFFFACC15)),
-                              SizedBox(width: r.sp2),
-                              Text(
-                                order.ownerRating?.toStringAsFixed(1) ?? '—',
-                                style: TextStyle(
-                                  fontSize: r.fontBase,
-                                  color: Colors.grey.shade500,
+                      child: GestureDetector(
+                        onTap: () {
+                          if (order.ownerId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => UserProfileScreen(
+                                  userId: order.ownerId!,
+                                  userName: order.ownerName ?? 'User',
                                 ),
                               ),
-                            ],
-                          ),
-                        ],
+                            );
+                          }
+                        },
+                        child: Row(
+                          children: [
+                            // Avatar
+                            Container(
+                              width: r.avatarSM,
+                              height: r.avatarSM,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.primary.withValues(alpha: 0.7),
+                                    AppColors.primary,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  (order.ownerName?.isNotEmpty == true
+                                      ? order.ownerName![0]
+                                      : 'U')
+                                      .toUpperCase(),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: r.fontLG,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: r.sp10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    order.ownerName ?? 'Unknown',
+                                    style: TextStyle(
+                                      fontSize: r.fontMD,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.star_rounded,
+                                          size: r.iconSM,
+                                          color: const Color(0xFFFACC15)),
+                                      SizedBox(width: r.sp2),
+                                      Text(
+                                        order.ownerRating?.toStringAsFixed(1) ?? '—',
+                                        style: TextStyle(
+                                          fontSize: r.fontBase,
+                                          color: Colors.grey.shade500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     // Send button
@@ -1311,71 +1334,86 @@ class _OrderDetailSheet extends StatelessWidget {
           // ── Sender card ──────────────────────────────────────────
           _DetailCard(
             r: r,
-            child: Row(
-              children: [
-                Container(
-                  width: r.avatarMD,
-                  height: r.avatarMD,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primary.withValues(alpha: 0.7),
-                        AppColors.primary,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      (order.ownerName?.isNotEmpty == true
-                          ? order.ownerName![0]
-                          : 'U')
-                          .toUpperCase(),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: r.font5XL,
+            child: InkWell(
+              onTap: () {
+                if (order.ownerId != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserProfileScreen(
+                        userId: order.ownerId!,
+                        userName: order.ownerName ?? 'User',
                       ),
                     ),
-                  ),
-                ),
-                SizedBox(width: r.s(14)),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        order.ownerName ?? 'Unknown',
-                        style: TextStyle(
-                          fontSize: r.font2XL,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: r.sp2),
-                      Row(
-                        children: [
-                          Icon(Icons.star_rounded,
-                              size: r.iconMD,
-                              color: const Color(0xFFFACC15)),
-                          SizedBox(width: r.s(3)),
-                          Text(
-                            order.ownerRating?.toStringAsFixed(1) ?? '—',
-                            style: TextStyle(
-                              fontSize: r.fontMD,
-                              color: Colors.grey.shade500,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                  );
+                }
+              },
+              child: Row(
+                children: [
+                  Container(
+                    width: r.avatarMD,
+                    height: r.avatarMD,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withValues(alpha: 0.7),
+                          AppColors.primary,
                         ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        (order.ownerName?.isNotEmpty == true
+                            ? order.ownerName![0]
+                            : 'U')
+                            .toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: r.font5XL,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                _UrgentBadge(r: r, isUrgent: order.isUrgent == true),
-              ],
+                  SizedBox(width: r.s(14)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.ownerName ?? 'Unknown',
+                          style: TextStyle(
+                            fontSize: r.font2XL,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: r.sp2),
+                        Row(
+                          children: [
+                            Icon(Icons.star_rounded,
+                                size: r.iconMD,
+                                color: const Color(0xFFFACC15)),
+                            SizedBox(width: r.s(3)),
+                            Text(
+                              order.ownerRating?.toStringAsFixed(1) ?? '—',
+                              style: TextStyle(
+                                fontSize: r.fontMD,
+                                color: Colors.grey.shade500,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  _UrgentBadge(r: r, isUrgent: order.isUrgent == true),
+                ],
+              ),
             ),
           ),
 

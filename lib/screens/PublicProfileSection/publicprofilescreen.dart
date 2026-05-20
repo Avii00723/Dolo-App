@@ -5,6 +5,7 @@ import '../../Controllers/PublicProfileService.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Models/PublicProfileModel.dart';
 
+
 class PublicProfileScreen extends StatefulWidget {
   final String targetUserHashedId;
 
@@ -30,14 +31,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   Future<void> _fetch() async {
     try {
       final viewerHashedId = await AuthService.getUserId();
+      debugPrint('🧪 PublicProfileScreen init - viewerHashedId=$viewerHashedId targetUserHashedId=${widget.targetUserHashedId}');
       if (viewerHashedId == null) {
         throw Exception('User not authenticated');
       }
+
+debugPrint('🌐 Calling PublicProfile endpoint.');
+      debugPrint('➡️ userHashedId=${widget.targetUserHashedId} viewerHashedId=$viewerHashedId');
+
 
       final res = await _service.getPublicProfile(
         userHashedId: widget.targetUserHashedId,
         viewerHashedId: viewerHashedId,
       );
+
 
       if (!mounted) return;
       setState(() {
@@ -77,6 +84,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         ),
       );
     }
+
 
     final data = _data!;
 
@@ -415,4 +423,3 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     );
   }
 }
-

@@ -11,7 +11,9 @@ const List<String> faqItems = [
 ];
 
 class SupportScreen extends StatelessWidget {
-  const SupportScreen({super.key});
+  final String? orderId;
+
+  const SupportScreen({super.key, this.orderId});
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +62,7 @@ class SupportScreen extends StatelessWidget {
                     label: 'Chat Support',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ChatSupportScreen()),
+                      MaterialPageRoute(builder: (_) => ChatSupportScreen(orderId: orderId)),
                     ),
                   ),
                   const SizedBox(width: 32),
@@ -70,7 +72,7 @@ class SupportScreen extends StatelessWidget {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const SupportFormScreen(isChatMode: false),
+                        builder: (_) => SupportFormScreen(isChatMode: false, orderId: orderId),
                       ),
                     ),
                   ),

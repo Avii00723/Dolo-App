@@ -33,7 +33,8 @@ class Order {
   final bool? isUrgent;
   final String? ownerName; 
   final double? ownerRating; 
-  final String? deliveryOtp; // Added field
+  final String? deliveryOtp;
+  final String? ownerId; // Added field for Public Profile navigation
 
   Order({
     required this.id,
@@ -67,7 +68,8 @@ class Order {
     this.isUrgent,
     this.ownerName,
     this.ownerRating,
-    this.deliveryOtp, // Added to constructor
+    this.deliveryOtp,
+    this.ownerId, // Added to constructor
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -164,13 +166,11 @@ class Order {
     if (rawItemDesc != null && rawItemDesc.isNotEmpty) {
       mappedDescription = rawItemDesc;
     } else if (apiCategory != null && apiCategory.isNotEmpty) {
-      // Try to find the user-friendly name from our predefined categories
       try {
         mappedDescription = orderCategories
             .firstWhere((c) => c.apiValue.toLowerCase() == apiCategory.toLowerCase())
             .name;
       } catch (_) {
-        // Fallback: Capitalize technical category string
         mappedDescription = apiCategory[0].toUpperCase() + apiCategory.substring(1);
       }
     }
@@ -217,6 +217,7 @@ class Order {
       ownerName: json['order_creator_name'] ?? json['user_name'],
       ownerRating: _parseDouble(json['owner_rating'] ?? 0.0),
       deliveryOtp: _parseDeliveryOtp(json),
+      ownerId: json['user_id']?.toString() ?? json['user_hashed_id']?.toString() ?? json['owner_id']?.toString() ?? json['owner_hashed_id']?.toString(),
     );
   }
 
@@ -279,6 +280,7 @@ class Order {
       'actual_weight': actualWeight,
       'custom_category': customCategory,
       'delivery_otp': deliveryOtp,
+      'user_id': ownerId,
     };
   }
 }

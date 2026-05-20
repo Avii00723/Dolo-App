@@ -1,20 +1,31 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../Controllers/SupportService.dart';
+import '../../Controllers/AuthService.dart';
+import '../../Models/SupportTicketModel.dart';
 
 class SupportFormScreen extends StatefulWidget {
   final bool isChatMode; // true = Chat Support, false = Email Support
+  final String? orderId; // Optional orderId to auto-populate
 
-  const SupportFormScreen({super.key, required this.isChatMode});
+  const SupportFormScreen({super.key, required this.isChatMode, this.orderId});
 
   @override
   State<SupportFormScreen> createState() => _SupportFormScreenState();
 }
 
 class _SupportFormScreenState extends State<SupportFormScreen> {
+  final SupportService _supportService = SupportService();
   String? _selectedIssueType;
-  final _orderIdController = TextEditingController();
+  late final TextEditingController _orderIdController;
   final _descriptionController = TextEditingController();
+  File? _attachment;
+  bool _isLoading = false;
   bool _submitted = false;
+  String? _userId;
+
+  bool get _hasPrefilledOrderId => widget.orderId?.trim().isNotEmpty == true;
 
   static const _issueTypes = [
     'Late Delivery',
@@ -26,20 +37,76 @@ class _SupportFormScreenState extends State<SupportFormScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _orderIdController = TextEditingController(text: widget.orderId);
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    _userId = await AuthService.getUserId();
+    setState(() {});
+  }
+
+  @override
   void dispose() {
     _orderIdController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (pickedFile != null) {
+      setState(() {
+        _attachment = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User not logged in')),
+      );
+      return;
+    }
     if (_selectedIssueType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a type of issue')),
       );
       return;
     }
-    setState(() => _submitted = true);
+    if (_descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a description')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final request = CreateTicketRequest(
+      userId: _userId!,
+      issueType: _selectedIssueType!,
+      description: _descriptionController.text.trim(),
+      orderId: _orderIdController.text.trim().isEmpty ? null : _orderIdController.text.trim(),
+      attachment: _attachment,
+    );
+
+    final result = await _supportService.createTicket(request);
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (result['success'] == true) {
+        setState(() => _submitted = true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to submit report')),
+        );
+      }
+    }
   }
 
   @override
@@ -118,7 +185,10 @@ class _SupportFormScreenState extends State<SupportFormScreen> {
                 const SizedBox(height: 6),
                 _FormField(
                   controller: _orderIdController,
-                  hint: 'Enter or select order ID',
+                  hint: _hasPrefilledOrderId
+                      ? 'Order ID added'
+                      : 'Enter or select order ID',
+                  readOnly: _hasPrefilledOrderId,
                 ),
 
                 const SizedBox(height: 16),
@@ -135,16 +205,16 @@ class _SupportFormScreenState extends State<SupportFormScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFDDDDDD)),
                   ),
-                  child: const Text(
-                    'USR-00123  (auto-filled)',
-                    style: TextStyle(fontSize: 14, color: Colors.black45),
+                  child: Text(
+                    _userId ?? 'Loading...',
+                    style: const TextStyle(fontSize: 14, color: Colors.black45),
                   ),
                 ),
 
                 const SizedBox(height: 16),
 
                 // Description
-                const _FieldLabel(label: 'Description'),
+                const _FieldLabel(label: '* Description'),
                 const SizedBox(height: 6),
                 _FormField(
                   controller: _descriptionController,
@@ -156,21 +226,27 @@ class _SupportFormScreenState extends State<SupportFormScreen> {
 
                 // Add attachment
                 GestureDetector(
-                  onTap: () {
-                    // TODO: add file picker
-                  },
+                  onTap: _pickImage,
                   child: Row(
                     children: [
                       const Icon(Icons.attach_file, size: 20, color: Colors.black54),
                       const SizedBox(width: 8),
-                      Text(
-                        'Add attachment',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                          decoration: TextDecoration.underline,
+                      Expanded(
+                        child: Text(
+                          _attachment == null ? 'Add attachment' : 'Attachment: ${_attachment!.path.split('/').last}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            decoration: TextDecoration.underline,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (_attachment != null)
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 16, color: Colors.red),
+                          onPressed: () => setState(() => _attachment = null),
+                        ),
                     ],
                   ),
                 ),
@@ -181,7 +257,7 @@ class _SupportFormScreenState extends State<SupportFormScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _submit,
+                    onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black87,
                       foregroundColor: Colors.white,
@@ -191,13 +267,19 @@ class _SupportFormScreenState extends State<SupportFormScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    child: Text(
-                      widget.isChatMode ? 'Start Chatting' : 'Submit',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(
+                            widget.isChatMode ? 'Start Chatting' : 'Submit',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                 ),
 
@@ -297,11 +379,13 @@ class _FormField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final int maxLines;
+  final bool readOnly;
 
   const _FormField({
     required this.controller,
     required this.hint,
     this.maxLines = 1,
+    this.readOnly = false,
   });
 
   @override
@@ -309,12 +393,13 @@ class _FormField extends StatelessWidget {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      readOnly: readOnly,
       style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: readOnly ? Colors.grey[100] : Colors.white,
         contentPadding:
         const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(

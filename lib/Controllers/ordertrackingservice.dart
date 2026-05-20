@@ -223,6 +223,25 @@ class OrderTrackingService {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // GET /orders/home-tracking/{userHashedId}
+  // Returns latest active order tracking for homepage
+  // ─────────────────────────────────────────────────────────────
+  Future<Map<String, dynamic>?> getHomeTracking(String userHashedId) async {
+    final endpoint = '/orders/home-tracking/${Uri.encodeComponent(userHashedId)}';
+    try {
+      final response = await _api.get(
+        endpoint,
+        parser: (json) => json,
+      );
+      if (response.success) return response.data;
+      return null;
+    } catch (e) {
+      print('❌ GET HOME TRACKING EXCEPTION: $e');
+      return null;
+    }
+  }
+
   // Convenience helpers aligned with documentation
   Future<bool> markAsConfirmed(String orderId) => updateTrackingStage(orderId, 1);
   Future<bool> markAsPickedUp(String orderId) => updateTrackingStage(orderId, 2);

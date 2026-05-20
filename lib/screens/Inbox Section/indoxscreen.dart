@@ -532,6 +532,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           chatId: conversation['chat_id'].toString(),
           orderId: conversation['order_id'].toString(),
           otherUserName: conversation['other_user_name'],
+          otherUserId: conversation['other_user_id']?.toString(), // PASSING OTHER USER ID
         ),
       ),
     ).then((_) => _loadInbox());

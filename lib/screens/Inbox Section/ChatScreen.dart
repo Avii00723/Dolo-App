@@ -23,12 +23,14 @@ class ChatScreen extends StatefulWidget {
   final String chatId;
   final String orderId;
   final String? otherUserName;
+  final String? otherUserId;
 
   const ChatScreen({
     super.key,
     required this.chatId,
     required this.orderId,
     this.otherUserName,
+    this.otherUserId,
   });
 
   @override
@@ -312,6 +314,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
         setState(() {
           messages = convertedMessages;
+          String? bestOtherUserId = widget.otherUserId;
+          String? bestOtherUserName = widget.otherUserName;
+
           if (convertedMessages.isNotEmpty) {
             final firstOtherMessage = convertedMessages.firstWhere(
                   (msg) => msg['senderId'] != _currentUserId,
@@ -319,23 +324,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             );
 
             if (firstOtherMessage.isNotEmpty) {
-              otherUserData = {
-                'id': firstOtherMessage['senderId'],
-                'name': firstOtherMessage['senderName'] ?? widget.otherUserName ?? 'Unknown User',
-                'profileUrl': '',
-              };
-            } else {
-              otherUserData = {
-                'name': widget.otherUserName ?? 'Unknown User',
-                'profileUrl': '',
-              };
+              bestOtherUserId = firstOtherMessage['senderId'].toString();
+              bestOtherUserName = firstOtherMessage['senderName'] ?? bestOtherUserName;
             }
-          } else {
-            otherUserData = {
-              'name': widget.otherUserName ?? 'Unknown User',
-              'profileUrl': '',
-            };
           }
+
+          otherUserData = {
+            'id': bestOtherUserId,
+            'name': bestOtherUserName ?? 'Unknown User',
+            'profileUrl': '',
+          };
 
           isLoading = false;
           _errorMessage = null;
@@ -377,6 +375,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             isLoading = false;
             _errorMessage = result['error'] as String?;
             otherUserData = {
+              'id': widget.otherUserId,
               'name': widget.otherUserName ?? 'Unknown User',
               'profileUrl': '',
             };
@@ -395,6 +394,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           isLoading = false;
           _errorMessage = 'Failed to load messages: $e';
           otherUserData = {
+            'id': widget.otherUserId,
             'name': widget.otherUserName ?? 'Unknown User',
             'profileUrl': '',
           };
@@ -551,17 +551,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // NEW METHOD: Navigate to user profile
   void _navigateToUserProfile() {
-    String? otherUserId = otherUserData['id']?.toString();
-
-    // If we don't have the ID in otherUserData, try to get it from messages
-    if (otherUserId == null) {
-      for (var message in messages) {
-        if (message['senderId'] != _currentUserId) {
-          otherUserId = message['senderId'].toString();
-          break;
-        }
-      }
-    }
+    debugPrint('🧭 ChatScreen _navigateToUserProfile() called - chatId=${widget.chatId} orderId=${widget.orderId} otherUserName=${otherUserData['name']} otherUserDataIdRaw=${otherUserData['id']}');
+    String? otherUserId = otherUserData['id']?.toString() ?? widget.otherUserId;
 
     if (otherUserId != null) {
       Navigator.push(
@@ -569,7 +560,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         MaterialPageRoute(
           builder: (context) => UserProfileScreen(
             userId: otherUserId!,
-            userName: otherUserData['name'] ?? 'Unknown User',
+            userName: otherUserData['name'] ?? widget.otherUserName ?? 'Unknown User',
             profileUrl: otherUserData['profileUrl'],
           ),
         ),
@@ -621,27 +612,50 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         onPressed: () => Navigator.pop(context),
       ),
       title: GestureDetector(
-        onTap: () => _navigateToUserProfile(),
+        onTap: () {
+          debugPrint('👤 ChatScreen AppBar title tapped - chatId=${widget.chatId} orderId=${widget.orderId} otherUser=${otherUserData['name']} otherUserId=${otherUserData['id']}');
+          _navigateToUserProfile();
+        },
         child: Row(
+
           children: [
-            _buildProfileAvatar(otherUserData['name'] ?? 'U', false, 40),
+            _buildProfileAvatar(otherUserData['name'] ?? widget.otherUserName ?? 'U', false, 40),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                otherUserData['name'] ?? 'Unknown User',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    otherUserData['name'] ?? widget.otherUserName ?? 'Unknown User',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View Profile',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 12,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
-              size: 20,
             ),
           ],
         ),
@@ -649,7 +663,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       actions: [
         IconButton(
           icon: Icon(Icons.phone, color: Theme.of(context).colorScheme.onSurface),
-          onPressed: () {},
+          onPressed: () async {
+            _navigateToUserProfile();
+          },
         ),
         PopupMenuButton(
           icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurface),
@@ -679,6 +695,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             if (value == 'refresh') {
               _loadMessages(silent: false);
             } else if (value == 'profile') {
+              debugPrint('👤 ChatScreen PopupMenu profile selected - chatId=${widget.chatId} orderId=${widget.orderId} otherUser=${otherUserData['name']} otherUserId=${otherUserData['id']}');
               _navigateToUserProfile();
             }
           },
@@ -718,7 +735,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               onCopy: _copyMessage,
               onLaunchUrl: _launchUrl,
               onDownloadImage: _downloadImage,
-              onAvatarTap: isMe ? null : _navigateToUserProfile, // NEW: Add avatar tap callback
+              onAvatarTap: isMe ? null : _navigateToUserProfile,
             ),
           );
         },
@@ -1017,7 +1034,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          _buildProfileAvatar(otherUserData['name'] ?? 'U', false, 32),
+          _buildProfileAvatar(otherUserData['name'] ?? widget.otherUserName ?? 'U', false, 32),
           const SizedBox(width: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1329,7 +1346,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-// Enhanced Message Bubble with avatar tap functionality
 class EnhancedMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final bool isMe;
@@ -1338,7 +1354,7 @@ class EnhancedMessageBubble extends StatelessWidget {
   final Function(String) onCopy;
   final Function(String) onLaunchUrl;
   final Function(String) onDownloadImage;
-  final VoidCallback? onAvatarTap; // NEW: Added callback for avatar tap
+  final VoidCallback? onAvatarTap;
 
   const EnhancedMessageBubble({
     super.key,
@@ -1349,7 +1365,7 @@ class EnhancedMessageBubble extends StatelessWidget {
     required this.onCopy,
     required this.onLaunchUrl,
     required this.onDownloadImage,
-    this.onAvatarTap, // NEW: Optional callback
+    this.onAvatarTap,
   });
 
   @override
@@ -1444,7 +1460,6 @@ class EnhancedMessageBubble extends StatelessWidget {
     );
   }
 
-  // UPDATED: Make avatar tappable
   Widget _buildAvatar(BuildContext context) {
     final name = message['senderName'] ?? 'U';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
@@ -1474,7 +1489,6 @@ class EnhancedMessageBubble extends StatelessWidget {
       ),
     );
 
-    // If not own message and callback is provided, make it tappable
     if (!isMe && onAvatarTap != null) {
       return GestureDetector(
         onTap: onAvatarTap,
@@ -1624,7 +1638,6 @@ class EnhancedMessageBubble extends StatelessWidget {
           ],
         ),
       ),
-
     );
   }
 }

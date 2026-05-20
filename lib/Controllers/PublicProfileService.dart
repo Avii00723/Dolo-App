@@ -26,9 +26,15 @@ class PublicProfileService {
     );
 
     if (res.statusCode == 200) {
-      final jsonMap = jsonDecode(res.body) as Map<String, dynamic>;
-      return PublicProfileResponse.fromJson(jsonMap);
+      try {
+        final jsonMap = jsonDecode(res.body) as Map<String, dynamic>;
+        return PublicProfileResponse.fromJson(jsonMap);
+      } catch (e) {
+        // Helps identify parsing mismatch when navigation originates from chat
+        throw Exception('Failed to parse public profile: $e; body=${res.body}');
+      }
     }
+
 
     if (res.statusCode == 404) {
       throw Exception('User not found');
