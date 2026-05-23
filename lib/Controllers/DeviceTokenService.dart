@@ -40,7 +40,7 @@ class DeviceTokenService {
         if (!_isListenersSet) {
           // Listen for token refresh
           _messaging.onTokenRefresh.listen((newToken) {
-            print('🔄 FCM Token refreshed');
+            print('🔄 FCM Token refreshed: $newToken');
             _saveTokenToServer(newToken);
           });
 
@@ -72,7 +72,7 @@ class DeviceTokenService {
     try {
       String? token = await _messaging.getToken();
       if (token != null) {
-        print('📱 Current FCM Token obtained');
+        print('📱 Current FCM Token: $token');
         return await _saveTokenToServer(token);
       } else {
         print('⚠️ Failed to get FCM token');
@@ -96,6 +96,7 @@ class DeviceTokenService {
       final platform = Platform.isAndroid ? 'android' : 'ios';
       
       print('📤 Attempting to save device token for userId: $userId');
+      print('📝 Token: $fcmToken');
 
       final response = await http.post(
         Uri.parse(ApiConstants.saveDeviceToken),
