@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -7,11 +8,15 @@ import 'AuthService.dart';
 
 class DeviceTokenService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  
+  // Stream to notify app of new foreground messages
+  static final StreamController<RemoteMessage> _notificationStreamController = StreamController<RemoteMessage>.broadcast();
+  static Stream<RemoteMessage> get onNotificationReceived => _notificationStreamController.stream;
 
   /// Initialize FCM and save device token
   static Future<void> initialize() async {
     try {
-      // Request notification permissions (required for iOS)
+      // Request notification permissions
       NotificationSettings settings = await _messaging.requestPermission(
         alert: true,
         announcement: false,
@@ -26,6 +31,7 @@ class DeviceTokenService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
+        
         // Get the FCM token
         await _getAndSaveToken();
 
@@ -34,6 +40,18 @@ class DeviceTokenService {
           print('🔄 FCM Token refreshed');
           _saveTokenToServer(newToken);
         });
+
+        // Listen for foreground messages
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+          print('📩 Foreground message received: ${message.notification?.title}');
+          _notificationStreamController.add(message);
+        });
+
+        // Handle notification clicks when app is in background
+        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+          print('🖱️ Notification clicked from background: ${message.data}');
+        });
+        
       } else {
         print('⚠️ Notification permissions denied');
       }
@@ -95,7 +113,6 @@ class DeviceTokenService {
     }
   }
 
-  /// Manually trigger token save (useful after login)
   static Future<bool> saveCurrentToken() async {
     try {
       String? token = await _messaging.getToken();
@@ -109,7 +126,6 @@ class DeviceTokenService {
     }
   }
 
-  /// Delete device token (useful for logout)
   static Future<void> deleteToken() async {
     try {
       await _messaging.deleteToken();

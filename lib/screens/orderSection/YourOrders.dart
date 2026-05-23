@@ -166,8 +166,13 @@ class TripRequestDisplay {
 
 class YourOrdersPage extends StatefulWidget {
   final int initialTabIndex;
+  final String? focusOrderId;
 
-  const YourOrdersPage({super.key, this.initialTabIndex = 0});
+  const YourOrdersPage({
+    super.key,
+    this.initialTabIndex = 0,
+    this.focusOrderId,
+  });
 
   @override
   State<YourOrdersPage> createState() => _YourOrdersPageState();
@@ -194,6 +199,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _selectedTab = widget.initialTabIndex.clamp(0, 1).toInt();
     _initializeUser();
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       if (currentUserId != null && mounted) {
@@ -315,7 +321,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
               );
       }).toList();
 
-      final trackedOrders = await _applyTrackingStatus(namedOrders);
+      final trackedOrders =
+          _prioritizeFocusedOrder(await _applyTrackingStatus(namedOrders));
 
       if (mounted) {
         setState(() {
@@ -421,7 +428,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         ));
       }
 
-      final trackedOrders = await _applyTrackingStatus(displayOrders);
+      final trackedOrders =
+          _prioritizeFocusedOrder(await _applyTrackingStatus(displayOrders));
 
       if (mounted) {
         setState(() {
@@ -718,6 +726,20 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   String? _readStatus(Map<String, dynamic>? source, String key) {
     final value = source?[key]?.toString().trim().toLowerCase();
     return value == null || value.isEmpty || value == 'null' ? null : value;
+  }
+
+  List<OrderDisplay> _prioritizeFocusedOrder(List<OrderDisplay> orders) {
+    final focusOrderId = widget.focusOrderId?.trim().toLowerCase();
+    if (focusOrderId == null || focusOrderId.isEmpty) return orders;
+
+    final sorted = List<OrderDisplay>.from(orders);
+    sorted.sort((a, b) {
+      final aMatches = a.id.trim().toLowerCase() == focusOrderId;
+      final bMatches = b.id.trim().toLowerCase() == focusOrderId;
+      if (aMatches == bMatches) return 0;
+      return aMatches ? -1 : 1;
+    });
+    return sorted;
   }
 
   Future<List<OrderDisplay>> _applyTrackingStatus(

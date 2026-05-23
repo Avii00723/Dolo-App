@@ -24,18 +24,33 @@ class NotificationModel {
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    // Helper to parse is_read which can be int (1/0) or bool
+    bool parseIsRead(dynamic value) {
+      if (value is bool) return value;
+      if (value is int) return value == 1;
+      if (value is String) return value == '1' || value.toLowerCase() == 'true';
+      return false;
+    }
+
+    // Helper to parse int fields that might come as strings
+    int parseInt(dynamic value, int defaultValue) {
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
     return NotificationModel(
-      id: json['id'] ?? json['hashed_id'] ?? '',
-      hashedId: json['hashed_id'] ?? json['id'] ?? '',
-      userId: json['user_id'] ?? 0,
-      actorUserId: json['actor_user_id'],
-      type: json['type'] ?? '',
-      title: json['title'] ?? '',
-      body: json['body'] ?? '',
+      id: json['id']?.toString() ?? json['hashed_id']?.toString() ?? '',
+      hashedId: json['hashed_id']?.toString() ?? json['id']?.toString() ?? '',
+      userId: parseInt(json['user_id'], 0),
+      actorUserId: json['actor_user_id'] != null ? parseInt(json['actor_user_id'], 0) : null,
+      type: json['type']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      body: json['body']?.toString() ?? '',
       data: json['data'] != null ? Map<String, dynamic>.from(json['data']) : null,
-      isRead: (json['is_read'] ?? 0) == 1,
+      isRead: parseIsRead(json['is_read']),
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
+          ? DateTime.parse(json['created_at'].toString())
           : DateTime.now(),
     );
   }

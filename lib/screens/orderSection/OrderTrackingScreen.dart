@@ -8,8 +8,7 @@ import 'dart:math' as math;
 
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/ordertrackingservice.dart';
-import '../../Controllers/ratingservice.dart';
-import '../../Models/RatingModel.dart';
+import 'RatingFeedbackDialog.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
@@ -34,7 +33,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   GoogleMapController? _mapController;
 
   // Location variables
-  LatLng? _currentPosition; LatLng? _pickupLocation;
+  LatLng? _currentPosition;
+  LatLng? _pickupLocation;
   LatLng? _dropoffLocation;
   LatLng? _deliveryPersonLocation;
 
@@ -464,7 +464,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       barrierDismissible: false,
       builder: (context) => RatingFeedbackDialog(
         orderId: widget.orderId,
-        deliveryPersonName:
+        displayName:
             widget.orderData['delivery_person_name'] ?? 'Delivery Person',
         isTraveller: widget.isTraveller,
         travellerId: _resolveTravellerIdFromOrderData(),
@@ -1437,277 +1437,6 @@ class OtpDisplayDialog extends StatelessWidget {
                 child: const Text('Got it',
                     style:
                         TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Rating & Feedback Dialog (unchanged from original)
-// ──────────────────────────────────────────────────────────────────────────────
-
-class RatingFeedbackDialog extends StatefulWidget {
-  final String orderId;
-  final String deliveryPersonName;
-  final bool isTraveller;
-  final String? travellerId;
-  final VoidCallback onSubmitted;
-
-  const RatingFeedbackDialog({
-    super.key,
-    required this.orderId,
-    required this.deliveryPersonName,
-    required this.isTraveller,
-    this.travellerId,
-    required this.onSubmitted,
-  });
-
-  @override
-  State<RatingFeedbackDialog> createState() => _RatingFeedbackDialogState();
-}
-
-class _RatingFeedbackDialogState extends State<RatingFeedbackDialog> {
-  final RatingService _ratingService = RatingService();
-  int _selectedRating = 0;
-  final TextEditingController _feedbackController = TextEditingController();
-  bool _isSubmitting = false;
-
-  @override
-  void dispose() {
-    _feedbackController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submitRating() async {
-    if (_selectedRating == 0) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a rating'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-
-    try {
-      final raterUserId = await AuthService.getUserId();
-      final travellerId =
-          widget.isTraveller ? raterUserId : widget.travellerId?.trim();
-
-      if (raterUserId == null ||
-          raterUserId.isEmpty ||
-          travellerId == null ||
-          travellerId.isEmpty) {
-        throw Exception('Unable to find rating user details');
-      }
-
-      await _ratingService.submitRating(
-        RatingRequest(
-          orderId: widget.orderId,
-          travellerId: travellerId,
-          raterId: raterUserId,
-          rating: _selectedRating,
-          feedback: _feedbackController.text.trim(),
-        ),
-      );
-
-      if (!mounted) return;
-      widget.onSubmitted();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error submitting rating: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  String _getRatingMessage() {
-    switch (_selectedRating) {
-      case 1:
-        return 'Poor';
-      case 2:
-        return 'Fair';
-      case 3:
-        return 'Good';
-      case 4:
-        return 'Very Good';
-      case 5:
-        return 'Excellent';
-      default:
-        return '';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ),
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  widget.deliveryPersonName.isNotEmpty
-                      ? widget.deliveryPersonName.substring(0, 2).toUpperCase()
-                      : 'DP',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'How was ${widget.deliveryPersonName}\'s delivery?',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your feedback helps us improve future orders',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.5),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                final starIndex = index + 1;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedRating = starIndex),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Icon(
-                      _selectedRating >= starIndex
-                          ? Icons.star
-                          : Icons.star_border,
-                      size: 40,
-                      color: _selectedRating >= starIndex
-                          ? Colors.amber
-                          : Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.25),
-                    ),
-                  ),
-                );
-              }),
-            ),
-            if (_selectedRating > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                _getRatingMessage(),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.6),
-                ),
-              ),
-            ],
-            const SizedBox(height: 24),
-            TextField(
-              controller: _feedbackController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Write a feedback',
-                hintStyle: TextStyle(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.35)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: Theme.of(context).colorScheme.primary),
-                ),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surface,
-                contentPadding: const EdgeInsets.all(16),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submitRating,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text(
-                        'Done',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
               ),
             ),
           ],

@@ -1,8 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../Controllers/NotificationService.dart';
 import '../Models/NotificationModel.dart';
+import '../Controllers/AuthService.dart';
+import '../Controllers/OrderTrackingService.dart';
+import '../Controllers/DeviceTokenService.dart';
+import '../Controllers/SocketService.dart';
 import 'Inbox Section/indoxscreen.dart';
 import 'Inbox Section/ChatScreen.dart';
+import 'orderSection/OrderTrackingScreen.dart';
+import 'orderSection/RatingFeedbackDialog.dart';
+import 'orderSection/YourOrders.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -14,19 +22,53 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List<NotificationModel> _notifications = [];
   bool _isLoading = true;
+  final OrderTrackingService _orderTrackingService = OrderTrackingService();
+  final SocketService _socketService = SocketService();
+  StreamSubscription? _fcmSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadNotifications();
+    _setupRealtimeListeners();
   }
 
-  Future<void> _loadNotifications() async {
+  @override
+  void dispose() {
+    _fcmSubscription?.cancel();
+    // Not removing socket listener here to avoid interfering with other screens, 
+    // but typically you'd want a dedicated event or a scoped listener.
+    super.dispose();
+  }
+
+  void _setupRealtimeListeners() {
+    // 1. Listen for FCM foreground notifications
+    _fcmSubscription = DeviceTokenService.onNotificationReceived.listen((message) {
+      debugPrint('🔔 NotificationsScreen: FCM message received, refreshing...');
+      _loadNotifications(silent: true);
+    });
+
+    // 2. Listen for Socket.io messages (which often correspond to notifications)
+    try {
+      if (_socketService.isConnected) {
+        _socketService.onReceiveMessage((data) {
+          debugPrint('🔌 NotificationsScreen: Socket message received, refreshing...');
+          _loadNotifications(silent: true);
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ NotificationsScreen: Error setting up socket listener: $e');
+    }
+  }
+
+  Future<void> _loadNotifications({bool silent = false}) async {
     if (!mounted) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final result = await NotificationService.getNotifications();
@@ -54,35 +96,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  void _handleNotificationNavigation(NotificationModel notification) {
+  Future<void> _handleNotificationNavigation(NotificationModel notification) async {
+    final context = this.context;
+    final data = notification.data ?? const <String, dynamic>{};
+    
     switch (notification.type) {
-      case 'TRIP_REQUEST_ACCEPTED':
-      case 'TRIP_REQUEST_SENT':
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const InboxScreen(initialTab: 1),
-          ),
-        );
-        break;
-
       case 'NEW_MESSAGE':
-        if (notification.data != null &&
-            notification.data!['chat_id'] != null &&
-            notification.data!['order_id'] != null) {
-          final chatId = notification.data!['chat_id'].toString();
-          final orderId = notification.data!['order_id'].toString();
-          Navigator.pushReplacement(
+        final chatId = _readString(data, const ['chat_id', 'chatId']);
+        final orderId = _readOrderId(data);
+
+        if (chatId != null && orderId != null) {
+          // Get sender info if available
+          final senderData =
+              _readMap(data, const ['sender', 'actor', 'from_user']);
+          final otherUserName = _readString(
+            senderData ?? data,
+            const ['name', 'sender_name', 'other_user_name', 'actor_name'],
+          );
+          final otherUserId = _readString(
+            senderData ?? data,
+            const [
+              'user_id',
+              'id',
+              'sender_id',
+              'other_user_id',
+              'actor_user_id',
+            ],
+          );
+
+          Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ChatScreen(
                 chatId: chatId,
                 orderId: orderId,
+                otherUserName: otherUserName,
+                otherUserId: otherUserId,
               ),
             ),
           );
         } else {
-          Navigator.pushReplacement(
+          Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const InboxScreen(initialTab: 0),
@@ -91,14 +145,462 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
         break;
 
+      case 'TRIP_REQUEST_SENT':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const InboxScreen(initialTab: 1),
+          ),
+        );
+        break;
+
+      case 'ORDER_TRACKING':
+        await _openOrderCardScreen(notification);
+        break;
+
+      case 'ARRIVED_OTP_REQUIRED':
+        await _openTrackingScreen(notification);
+        break;
+
+      case 'TRIP_REQUEST_ACCEPTED':
+        _openOrdersScreen(1, focusOrderId: _readOrderId(data));
+        break;
+
+      case 'RATE_FEEDBACK':
+        await _openRatingDialog(notification);
+        break;
+
+      case 'ACCOUNT_WARNING':
+        _showWarningDialog(notification.title, notification.body);
+        break;
+
       default:
-        Navigator.pushReplacement(
+        Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => const InboxScreen(initialTab: 0),
           ),
         );
     }
+  }
+
+  Future<void> _openOrderCardScreen(NotificationModel notification) async {
+    final payloadTab = _ordersTabFromNotification(notification);
+    final data = notification.data ?? const <String, dynamic>{};
+    final orderId = _readOrderId(data);
+
+    if (payloadTab != null) {
+      _openOrdersScreen(payloadTab, focusOrderId: orderId);
+      return;
+    }
+
+    if (orderId == null) {
+      _openOrdersScreen(0);
+      return;
+    }
+
+    var loadingDialogOpen = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+    loadingDialogOpen = true;
+
+    try {
+      final orderDetails = await _orderTrackingService.getOrderDetails(orderId);
+      final currentUserId = await AuthService.getUserId();
+
+      if (mounted && loadingDialogOpen) {
+        Navigator.pop(context);
+        loadingDialogOpen = false;
+      }
+
+      if (!mounted) return;
+      _openOrdersScreen(
+        _ordersTabFromOrderDetails(orderDetails, currentUserId) ?? 0,
+        focusOrderId: orderId,
+      );
+    } catch (e) {
+      if (mounted && loadingDialogOpen) Navigator.pop(context);
+      debugPrint('Error resolving order card tab: $e');
+      if (mounted) _openOrdersScreen(0);
+    }
+  }
+
+  Future<void> _openTrackingScreen(NotificationModel notification) async {
+    final data = notification.data ?? const <String, dynamic>{};
+    final orderId = _readOrderId(data);
+
+    if (orderId == null) {
+      _openOrdersScreen(
+        _ordersTabFromNotification(notification) ?? 0,
+      );
+      return;
+    }
+
+    var loadingDialogOpen = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+    loadingDialogOpen = true;
+
+    try {
+      final orderDetails = await _orderTrackingService.getOrderDetails(orderId);
+      if (mounted && loadingDialogOpen) {
+        Navigator.pop(context);
+        loadingDialogOpen = false;
+      }
+
+      if (orderDetails == null) {
+        if (mounted) {
+          _openOrdersScreen(
+            _ordersTabFromNotification(notification) ?? 0,
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OrderTrackingScreen(
+            orderId: orderId,
+            orderData: orderDetails,
+            isTraveller: _isTravellerNotification(notification),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted && loadingDialogOpen) Navigator.pop(context);
+      debugPrint('Error navigating to tracking: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to open order tracking')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openRatingDialog(NotificationModel notification) async {
+    final data = notification.data ?? const <String, dynamic>{};
+    final orderId = _readOrderId(data);
+
+    if (orderId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to find order for rating')),
+      );
+      return;
+    }
+
+    Map<String, dynamic>? orderDetails;
+    try {
+      orderDetails = await _orderTrackingService.getOrderDetails(orderId);
+    } catch (e) {
+      debugPrint('Unable to load order details for rating: $e');
+    }
+
+    final counterpart = _readMap(data, const [
+      'sender',
+      'traveller',
+      'traveler',
+      'delivery_person',
+      'rated_user',
+      'actor',
+    ]);
+    final displayName = _readString(counterpart ?? data, const [
+          'name',
+          'display_name',
+          'traveller_name',
+          'traveler_name',
+          'sender_name',
+          'delivery_person_name',
+          'rated_user_name',
+        ]) ??
+        (notification.title.trim().isNotEmpty ? notification.title : 'User');
+    final travellerId = _readString(counterpart ?? data, const [
+      'traveller_id',
+      'traveler_id',
+      'traveller_hashed_id',
+      'traveler_hashed_id',
+      'delivery_person_id',
+      'user_id',
+      'id',
+      'rated_user_id',
+    ]);
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => RatingFeedbackDialog(
+        orderId: orderId,
+        displayName: displayName,
+        isTraveller: _isTravellerNotification(notification),
+        travellerId: travellerId,
+        orderDetails: orderDetails,
+        onSubmitted: () {
+          if (Navigator.canPop(context)) Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  void _openOrdersScreen(int initialTabIndex, {String? focusOrderId}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => YourOrdersPage(
+          initialTabIndex: initialTabIndex,
+          focusOrderId: focusOrderId,
+        ),
+      ),
+    );
+  }
+
+  int? _ordersTabFromNotification(NotificationModel notification) {
+    final data = notification.data ?? const <String, dynamic>{};
+    final explicitTab = int.tryParse(
+      _readString(
+            data,
+            const ['target_tab', 'initial_tab', 'orders_tab', 'tab'],
+          ) ??
+          '',
+    );
+    if (explicitTab != null) return explicitTab.clamp(0, 1).toInt();
+
+    final explicitTraveller = data['is_traveller'] ??
+        data['is_traveler'] ??
+        data['isTraveller'] ??
+        data['isTraveler'];
+    if (explicitTraveller is bool) return explicitTraveller ? 1 : 0;
+    if (explicitTraveller != null) {
+      final value = explicitTraveller.toString().toLowerCase();
+      if (value == 'true' || value == '1') return 1;
+      if (value == 'false' || value == '0') return 0;
+    }
+
+    final role = _readString(data, const [
+      'role',
+      'my_role',
+      'user_role',
+      'current_user_role',
+      'recipient_role',
+      'notification_for',
+      'order_type',
+    ])?.toLowerCase();
+    if (role != null) {
+      if (role.contains('traveller') ||
+          role.contains('traveler') ||
+          role.contains('trip') ||
+          role.contains('receive')) {
+        return 1;
+      }
+      if (role.contains('sender') ||
+          role.contains('creator') ||
+          role.contains('send') ||
+          role.contains('order')) {
+        return 0;
+      }
+    }
+
+    final order = _readMap(data, const ['order', 'order_details']);
+    return _ordersTabFromOrderDetails(order ?? data, null);
+  }
+
+  int? _ordersTabFromOrderDetails(
+    Map<String, dynamic>? orderDetails,
+    String? currentUserId,
+  ) {
+    if (orderDetails == null) return null;
+
+    final order =
+        _readMap(orderDetails, const ['order', 'order_details']) ?? orderDetails;
+    final role = _readString(order, const [
+      'my_role',
+      'role',
+      'user_role',
+      'current_user_role',
+      'order_type',
+    ])?.toLowerCase();
+    if (role != null) {
+      if (role.contains('traveller') ||
+          role.contains('traveler') ||
+          role.contains('trip') ||
+          role.contains('receive')) {
+        return 1;
+      }
+      if (role.contains('sender') ||
+          role.contains('creator') ||
+          role.contains('owner') ||
+          role.contains('send')) {
+        return 0;
+      }
+    }
+
+    if (currentUserId == null || currentUserId.isEmpty) return null;
+
+    final travellerId = _readString(order, const [
+          'traveller_id',
+          'traveler_id',
+          'traveller_hashed_id',
+          'traveler_hashed_id',
+          'matched_traveller_id',
+          'matched_traveler_id',
+          'accepted_traveller_id',
+          'accepted_traveler_id',
+          'delivery_person_id',
+          'delivery_person_hashed_id',
+        ]) ??
+        _readString(orderDetails, const [
+          'traveller_id',
+          'traveler_id',
+          'traveller_hashed_id',
+          'traveler_hashed_id',
+          'matched_traveller_id',
+          'matched_traveler_id',
+          'accepted_traveller_id',
+          'accepted_traveler_id',
+          'delivery_person_id',
+          'delivery_person_hashed_id',
+        ]);
+    if (_sameId(travellerId, currentUserId)) return 1;
+
+    final senderId = _readString(order, const [
+          'user_id',
+          'user_hashed_id',
+          'sender_id',
+          'sender_hashed_id',
+          'owner_id',
+          'owner_hashed_id',
+          'order_creator_id',
+          'order_creator_hashed_id',
+          'creator_id',
+          'creator_hashed_id',
+        ]) ??
+        _readString(orderDetails, const [
+          'user_id',
+          'user_hashed_id',
+          'sender_id',
+          'sender_hashed_id',
+          'owner_id',
+          'owner_hashed_id',
+          'order_creator_id',
+          'order_creator_hashed_id',
+          'creator_id',
+          'creator_hashed_id',
+        ]);
+    if (_sameId(senderId, currentUserId)) return 0;
+
+    return null;
+  }
+
+  bool _sameId(String? left, String right) {
+    if (left == null || left.isEmpty) return false;
+    return left.trim().toLowerCase() == right.trim().toLowerCase();
+  }
+
+  bool _isTravellerNotification(NotificationModel notification) {
+    final data = notification.data ?? const <String, dynamic>{};
+    final explicit = data['is_traveller'] ??
+        data['is_traveler'] ??
+        data['isTraveller'] ??
+        data['isTraveler'];
+    if (explicit is bool) return explicit;
+    if (explicit != null) {
+      final value = explicit.toString().toLowerCase();
+      if (value == 'true' || value == '1') return true;
+      if (value == 'false' || value == '0') return false;
+    }
+
+    final role = _readString(
+      data,
+      const ['role', 'user_role', 'rater_role', 'order_type'],
+    )?.toLowerCase();
+    if (role != null) {
+      if (role.contains('traveller') ||
+          role.contains('traveler') ||
+          role.contains('receive')) {
+        return true;
+      }
+      if (role.contains('sender') ||
+          role.contains('creator') ||
+          role.contains('send')) {
+        return false;
+      }
+    }
+
+    if (notification.type == 'ARRIVED_OTP_REQUIRED') {
+      final text = '${notification.title} ${notification.body}'.toLowerCase();
+      return !text.contains('show otp') && !text.contains('view otp');
+    }
+
+    return false;
+  }
+
+  String? _readOrderId(Map<String, dynamic> data) {
+    return _readString(data, const [
+          'order_id',
+          'orderId',
+          'order_hashed_id',
+          'orderHashedId',
+          'order_hash',
+        ]) ??
+        _readString(_readMap(data, const ['order', 'order_details']), const [
+          'id',
+          'hashed_id',
+          'order_id',
+          'orderId',
+        ]);
+  }
+
+  Map<String, dynamic>? _readMap(
+    Map<String, dynamic>? source,
+    List<String> keys,
+  ) {
+    if (source == null) return null;
+    for (final key in keys) {
+      final value = source[key];
+      if (value is Map<String, dynamic>) return value;
+      if (value is Map) return Map<String, dynamic>.from(value);
+    }
+    return null;
+  }
+
+  String? _readString(Map<String, dynamic>? source, List<String> keys) {
+    if (source == null) return null;
+    for (final key in keys) {
+      final value = source[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+    }
+    return null;
+  }
+
+  void _showWarningDialog(String title, String body) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.red),
+            const SizedBox(width: 8),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Dismiss'),
+          ),
+        ],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
   }
 
   IconData _getNotificationIcon(String type) {
@@ -109,6 +611,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.send_outlined;
       case 'NEW_MESSAGE':
         return Icons.message_outlined;
+      case 'ORDER_TRACKING':
+        return Icons.local_shipping_outlined;
+      case 'ARRIVED_OTP_REQUIRED':
+        return Icons.vpn_key_outlined;
+      case 'RATE_FEEDBACK':
+        return Icons.star_outline;
+      case 'ACCOUNT_WARNING':
+        return Icons.warning_amber_outlined;
       default:
         return Icons.notifications_outlined;
     }
@@ -122,6 +632,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Colors.blue;
       case 'NEW_MESSAGE':
         return Colors.orange;
+      case 'ORDER_TRACKING':
+        return Colors.purple;
+      case 'ARRIVED_OTP_REQUIRED':
+        return Colors.amber;
+      case 'RATE_FEEDBACK':
+        return Colors.pink;
+      case 'ACCOUNT_WARNING':
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -167,7 +685,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface),
-            onPressed: _loadNotifications,
+            onPressed: () => _loadNotifications(),
             tooltip: 'Refresh',
           ),
         ],
@@ -211,7 +729,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
       )
           : RefreshIndicator(
-        onRefresh: _loadNotifications,
+        onRefresh: () => _loadNotifications(),
         child: ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: _notifications.length,
@@ -223,6 +741,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 if (!notification.isRead) {
                   await NotificationService.markAsRead(
                       notification.hashedId);
+                  setState(() {
+                    _notifications[index] = NotificationModel(
+                      id: notification.id,
+                      hashedId: notification.hashedId,
+                      userId: notification.userId,
+                      actorUserId: notification.actorUserId,
+                      type: notification.type,
+                      title: notification.title,
+                      body: notification.body,
+                      data: notification.data,
+                      isRead: true,
+                      createdAt: notification.createdAt,
+                    );
+                  });
                 }
                 // Navigate
                 _handleNotificationNavigation(notification);
