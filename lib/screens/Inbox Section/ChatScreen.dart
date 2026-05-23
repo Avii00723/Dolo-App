@@ -14,6 +14,7 @@ import '../../Controllers/AuthService.dart';
 import '../../Controllers/ChatService.dart';
 import '../../Controllers/SocketService.dart';
 import '../../Controllers/tutorial_service.dart';
+import '../../widgets/ReportScreen.dart';
 import '../../widgets/tutorial_helper.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
@@ -24,6 +25,7 @@ class ChatScreen extends StatefulWidget {
   final String orderId;
   final String? otherUserName;
   final String? otherUserId;
+  final bool isOrderAccepted;
 
   const ChatScreen({
     super.key,
@@ -31,6 +33,7 @@ class ChatScreen extends StatefulWidget {
     required this.orderId,
     this.otherUserName,
     this.otherUserId,
+    this.isOrderAccepted = false,
   });
 
   @override
@@ -562,6 +565,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             userId: otherUserId!,
             userName: otherUserData['name'] ?? widget.otherUserName ?? 'Unknown User',
             profileUrl: otherUserData['profileUrl'],
+            orderId: widget.orderId,
+            isOrderAccepted: true, // Chat is only accessible after order is accepted
           ),
         ),
       );
@@ -602,7 +607,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   // UPDATED: Make the app bar title tappable
+
   PreferredSizeWidget _buildAppBar() {
+    final bool canReport =
+        widget.isOrderAccepted && otherUserData['id'] != null;
+
     return AppBar(
       elevation: 0.5,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -613,13 +622,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       title: GestureDetector(
         onTap: () {
-          debugPrint('👤 ChatScreen AppBar title tapped - chatId=${widget.chatId} orderId=${widget.orderId} otherUser=${otherUserData['name']} otherUserId=${otherUserData['id']}');
+          debugPrint(
+              '👤 ChatScreen AppBar title tapped - chatId=${widget.chatId} orderId=${widget.orderId} otherUser=${otherUserData['name']} otherUserId=${otherUserData['id']}');
           _navigateToUserProfile();
         },
         child: Row(
-
           children: [
-            _buildProfileAvatar(otherUserData['name'] ?? widget.otherUserName ?? 'U', false, 40),
+            _buildProfileAvatar(
+                otherUserData['name'] ?? widget.otherUserName ?? 'U', false, 40),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -627,7 +637,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    otherUserData['name'] ?? widget.otherUserName ?? 'Unknown User',
+                    otherUserData['name'] ??
+                        widget.otherUserName ??
+                        'Unknown User',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
@@ -662,13 +674,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.phone, color: Theme.of(context).colorScheme.onSurface),
+          icon: Icon(Icons.phone,
+              color: Theme.of(context).colorScheme.onSurface),
           onPressed: () async {
             _navigateToUserProfile();
           },
         ),
         PopupMenuButton(
-          icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurface),
+          icon: Icon(Icons.more_vert,
+              color: Theme.of(context).colorScheme.onSurface),
           itemBuilder: (context) => [
             const PopupMenuItem(
               value: 'profile',
@@ -690,20 +704,47 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ],
               ),
             ),
+            // Report option — only shown when order is accepted
+            if (canReport)
+              const PopupMenuItem(
+                value: 'report',
+                child: Row(
+                  children: [
+                    Icon(Icons.flag_outlined, size: 20, color: Colors.red),
+                    SizedBox(width: 12),
+                    Text(
+                      'Report',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ],
+                ),
+              ),
           ],
           onSelected: (value) {
             if (value == 'refresh') {
               _loadMessages(silent: false);
             } else if (value == 'profile') {
-              debugPrint('👤 ChatScreen PopupMenu profile selected - chatId=${widget.chatId} orderId=${widget.orderId} otherUser=${otherUserData['name']} otherUserId=${otherUserData['id']}');
+              debugPrint(
+                  '👤 ChatScreen PopupMenu profile selected - chatId=${widget.chatId} orderId=${widget.orderId} otherUser=${otherUserData['name']} otherUserId=${otherUserData['id']}');
               _navigateToUserProfile();
+            } else if (value == 'report') {
+              debugPrint(
+                  '🚩 ChatScreen PopupMenu report selected - orderId=${widget.orderId} reportedUserId=${otherUserData['id']}');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReportScreen(
+                    reportedUserId: otherUserData['id'].toString(),
+                    orderId: widget.orderId,
+                  ),
+                ),
+              );
             }
           },
         ),
       ],
     );
   }
-
   Widget _buildMessagesList() {
     if (messages.isEmpty) {
       return _buildEmptyMessages();

@@ -4,12 +4,27 @@ import 'package:intl/intl.dart';
 import '../../Controllers/PublicProfileService.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Models/PublicProfileModel.dart';
+import '../../widgets/ReportScreen.dart'; // adjust path as needed
 
 
 class PublicProfileScreen extends StatefulWidget {
   final String targetUserHashedId;
 
-  const PublicProfileScreen({super.key, required this.targetUserHashedId});
+  /// Pass orderId when navigating from a chat / order context so the
+  /// Report option becomes available. Leave null to hide it (e.g. browsing
+  /// from a non-order context).
+  final String? orderId;
+
+  /// Pass true only when the order linked to this profile has been accepted.
+  /// The Report button is hidden when false, matching backend rules.
+  final bool isOrderAccepted;
+
+  const PublicProfileScreen({
+    super.key,
+    required this.targetUserHashedId,
+    this.orderId,
+    this.isOrderAccepted = false,
+  });
 
   @override
   State<PublicProfileScreen> createState() => _PublicProfileScreenState();
@@ -31,20 +46,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   Future<void> _fetch() async {
     try {
       final viewerHashedId = await AuthService.getUserId();
-      debugPrint('🧪 PublicProfileScreen init - viewerHashedId=$viewerHashedId targetUserHashedId=${widget.targetUserHashedId}');
+      debugPrint(
+          '🧪 PublicProfileScreen init - viewerHashedId=$viewerHashedId targetUserHashedId=${widget.targetUserHashedId}');
       if (viewerHashedId == null) {
         throw Exception('User not authenticated');
       }
 
-debugPrint('🌐 Calling PublicProfile endpoint.');
-      debugPrint('➡️ userHashedId=${widget.targetUserHashedId} viewerHashedId=$viewerHashedId');
-
+      debugPrint('🌐 Calling PublicProfile endpoint.');
+      debugPrint(
+          '➡️ userHashedId=${widget.targetUserHashedId} viewerHashedId=$viewerHashedId');
 
       final res = await _service.getPublicProfile(
         userHashedId: widget.targetUserHashedId,
         viewerHashedId: viewerHashedId,
       );
-
 
       if (!mounted) return;
       setState(() {
@@ -62,6 +77,26 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
   }
 
   bool get _accepted => _data?.verifiedInformation != null;
+
+  /// Whether the Report option should be shown.
+  bool get _canReport =>
+      widget.isOrderAccepted &&
+          widget.orderId != null &&
+          widget.orderId!.isNotEmpty;
+
+  void _openReport() {
+    debugPrint(
+        '🚩 PublicProfileScreen - opening report for userId=${widget.targetUserHashedId} orderId=${widget.orderId}');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReportScreen(
+          reportedUserId: widget.targetUserHashedId,
+          orderId: widget.orderId!,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,11 +120,9 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
       );
     }
 
-
     final data = _data!;
-
-    final memberSinceText = DateFormat('MMM d, yyyy')
-        .format(data.user.memberSince.toLocal());
+    final memberSinceText =
+    DateFormat('MMM d, yyyy').format(data.user.memberSince.toLocal());
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -97,6 +130,41 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
         title: Text(data.user.name),
         centerTitle: false,
         elevation: 0,
+        actions: [
+          if (_canReport)
+            PopupMenuButton<String>(
+              icon: Icon(
+                Icons.more_vert,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'report',
+                  child: Row(
+                    children: [
+                      Icon(Icons.flag_outlined, size: 20, color: Colors.red),
+                      SizedBox(width: 12),
+                      Text('Report', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'block',
+                  child: Row(
+                    children: [
+                      Icon(Icons.block, size: 20),
+                      SizedBox(width: 12),
+                      Text('Block'),
+                    ],
+                  ),
+                ),
+              ],
+              onSelected: (value) {
+                if (value == 'report') _openReport();
+                // 'block' handler — wire when block API is ready
+              },
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -125,10 +193,14 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
           children: [
             CircleAvatar(
               radius: 36,
-              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              backgroundColor:
+              Theme.of(context).colorScheme.primary.withOpacity(0.12),
               child: Text(
-                data.user.name.isNotEmpty ? data.user.name[0].toUpperCase() : '?',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                data.user.name.isNotEmpty
+                    ? data.user.name[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(
+                    fontSize: 24, fontWeight: FontWeight.w800),
               ),
             ),
             const SizedBox(width: 12),
@@ -138,16 +210,20 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
                 children: [
                   Text(
                     data.user.name,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                    style:
+                    Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Member since $memberSinceText',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                        ),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.6),
+                    ),
                   ),
                 ],
               ),
@@ -171,39 +247,36 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
           Expanded(
             child: permissions.canCall
                 ? OutlinedButton.icon(
-                    icon: const Icon(Icons.call_outlined),
-                    label: const Text('Call'),
-                    onPressed: () {
-                      // Phone number will be available on accepted path.
-                      // Launch call logic depends on backend phone availability.
-                      // Current backend schema only includes verification flags here;
-                      // implement your existing call flow when phone is provided.
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Call action not wired')),
-                      );
-                    },
-                  )
+              icon: const Icon(Icons.call_outlined),
+              label: const Text('Call'),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Call action not wired')),
+                );
+              },
+            )
                 : OutlinedButton.icon(
-                    icon: const Icon(Icons.call_outlined),
-                    label: const Text('Call unavailable'),
-                    onPressed: null,
-                  ),
+              icon: const Icon(Icons.call_outlined),
+              label: const Text('Call unavailable'),
+              onPressed: null,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: permissions.canMessage
                 ? OutlinedButton.icon(
-                    icon: const Icon(Icons.chat_bubble_outline),
-                    label: const Text('Message'),
-                    onPressed: () {
-                      Navigator.pop(context); // keep minimal; chat entry handled by caller
-                    },
-                  )
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text('Message'),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            )
                 : OutlinedButton.icon(
-                    icon: const Icon(Icons.chat_bubble_outline),
-                    label: const Text('Message unavailable'),
-                    onPressed: null,
-                  ),
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text('Message unavailable'),
+              onPressed: null,
+            ),
           ),
         ],
       ),
@@ -224,8 +297,8 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
           Text(
             'Ratings & Feedback',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 10),
           Row(
@@ -235,8 +308,11 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
               Text(
                 '${data.statistics.averageRating.toStringAsFixed(1)} average • ${data.statistics.totalReviews} reviews',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
-                    ),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.65),
+                ),
               ),
             ],
           ),
@@ -259,9 +335,10 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
                   children: [
                     Text(
                       r.raterName,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style:
+                      Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Row(
@@ -275,9 +352,15 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
                         const SizedBox(width: 8),
                         Text(
                           '${r.stars}/5',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55),
-                              ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.55),
+                          ),
                         ),
                       ],
                     ),
@@ -285,8 +368,11 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
                     Text(
                       r.feedback.isNotEmpty ? r.feedback : '—',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75),
-                          ),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.75),
+                      ),
                     ),
                   ],
                 );
@@ -311,13 +397,16 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
           Text(
             'Verified Information',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 12),
-          _buildVerifiedRow(Icons.phone, 'Phone verified', verified.phoneVerified),
-          _buildVerifiedRow(Icons.email_outlined, 'Email verified', verified.emailVerified),
-          _buildVerifiedRow(Icons.verified_user_outlined, 'KYC verified', verified.kycVerified),
+          _buildVerifiedRow(
+              Icons.phone, 'Phone verified', verified.phoneVerified),
+          _buildVerifiedRow(
+              Icons.email_outlined, 'Email verified', verified.emailVerified),
+          _buildVerifiedRow(
+              Icons.verified_user_outlined, 'KYC verified', verified.kycVerified),
         ],
       ),
     );
@@ -331,7 +420,9 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
           Icon(
             ok ? Icons.check_circle : Icons.cancel,
             size: 20,
-            color: ok ? Colors.green : Theme.of(context).colorScheme.onSurface.withOpacity(0.25),
+            color: ok
+                ? Colors.green
+                : Theme.of(context).colorScheme.onSurface.withOpacity(0.25),
           ),
           const SizedBox(width: 10),
           Text(text),
@@ -354,8 +445,8 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
           Text(
             'User Statistics',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -403,20 +494,26 @@ debugPrint('🌐 Calling PublicProfile endpoint.');
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary.withOpacity(0.75)),
+          Icon(icon,
+              size: 20,
+              color:
+              Theme.of(context).colorScheme.primary.withOpacity(0.75)),
           const SizedBox(height: 8),
           Text(
             value,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55),
-                ),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withOpacity(0.55),
+            ),
           ),
         ],
       ),
