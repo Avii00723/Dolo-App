@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../Controllers/LoginService.dart';
 import '../../Controllers/AuthService.dart';
+import '../../Controllers/DeviceTokenService.dart';
 import '../../Models/LoginModel.dart';
 import 'package:dolo/screens/home/homepage.dart';
 
@@ -144,6 +145,9 @@ class _SignupScreenState extends State<SignupScreen> {
           isProfileCompleted: true, // Mark profile as completed
         );
         debugPrint('✅ User session confirmed in secure storage');
+        
+        // Initialize FCM and save device token for the new user profile
+        await DeviceTokenService.initialize();
       }
 
       _showSnackBar('Profile created successfully!');

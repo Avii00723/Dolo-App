@@ -8,6 +8,7 @@ import 'AuthService.dart';
 
 class DeviceTokenService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  static bool _isListenersSet = false;
   
   // Stream to notify app of new foreground messages
   static final StreamController<RemoteMessage> _notificationStreamController = StreamController<RemoteMessage>.broadcast();
@@ -32,25 +33,31 @@ class DeviceTokenService {
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         
-        // Get the FCM token
-        await _getAndSaveToken();
+        // Always try to get and save token when initialize is called (on app start or login)
+        await saveCurrentToken();
 
-        // Listen for token refresh
-        _messaging.onTokenRefresh.listen((newToken) {
-          print('🔄 FCM Token refreshed');
-          _saveTokenToServer(newToken);
-        });
+        // Set up listeners only once to avoid duplicate notifications and token refresh calls
+        if (!_isListenersSet) {
+          // Listen for token refresh
+          _messaging.onTokenRefresh.listen((newToken) {
+            print('🔄 FCM Token refreshed');
+            _saveTokenToServer(newToken);
+          });
 
-        // Listen for foreground messages
-        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-          print('📩 Foreground message received: ${message.notification?.title}');
-          _notificationStreamController.add(message);
-        });
+          // Listen for foreground messages
+          FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+            print('📩 Foreground message received: ${message.notification?.title}');
+            _notificationStreamController.add(message);
+          });
 
-        // Handle notification clicks when app is in background
-        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-          print('🖱️ Notification clicked from background: ${message.data}');
-        });
+          // Handle notification clicks when app is in background
+          FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+            print('🖱️ Notification clicked from background: ${message.data}');
+          });
+          
+          _isListenersSet = true;
+          print('✅ FCM listeners initialized');
+        }
         
       } else {
         print('⚠️ Notification permissions denied');
@@ -61,17 +68,19 @@ class DeviceTokenService {
   }
 
   /// Get FCM token and save to server
-  static Future<void> _getAndSaveToken() async {
+  static Future<bool> saveCurrentToken() async {
     try {
       String? token = await _messaging.getToken();
       if (token != null) {
-        print('📱 FCM Token obtained: ${token.substring(0, 20)}...');
-        await _saveTokenToServer(token);
+        print('📱 Current FCM Token obtained');
+        return await _saveTokenToServer(token);
       } else {
         print('⚠️ Failed to get FCM token');
+        return false;
       }
     } catch (e) {
       print('❌ Error getting FCM token: $e');
+      return false;
     }
   }
 
@@ -80,11 +89,13 @@ class DeviceTokenService {
     try {
       final userId = await AuthService.getUserId();
       if (userId == null) {
-        print('⚠️ Cannot save device token: User not logged in');
+        print('⚠️ Cannot save device token: No userId found in secure storage');
         return false;
       }
 
       final platform = Platform.isAndroid ? 'android' : 'ios';
+      
+      print('📤 Attempting to save device token for userId: $userId');
 
       final response = await http.post(
         Uri.parse(ApiConstants.saveDeviceToken),
@@ -100,7 +111,7 @@ class DeviceTokenService {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Device token saved successfully');
+        print('✅ Device token saved successfully for user $userId');
         return true;
       } else {
         final errorBody = jsonDecode(response.body);
@@ -109,19 +120,6 @@ class DeviceTokenService {
       }
     } catch (e) {
       print('❌ Error saving device token: $e');
-      return false;
-    }
-  }
-
-  static Future<bool> saveCurrentToken() async {
-    try {
-      String? token = await _messaging.getToken();
-      if (token != null) {
-        return await _saveTokenToServer(token);
-      }
-      return false;
-    } catch (e) {
-      print('❌ Error saving current token: $e');
       return false;
     }
   }
