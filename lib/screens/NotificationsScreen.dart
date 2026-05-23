@@ -163,7 +163,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         break;
 
       case 'TRIP_REQUEST_ACCEPTED':
-        _openOrdersScreen(1, focusOrderId: _readOrderId(data));
+        _openOrdersScreen(
+          1,
+          focusOrderId: _readOrderId(data),
+        );
         break;
 
       case 'RATE_FEEDBACK':
@@ -190,7 +193,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final orderId = _readOrderId(data);
 
     if (payloadTab != null) {
-      _openOrdersScreen(payloadTab, focusOrderId: orderId);
+      _openOrdersScreen(
+        payloadTab,
+        focusOrderId: orderId,
+      );
       return;
     }
 
@@ -348,7 +354,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  void _openOrdersScreen(int initialTabIndex, {String? focusOrderId}) {
+  void _openOrdersScreen(
+    int initialTabIndex, {
+    String? focusOrderId,
+  }) {
     Navigator.push(
       context,
       MaterialPageRoute(
