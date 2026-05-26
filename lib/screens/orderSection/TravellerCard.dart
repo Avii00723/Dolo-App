@@ -1,9 +1,8 @@
 
 // Modern Traveller Order Card - Redesigned to match new UI design
-// Traveler sees OTP CODE displayed (not enter OTP)
+// Traveller enters the sender-provided OTP to complete delivery.
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:dolo/screens/Inbox Section/ChatScreen.dart';
@@ -508,10 +507,29 @@ class _TravellerOrderDetailScreenState
       );
     } else if (_hasCompletedRating) {
       stickyButton = _buildFeedbackThankYou();
-    } else if (order.status.toLowerCase() == 'confirmed' ||
-        order.status.toLowerCase() == 'accepted' ||
+    } else if (order.status.toLowerCase() == 'accepted' ||
         order.status.toLowerCase() == 'matched' ||
         order.status.toLowerCase() == 'booked') {
+      stickyButton = ElevatedButton.icon(
+        onPressed: _isUpdatingStatus ? null : () => _updateStatus(1),
+        icon: _isUpdatingStatus
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.inventory_2_outlined, size: 18),
+        label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Order'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black87,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } else if (order.status.toLowerCase() == 'confirmed') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
         icon: _isUpdatingStatus
@@ -520,7 +538,7 @@ class _TravellerOrderDetailScreenState
                 height: 16,
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: Colors.white))
-            : const Icon(Icons.inventory_2_outlined, size: 18),
+            : const Icon(Icons.flight_land_outlined, size: 18),
         label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as Picked Up'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
@@ -531,28 +549,8 @@ class _TravellerOrderDetailScreenState
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
-    } else if (order.status.toLowerCase() == 'picked_up') {
-      stickyButton = ElevatedButton.icon(
-        onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
-        icon: _isUpdatingStatus
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white))
-            : const Icon(Icons.flight_land_outlined, size: 18),
-        label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as Arrived'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.black87,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          elevation: 0,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    } else if (order.status.toLowerCase() == 'in-transit' ||
-        order.status.toLowerCase() == 'in_transit') {
+    } else if (order.status.toLowerCase() == 'picked' ||
+        order.status.toLowerCase() == 'picked_up') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
         icon: _isUpdatingStatus
@@ -576,7 +574,7 @@ class _TravellerOrderDetailScreenState
       stickyButton = ElevatedButton.icon(
         onPressed: () => _showCompleteOrderOtpDialog(context),
         icon: const Icon(Icons.check_circle_outline, size: 18),
-        label: const Text('Complete Order'),
+        label: const Text('Enter OTP to Complete Delivery'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.green[700],
           foregroundColor: Colors.white,
@@ -742,45 +740,6 @@ class _TravellerOrderDetailScreenState
                           color: Colors.black,
                         ),
                       ),
-                      const Spacer(),
-                      if (order.otp != null &&
-                          order.status.toLowerCase() == 'arrived')
-                        GestureDetector(
-                          onTap: () {
-                            Clipboard.setData(ClipboardData(text: order.otp!));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('OTP copied to clipboard'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  'OTP: ${order.otp}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black87,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Icon(Icons.copy,
-                                    size: 14, color: Colors.black54),
-                              ],
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                   const SizedBox(height: 20),

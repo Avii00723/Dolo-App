@@ -346,14 +346,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   int _nextApiStage() {
     switch (_trackingStatus.toLowerCase()) {
-      case 'confirmed':
       case 'accepted':
       case 'matched':
       case 'booked':
+        return 1;
+      case 'confirmed':
         return 2;
+      case 'picked':
       case 'picked_up':
-      case 'in_transit':
-      case 'in-transit':
         return 3;
       default:
         return 1;
@@ -376,10 +376,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   }
 
   String _getNextStatusLabel() {
-    switch (_trackingStage) {
-      case 0:
-        return 'Mark as Picked Up';
+    switch (_nextApiStage()) {
       case 1:
+        return 'Confirm Order';
+      case 2:
+        return 'Mark as Picked Up';
+      case 3:
         return 'Mark as Arrived';
       default:
         return '';
@@ -387,10 +389,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   }
 
   IconData _getNextStatusIcon() {
-    switch (_trackingStage) {
-      case 0:
-        return Icons.inventory_2_outlined;
+    switch (_nextApiStage()) {
       case 1:
+        return Icons.check_circle_outline;
+      case 2:
+        return Icons.inventory_2_outlined;
+      case 3:
         return Icons.location_on_outlined;
       default:
         return Icons.check_circle_outline;

@@ -39,7 +39,8 @@ class OrderTrackingService {
   }
 
   static int? currentStageFromHistory(Map<String, dynamic>? trackingHistory) {
-    final rawHistory = trackingHistory?['history'];
+    final rawHistory =
+        trackingHistory?['history'] ?? trackingHistory?['tracking'];
     if (rawHistory is! List || rawHistory.isEmpty) return null;
 
     final entries = rawHistory
@@ -111,10 +112,15 @@ class OrderTrackingService {
   /// Update order tracking to a given stage.
   Future<bool> updateTrackingStage(String orderId, int stage) async {
     const endpoint = '/order-tracking/track';
-    
-    // Validate stages based on documentation
+
+    // Unified endpoint supports only 1 -> 2 -> 3.
+    // Stage 4 must go through OTP verification.
     if (stage == 4) {
-      throw Exception('Stage 4 (Delivered) must be handled via /verify-otp endpoint.');
+      throw Exception(
+          'Stage 4 (Delivered) must be handled via OTP verification.');
+    }
+    if (stage < 1 || stage > 3) {
+      throw Exception('Invalid tracking stage. Use stages 1, 2, or 3 only.');
     }
 
     try {
@@ -128,7 +134,8 @@ class OrderTrackingService {
       );
 
       if (!response.success) {
-        throw Exception(response.error ?? 'Failed to update tracking stage to $stage');
+        throw Exception(
+            response.error ?? 'Failed to update tracking stage to $stage');
       }
 
       return true;

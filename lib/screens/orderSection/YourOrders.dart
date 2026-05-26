@@ -728,6 +728,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     return value == null || value.isEmpty || value == 'null' ? null : value;
   }
 
+  String? _readText(Map<String, dynamic>? source, String key) {
+    final value = source?[key]?.toString().trim();
+    return value == null || value.isEmpty || value == 'null' ? null : value;
+  }
+
   List<OrderDisplay> _prioritizeFocusedOrder(List<OrderDisplay> orders) {
     final focusOrderId = widget.focusOrderId?.trim().toLowerCase();
     if (focusOrderId == null || focusOrderId.isEmpty) return orders;
@@ -746,14 +751,22 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       List<OrderDisplay> orders) async {
     return Future.wait(orders.map((order) async {
       final details = await _trackingService.getOrderDetails(order.id);
+      final otpDetails = await _trackingService.getOrderOtp(order.id);
       final apiOrder = details?['order'] is Map
           ? Map<String, dynamic>.from(details!['order'] as Map)
           : null;
-      final status = _readStatus(apiOrder, 'status') ??
-          await _trackingService.getCurrentStatus(order.id);
+      final currentStage = OrderTrackingService.currentStageFromHistory(details);
+      final status = currentStage == null
+          ? (_readStatus(apiOrder, 'status') ??
+              await _trackingService.getCurrentStatus(order.id))
+          : OrderTrackingService.statusFromStage(currentStage);
 
       return order.copyWith(
         status: status ?? order.status,
+        otp: _readText(otpDetails, 'otp') ??
+            _readText(apiOrder, 'otp') ??
+            _readText(apiOrder, 'delivery_otp') ??
+            order.otp,
         requestStatus:
             order.requestStatus == null ? null : status ?? order.requestStatus,
         myRatingStatus: _readStatus(apiOrder, 'my_rating_status') ??

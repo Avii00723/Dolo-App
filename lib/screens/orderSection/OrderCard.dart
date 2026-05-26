@@ -81,8 +81,18 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
   String get _travellerName => widget.order.travelerName ?? _apiOrder?['traveller_name'] ?? _orderDetails?['traveller_name'] ?? 'Traveller';
   String? get _travellerProfileImageUrl => _apiOrder?['traveller_profile_image_url'] ?? _orderDetails?['traveller_profile_image_url'];
 
-  String get _ratingOrderStatus =>
-      _apiOrder?['status'] ?? _orderDetails?['status'] ?? widget.order.status;
+  String get _displayStatus {
+    final currentStage =
+        OrderTrackingService.currentStageFromHistory(_orderDetails);
+    if (currentStage != null) {
+      return OrderTrackingService.statusFromStage(currentStage);
+    }
+    return _apiOrder?['status'] ??
+        _orderDetails?['status'] ??
+        widget.order.status;
+  }
+
+  String get _ratingOrderStatus => _displayStatus;
 
   String? get _ratingFeedbackStatus {
     final raw = _apiOrder?['my_rating_status'] ??
@@ -108,7 +118,8 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
 
     setState(() => _isLoadingDetails = true);
     try {
-      final details = await OrderTrackingService().getOrderDetails(widget.order.id);
+      final details =
+          await OrderTrackingService().getOrderDetails(widget.order.id);
       if (mounted) {
         setState(() {
           _orderDetails = details;
@@ -153,7 +164,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
 
   // Map status to progress step (0-4 for 5 dots)
   int _getProgressStep() {
-    return OrderTrackingService.progressStepFromStatus(widget.order.status);
+    return OrderTrackingService.progressStepFromStatus(_displayStatus);
   }
 
   Color _getStatusBgColor(String status) {
@@ -230,6 +241,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
   @override
   Widget build(BuildContext context) {
     final progressStep = _getProgressStep();
+    final displayStatus = _displayStatus;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -335,15 +347,15 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                     padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _getStatusBgColor(widget.order.status),
+                      color: _getStatusBgColor(displayStatus),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      _getStatusLabel(widget.order.status),
+                      _getStatusLabel(displayStatus),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: _getStatusTextColor(widget.order.status),
+                        color: _getStatusTextColor(displayStatus),
                       ),
                     ),
                   ),
@@ -616,7 +628,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
 }
 
 // ═══════════════════════════════════════════════════
-// ORDER DETAIL SCREEN — Full Page with OTP (Sender view: Enter OTP)
+// ORDER DETAIL SCREEN — Full Page with OTP (Sender view: Show OTP)
 // ═══════════════════════════════════════════════════
 class OrderDetailScreen extends StatefulWidget {
   final OrderDisplay order;
@@ -730,9 +742,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool get _canRateOrder =>
       _ratingOrderStatus == 'delivered' && !_hasCompletedRating;
 
+  String? _readOtp(Map<String, dynamic>? source) {
+    final raw = source?['otp'] ?? source?['delivery_otp'];
+    final value = raw?.toString().trim();
+    return value == null || value.isEmpty || value == 'null' ? null : value;
+  }
+
   static const _stageToStatus = {
-    1: 'picked_up',
-    2: 'in-transit',
+    1: 'confirmed',
+    2: 'picked_up',
     3: 'arrived',
     4: 'delivered',
   };
@@ -749,9 +767,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     setState(() => _isLoadingDetails = true);
     try {
       final details = await _trackingService.getOrderDetails(_order.id);
+      final otpDetails = await _trackingService.getOrderOtp(_order.id);
+      final apiOrder = details?['order'] is Map
+          ? Map<String, dynamic>.from(details!['order'] as Map)
+          : null;
+      final latestOtp =
+          _readOtp(otpDetails) ?? _readOtp(apiOrder) ?? _readOtp(details);
       if (mounted) {
         setState(() {
           _orderDetails = details;
+          if (latestOtp != null) {
+            _order = _order.copyWith(otp: latestOtp);
+          }
           _isLoadingDetails = false;
         });
       }
@@ -893,6 +920,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget build(BuildContext context) {
     final order = _order;
     final progressStep = _getProgressStep();
+    final orderOtp = order.otp?.trim();
 
     // ── Determine sticky action button based on status ──
     Widget? stickyButton;
@@ -956,8 +984,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: CircularProgressIndicator(
                 strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.inventory_2_outlined, size: 18),
-        label: Text(
-            _isUpdatingStatus ? 'Updating...' : 'Hand over: Mark as Picked Up'),
+        label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Order'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
           foregroundColor: Colors.white,
@@ -967,7 +994,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           elevation: 2,
         ),
       );
-    } else if (order.status.toLowerCase() == 'picked_up') {
+    } else if (order.status.toLowerCase() == 'confirmed') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
         icon: _isUpdatingStatus
@@ -976,7 +1003,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: CircularProgressIndicator(
                 strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.local_shipping_outlined, size: 18),
-        label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as In Transit'),
+        label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as Picked Up'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
           foregroundColor: Colors.white,
@@ -986,8 +1013,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           elevation: 2,
         ),
       );
-    } else if (order.status.toLowerCase() == 'in-transit' ||
-        order.status.toLowerCase() == 'in_transit') {
+    } else if (order.status.toLowerCase() == 'picked' ||
+        order.status.toLowerCase() == 'picked_up') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
         icon: _isUpdatingStatus
@@ -999,20 +1026,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
-          elevation: 2,
-        ),
-      );
-    } else if (order.status.toLowerCase() == 'arrived') {
-      stickyButton = ElevatedButton.icon(
-        onPressed: () => _showEnterOtpDialog(context),
-        icon: const Icon(Icons.lock_open_outlined, size: 18),
-        label: const Text('Enter OTP to Complete Delivery'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green[700],
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
@@ -1166,31 +1179,44 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       const Icon(Icons.location_on_outlined, size: 20,
                           color: Colors.black87),
                       const SizedBox(width: 10),
-                      const Text(
-                        'Track Package',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
+                      const Expanded(
+                        child: Text(
+                          'Track Package',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
                         ),
                       ),
+                      if (orderOtp != null && orderOtp.isNotEmpty) ...[
+                        const SizedBox(width: 12),
+                        Text(
+                          'OTP: $orderOtp',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 20),
                   _buildTrackingTimeline(progressStep),
 
-                  // ── Status Update Buttons (added in Track Package section) ──
-                  if (order.status.toLowerCase() != 'delivered') ...[
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Update Track Package Status',
-                      style: TextStyle(fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildStatusUpdateButton(order),
-                  ],
+                  // // ── Status Update Buttons (added in Track Package section) ──
+                  // if (order.status.toLowerCase() != 'delivered') ...[
+                  //   const SizedBox(height: 24),
+                  //   const Text(
+                  //     'Update Track Package Status',
+                  //     style: TextStyle(fontSize: 13,
+                  //         fontWeight: FontWeight.bold,
+                  //         color: Colors.black54),
+                  //   ),
+                  //   const SizedBox(height: 12),
+                  //   _buildStatusUpdateButton(order),
+                  // ],
                 ],
               ),
             ),
@@ -1639,8 +1665,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget _buildStatusUpdateButton(OrderDisplay order) {
     if (order.status.toLowerCase() == 'accepted' ||
         order.status.toLowerCase() == 'matched' ||
-        order.status.toLowerCase() == 'booked' ||
-        order.status.toLowerCase() == 'confirmed') {
+        order.status.toLowerCase() == 'booked') {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
@@ -1650,9 +1675,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               height: 16,
               child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.inventory_2_outlined),
-          label: Text(_isUpdatingStatus
-              ? 'Updating...'
-              : 'Hand over: Mark as Picked Up'),
+          label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Order'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black87,
             foregroundColor: Colors.white,
@@ -1662,7 +1685,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         ),
       );
-    } else if (order.status.toLowerCase() == 'picked_up') {
+    } else if (order.status.toLowerCase() == 'confirmed') {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
@@ -1672,7 +1695,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               height: 16,
               child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.local_shipping_outlined),
-          label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as In Transit'),
+          label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as Picked Up'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black87,
             foregroundColor: Colors.white,
@@ -1682,8 +1705,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         ),
       );
-    } else if (order.status.toLowerCase() == 'in-transit' ||
-        order.status.toLowerCase() == 'in_transit') {
+    } else if (order.status.toLowerCase() == 'picked' ||
+        order.status.toLowerCase() == 'picked_up') {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
@@ -1696,22 +1719,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           label: Text(_isUpdatingStatus ? 'Updating...' : 'Confirm Arrival'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black87,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
-          ),
-        ),
-      );
-    } else if (order.status.toLowerCase() == 'arrived') {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () => _showEnterOtpDialog(context),
-          icon: const Icon(Icons.check_circle_outline),
-          label: const Text('Enter OTP to Complete Delivery'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green[700],
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(
