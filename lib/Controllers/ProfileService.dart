@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../Constants/ApiService.dart';
 import '../Constants/ApiConstants.dart';
@@ -8,49 +9,43 @@ import 'AuthService.dart';
 class ProfileService {
   final ApiService _api = ApiService();
 
-  // Get user profile by userId with error handling
+  // Get user profile by userId
   Future<UserProfile?> getUserProfile(String userId) async {
     try {
       final response = await _api.get(
         '${ApiConstants.getUserProfile}/$userId',
-        parser: (json) => UserProfile.fromJson(json['profile']),
+        parser: (json) {
+          if (json == null || json['profile'] == null) return null;
+          return UserProfile.fromJson(json['profile']);
+        },
       );
 
-      if (!response.success) {
+      if (response.userNotFound) {
         await AuthService.clearUserSession();
         return null;
       }
 
       return response.data;
     } catch (e) {
-      print('❌ Error fetching user profile: $e');
-      if (e.toString().contains('404') ||
-          e.toString().contains('user does not exist') ||
-          e.toString().contains('not found')) {
-        await AuthService.clearUserSession();
-      }
+      debugPrint('❌ Error fetching user profile: $e');
       return null;
     }
   }
 
   Future<TrustScore?> getUserTrustScore(String userId) async {
     try {
-      print('🌐 TrustScore API URL: ${ApiConstants.getUserTrustScore}/$userId');
       final response = await _api.get(
         '${ApiConstants.getUserTrustScore}/$userId',
-        parser: (json) => TrustScore.fromJson(json),
+        parser: (json) => json == null ? null : TrustScore.fromJson(json),
       );
 
-      print('📡 TrustScore Response: success=${response.success}, data=${response.data}');
-
-      if (response.success) {
-        print('✅ TrustScore fetched: ${response.data}');
-        return response.data as TrustScore?;
+      if (response.userNotFound) {
+        await AuthService.clearUserSession();
       }
-      print('❌ TrustScore API returned !success');
-      return null;
+
+      return response.data;
     } catch (e) {
-      print('💥 TrustScore ERROR: $e');
+      debugPrint('💥 TrustScore ERROR: $e');
       return null;
     }
   }
@@ -63,18 +58,13 @@ class ProfileService {
         body: updates,
       );
 
-      if (!response.success) {
+      if (response.userNotFound) {
         await AuthService.clearUserSession();
-        return false;
       }
 
       return response.success;
     } catch (e) {
-      print('❌ Error updating user profile: $e');
-      if (e.toString().contains('404') ||
-          e.toString().contains('user does not exist')) {
-        await AuthService.clearUserSession();
-      }
+      debugPrint('❌ Error updating user profile: $e');
       return false;
     }
   }
@@ -84,21 +74,23 @@ class ProfileService {
     try {
       final file = await http.MultipartFile.fromPath('photo', filePath);
       
-      final response = await _api.postMultipart(
+      final response = await _api.postMultipart<Map<String, dynamic>>(
         ApiConstants.uploadProfilePhoto,
         fields: {'userId': userId},
         files: [file],
       );
 
       if (response.success) {
-        print('✅ Profile photo uploaded successfully: ${response.data}');
-        return response.data as Map<String, dynamic>?;
+        return response.data;
       } else {
-        print('❌ Failed to upload profile photo: ${response.error}');
+        if (response.userNotFound) {
+          await AuthService.clearUserSession();
+        }
+        debugPrint('❌ Failed to upload profile photo: ${response.error}');
         return null;
       }
     } catch (e) {
-      print('❌ Error uploading profile photo: $e');
+      debugPrint('❌ Error uploading profile photo: $e');
       return null;
     }
   }

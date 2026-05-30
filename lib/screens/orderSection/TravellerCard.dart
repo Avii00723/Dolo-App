@@ -1,7 +1,7 @@
-
 // Modern Traveller Order Card - Redesigned to match new UI design
 // Traveller enters the sender-provided OTP to complete delivery.
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -19,6 +19,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
   final Function(String)? onWithdrawRequest;
   final Function(String orderId, int currentStage)? onUpdateStatus;
   final Function(String orderId, String otp)? onCompleteOrderWithOtp;
+  final Function(String orderId, bool confirmed)? onConfirmPickup;
 
   const ModernTravellerOrderCard({
     super.key,
@@ -28,6 +29,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
     this.onWithdrawRequest,
     this.onUpdateStatus,
     this.onCompleteOrderWithOtp,
+    this.onConfirmPickup,
   });
 
   int _getProgressStep() {
@@ -69,7 +71,18 @@ class ModernTravellerOrderCard extends StatelessWidget {
   }
 
   String _getStatusLabel(String status) {
-    switch (status.toLowerCase()) {
+    final normalized = status.toLowerCase().trim();
+    if (normalized == 'picked' ||
+        normalized == 'picked_up' ||
+        normalized == 'picked up') {
+      final confirmation =
+          order.pickupConfirmationStatus?.toLowerCase().trim() ?? '';
+      if (confirmation == 'confirmed') return 'Picked Up';
+      if (confirmation == 'rejected') return 'Pickup Rejected';
+      return 'Pickup Requested';
+    }
+
+    switch (normalized) {
       case 'in-transit':
       case 'in_transit':
         return 'In Transit';
@@ -83,8 +96,6 @@ class ModernTravellerOrderCard extends StatelessWidget {
         return 'Accepted';
       case 'matched':
         return 'Matched';
-      case 'picked_up':
-        return 'Picked Up';
       case 'arrived':
         return 'Arrived';
       default:
@@ -119,6 +130,25 @@ class ModernTravellerOrderCard extends StatelessWidget {
       (order.requestStatus ?? order.status).toLowerCase() == 'delivered';
   bool get _hasCompletedCardRating =>
       order.myRatingStatus?.toLowerCase() == 'completed';
+  bool get _isWaitingForPickupConfirmation {
+    final status = (order.requestStatus ?? order.status).toLowerCase().trim();
+    final confirmation =
+        order.pickupConfirmationStatus?.toLowerCase().trim() ?? '';
+    return (status == 'picked' ||
+            status == 'picked_up' ||
+            status == 'picked up') &&
+        (confirmation.isEmpty || confirmation == 'pending');
+  }
+
+  bool get _isPickupRejected {
+    final status = (order.requestStatus ?? order.status).toLowerCase().trim();
+    final confirmation =
+        order.pickupConfirmationStatus?.toLowerCase().trim() ?? '';
+    return (status == 'picked' ||
+            status == 'picked_up' ||
+            status == 'picked up') &&
+        confirmation == 'rejected';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -258,6 +288,50 @@ class ModernTravellerOrderCard extends StatelessWidget {
 
               // ── Dotted Progress Tracker ──
               _buildProgressDots(progressStep),
+              if (_isWaitingForPickupConfirmation || _isPickupRejected) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: (_isPickupRejected ? Colors.red : Colors.amber)
+                        .withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: (_isPickupRejected ? Colors.red : Colors.amber)
+                          .withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                          _isPickupRejected
+                              ? Icons.error_outline
+                              : Icons.hourglass_top_outlined,
+                          size: 18,
+                          color: _isPickupRejected
+                              ? Colors.red[700]
+                              : Colors.amber[800]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _isPickupRejected
+                              ? 'Pickup confirmation rejected'
+                              : 'Waiting for pickup confirmation',
+                          style: TextStyle(
+                            color: _isPickupRejected
+                                ? Colors.red[700]
+                                : Colors.amber[900],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -266,7 +340,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
   }
 
   Widget _buildProgressDots(int activeStep) {
-    const totalSteps = 5;
+    const totalSteps = 4;
     return Row(
       children: List.generate(totalSteps * 2 - 1, (i) {
         if (i.isEven) {
@@ -319,6 +393,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
           onTrackOrder: onTrackOrder,
           onUpdateStatus: onUpdateStatus,
           onCompleteOrderWithOtp: onCompleteOrderWithOtp,
+          onConfirmPickup: onConfirmPickup,
         ),
       ),
     );
@@ -332,6 +407,7 @@ class TravellerOrderDetailScreen extends StatefulWidget {
   final VoidCallback? onTrackOrder;
   final Function(String orderId, int currentStage)? onUpdateStatus;
   final Function(String orderId, String otp)? onCompleteOrderWithOtp;
+  final Function(String orderId, bool confirmed)? onConfirmPickup;
 
   const TravellerOrderDetailScreen({
     super.key,
@@ -341,6 +417,7 @@ class TravellerOrderDetailScreen extends StatefulWidget {
     this.onTrackOrder,
     this.onUpdateStatus,
     this.onCompleteOrderWithOtp,
+    this.onConfirmPickup,
   });
 
   @override
@@ -393,11 +470,56 @@ class _TravellerOrderDetailScreenState
   bool get _canRateOrder =>
       _ratingOrderStatus == 'delivered' && !_hasCompletedRating;
 
+  /// Authoritative display status: prefer API tracking history, then API order, then local.
+  String get _displayStatus {
+    final apiStage =
+        OrderTrackingService.currentStageFromHistory(_orderDetails);
+    if (apiStage != null) return OrderTrackingService.statusFromStage(apiStage);
+    final apiStatus = _apiOrder?['status']?.toString().trim().toLowerCase();
+    if (apiStatus != null && apiStatus.isNotEmpty && apiStatus != 'null') {
+      return apiStatus;
+    }
+    return _order.status.toLowerCase();
+  }
+
+  String? get _pickupConfirmationStatus {
+    final raw = _apiOrder?['pickup_confirmation_status'] ??
+        _orderDetails?['pickup_confirmation_status'] ??
+        _order.pickupConfirmationStatus;
+    final value = raw?.toString().trim().toLowerCase();
+    return value == null || value.isEmpty || value == 'null' ? null : value;
+  }
+
+  bool get _isWaitingForPickupConfirmation {
+    final status = _displayStatus;
+    final confirmation = _pickupConfirmationStatus;
+    return (status == 'picked' ||
+            status == 'picked_up' ||
+            status == 'picked up') &&
+        (confirmation == null || confirmation == 'pending');
+  }
+
+  bool get _isPickupConfirmed {
+    final status = _displayStatus;
+    return (status == 'picked' ||
+            status == 'picked_up' ||
+            status == 'picked up') &&
+        _pickupConfirmationStatus == 'confirmed';
+  }
+
+  bool get _isPickupRejected {
+    final status = _displayStatus;
+    return (status == 'picked' ||
+            status == 'picked_up' ||
+            status == 'picked up') &&
+        _pickupConfirmationStatus == 'rejected';
+  }
+
   void _showRatingDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
-        builder: (_) => RatingFeedbackDialog(
+      builder: (_) => RatingFeedbackDialog(
         orderId: _order.id,
         isTraveller: true,
         displayName:
@@ -443,9 +565,25 @@ class _TravellerOrderDetailScreenState
     setState(() => _isLoadingDetails = true);
     try {
       final result = await _trackingService.getOrderDetails(_order.id);
+      // Debug print for API response
+      try {
+        print('TravellerCard: getOrderDetails for ${_order.id}: $result');
+      } catch (_) {}
       if (!mounted) return;
+      final apiOrder = result?['order'] is Map
+          ? Map<String, dynamic>.from(result!['order'] as Map)
+          : null;
+      final pickupConfirmationStatus =
+          apiOrder?['pickup_confirmation_status']?.toString() ??
+              result?['pickup_confirmation_status']?.toString();
       setState(() {
         _orderDetails = result;
+        if (pickupConfirmationStatus != null &&
+            pickupConfirmationStatus.trim().isNotEmpty) {
+          _order = _order.copyWith(
+            pickupConfirmationStatus: pickupConfirmationStatus,
+          );
+        }
         _isLoadingDetails = false;
       });
     } catch (_) {
@@ -458,8 +596,18 @@ class _TravellerOrderDetailScreenState
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
@@ -471,8 +619,18 @@ class _TravellerOrderDetailScreenState
     try {
       final DateTime d = DateTime.parse(date);
       final months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
       ];
       return '${d.day} ${months[d.month - 1]}, ${d.year}';
     } catch (e) {
@@ -481,12 +639,13 @@ class _TravellerOrderDetailScreenState
   }
 
   int _getProgressStep() {
-    return OrderTrackingService.progressStepFromStatus(_order.status);
+    return OrderTrackingService.progressStepFromStatus(_displayStatus);
   }
 
   @override
   Widget build(BuildContext context) {
     final order = _order; // use local stateful copy
+    final displayStatus = _displayStatus;
     final progressStep = _getProgressStep();
 
     // ── Determine which action button to show in the sticky bottom bar ──
@@ -507,9 +666,9 @@ class _TravellerOrderDetailScreenState
       );
     } else if (_hasCompletedRating) {
       stickyButton = _buildFeedbackThankYou();
-    } else if (order.status.toLowerCase() == 'accepted' ||
-        order.status.toLowerCase() == 'matched' ||
-        order.status.toLowerCase() == 'booked') {
+    } else if (displayStatus == 'accepted' ||
+        displayStatus == 'matched' ||
+        displayStatus == 'booked') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(1),
         icon: _isUpdatingStatus
@@ -529,7 +688,7 @@ class _TravellerOrderDetailScreenState
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
-    } else if (order.status.toLowerCase() == 'confirmed') {
+    } else if (displayStatus == 'confirmed') {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(2),
         icon: _isUpdatingStatus
@@ -539,7 +698,8 @@ class _TravellerOrderDetailScreenState
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.flight_land_outlined, size: 18),
-        label: Text(_isUpdatingStatus ? 'Updating...' : 'Mark as Picked Up'),
+        label: Text(
+            _isUpdatingStatus ? 'Updating...' : 'Request Pickup Confirmation'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
           foregroundColor: Colors.white,
@@ -549,8 +709,11 @@ class _TravellerOrderDetailScreenState
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
-    } else if (order.status.toLowerCase() == 'picked' ||
-        order.status.toLowerCase() == 'picked_up') {
+    } else if (_isWaitingForPickupConfirmation) {
+      stickyButton = _buildWaitingForPickupConfirmation();
+    } else if (_isPickupRejected) {
+      stickyButton = _buildPickupRejected();
+    } else if (_isPickupConfirmed) {
       stickyButton = ElevatedButton.icon(
         onPressed: _isUpdatingStatus ? null : () => _updateStatus(3),
         icon: _isUpdatingStatus
@@ -570,7 +733,7 @@ class _TravellerOrderDetailScreenState
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
-    } else if (order.status.toLowerCase() == 'arrived') {
+    } else if (displayStatus == 'arrived') {
       stickyButton = ElevatedButton.icon(
         onPressed: () => _showCompleteOrderOtpDialog(context),
         icon: const Icon(Icons.check_circle_outline, size: 18),
@@ -584,7 +747,7 @@ class _TravellerOrderDetailScreenState
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
-    } else if (order.status.toLowerCase() == 'pending') {
+    } else if (displayStatus == 'pending') {
       stickyButton = OutlinedButton(
         onPressed: () {
           Navigator.pop(context);
@@ -996,13 +1159,16 @@ class _TravellerOrderDetailScreenState
                     icon:
                         const Icon(Icons.call_outlined, color: Colors.black54),
                     onPressed: () async {
-                      final details = await _trackingService.getOrderDetails(order.id);
-                      final rawPhone = details?['order']?['user_phone'] ?? details?['order']?['phone'];
+                      final details =
+                          await _trackingService.getOrderDetails(order.id);
+                      final rawPhone = details?['order']?['user_phone'] ??
+                          details?['order']?['phone'];
                       final phone = rawPhone?.toString();
                       if (phone == null || phone.trim().isEmpty) {
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Phone number not available')),
+                          const SnackBar(
+                              content: Text('Phone number not available')),
                         );
                         return;
                       }
@@ -1045,6 +1211,86 @@ class _TravellerOrderDetailScreenState
     );
   }
 
+  Widget _buildWaitingForPickupConfirmation() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.amber[50],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.amber[200]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.hourglass_top_outlined,
+              color: Colors.amber[800], size: 18),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'Waiting for pickup confirmation',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.amber[900],
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPickupRejected() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.red[50],
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.red[200]!),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, color: Colors.red[700], size: 18),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Pickup confirmation rejected',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.red[700],
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isUpdatingStatus ? null : () => _retryPickupConfirmation(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black87,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              _isUpdatingStatus ? 'Retrying...' : 'Retry Pickup Confirmation',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Calls the parent callback, then updates local order status so the screen
   /// re-renders immediately (button changes, timeline advances, OTP button appears).
   Future<void> _updateStatus(int stage) async {
@@ -1054,13 +1300,48 @@ class _TravellerOrderDetailScreenState
       if (!mounted) return;
       // Mirror the new status locally so the UI advances without a full list refresh
       final newStatus = OrderTrackingService.statusFromStage(stage);
+      final updatedDetails = _orderDetails != null
+          ? Map<String, dynamic>.from(_orderDetails!)
+          : null;
+      if (updatedDetails != null) {
+        final historyKey = updatedDetails.containsKey('history')
+            ? 'history'
+            : updatedDetails.containsKey('tracking')
+                ? 'tracking'
+                : 'history';
+        final rawHistory = updatedDetails[historyKey];
+        final List<dynamic> historyList = rawHistory is List
+            ? List<dynamic>.from(rawHistory)
+            : <dynamic>[];
+        historyList.add(
+          {
+            'stage': stage,
+            'timestamp': DateTime.now().toIso8601String(),
+          },
+        );
+        updatedDetails[historyKey] = historyList;
+        final apiOrderData = _apiOrder != null
+            ? Map<String, dynamic>.from(_apiOrder!)
+            : <String, dynamic>{};
+        apiOrderData['status'] = newStatus;
+        updatedDetails['order'] = apiOrderData;
+      }
       setState(() {
-        _order = _order.copyWith(status: newStatus);
+        _order = _order.copyWith(
+          status: newStatus,
+          pickupConfirmationStatus:
+              stage == 2 ? 'pending' : _order.pickupConfirmationStatus,
+        );
+        if (updatedDetails != null) {
+          _orderDetails = updatedDetails;
+        }
         _isUpdatingStatus = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Status updated to ${_statusLabel(newStatus)}'),
+          content: Text(stage == 2
+              ? 'Pickup confirmation requested'
+              : 'Status updated to ${_statusLabel(newStatus)}'),
           backgroundColor: Colors.green[700],
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -1072,6 +1353,52 @@ class _TravellerOrderDetailScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to update status: $e'),
+          backgroundColor: Colors.red[700],
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _retryPickupConfirmation() async {
+    await _updateStatus(2);
+  }
+
+  /// Calls the parent confirmPickup callback (which calls the REST API).
+  /// Also updates local state so the "waiting" banner disappears immediately.
+  Future<void> _confirmPickup(bool confirmed) async {
+    setState(() => _isUpdatingStatus = true);
+    try {
+      if (widget.onConfirmPickup != null) {
+        await widget.onConfirmPickup!.call(_order.id, confirmed);
+      } else {
+        // Direct API call fallback when widget is opened standalone.
+        await _trackingService.confirmPickup(
+          orderHashedId: _order.id,
+          confirmed: confirmed,
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _isUpdatingStatus = false;
+        _order = _order.copyWith(
+          pickupConfirmationStatus: confirmed ? 'confirmed' : 'rejected',
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              confirmed ? 'Pickup confirmed successfully' : 'Pickup rejected'),
+          backgroundColor: confirmed ? Colors.green[700] : Colors.orange[700],
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUpdatingStatus = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to confirm pickup: $e'),
           backgroundColor: Colors.red[700],
           behavior: SnackBarBehavior.floating,
         ),
@@ -1097,163 +1424,249 @@ class _TravellerOrderDetailScreenState
   void _showCompleteOrderOtpDialog(BuildContext context) {
     final otpController = TextEditingController();
     bool isSubmitting = false;
+    bool isResending = false;
+    int resendCooldown = 0;
+    Timer? cooldownTimer;
     String? errorText;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          contentPadding: EdgeInsets.zero,
-          content: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.lock_open_outlined,
-                      color: Colors.green[700], size: 28),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Enter Delivery OTP',
-                  style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Ask the order creator for the OTP to confirm delivery.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: otpController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 10,
-                  ),
-                  decoration: InputDecoration(
-                    counterText: '',
-                    hintText: '• • • • • •',
-                    hintStyle: TextStyle(
-                        letterSpacing: 6,
-                        color: Colors.grey[400],
-                        fontSize: 22),
-                    errorText: errorText,
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: Colors.green[700]!, width: 2),
+        builder: (dialogContext, setDialogState) {
+          void startCooldown() {
+            resendCooldown = 30;
+            cooldownTimer?.cancel();
+            cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+              if (!dialogContext.mounted) {
+                t.cancel();
+                return;
+              }
+              setDialogState(() {
+                resendCooldown--;
+                if (resendCooldown <= 0) t.cancel();
+              });
+            });
+          }
+
+          return AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            contentPadding: EdgeInsets.zero,
+            content: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      shape: BoxShape.circle,
                     ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Colors.red, width: 1.5),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Icon(Icons.lock_open_outlined,
+                        color: Colors.green[700], size: 28),
                   ),
-                  onChanged: (_) {
-                    if (errorText != null) {
-                      setDialogState(() => errorText = null);
-                    }
-                  },
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: isSubmitting
-                            ? null
-                            : () => Navigator.pop(dialogContext),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          side: BorderSide(color: Colors.grey[300]!),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('Cancel',
-                            style: TextStyle(color: Colors.black54)),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Enter Delivery OTP',
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Ask the order creator for the OTP to confirm delivery.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: otpController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 10,
+                    ),
+                    decoration: InputDecoration(
+                      counterText: '',
+                      hintText: '• • • • • •',
+                      hintStyle: TextStyle(
+                          letterSpacing: 6,
+                          color: Colors.grey[400],
+                          fontSize: 22),
+                      errorText: errorText,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            BorderSide(color: Colors.green[700]!, width: 2),
                       ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Colors.red, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: isSubmitting
-                            ? null
-                            : () async {
-                                final otp = otpController.text.trim();
-                                if (otp.length != 6) {
-                                  setDialogState(() => errorText =
-                                      'Please enter a valid 6-digit OTP');
-                                  return;
-                                }
-                                setDialogState(() => isSubmitting = true);
-                                try {
-                                  await widget.onCompleteOrderWithOtp
-                                      ?.call(_order.id, otp);
-                                  if (mounted) {
-                                    if (dialogContext.mounted) {
-                                      Navigator.pop(dialogContext);
-                                    }
-                                    setState(() {
-                                      _order =
-                                          _order.copyWith(status: 'delivered');
-                                    });
-                                    _fetchOrderDetails();
+                    onChanged: (_) {
+                      if (errorText != null) {
+                        setDialogState(() => errorText = null);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  // ── Resend OTP (triggers sender to receive a new OTP) ──
+                  TextButton.icon(
+                    onPressed: (isResending || resendCooldown > 0)
+                        ? null
+                        : () async {
+                            setDialogState(() => isResending = true);
+                            try {
+                              await _trackingService.resendOtp(_order.id);
+                              if (dialogContext.mounted) {
+                                setDialogState(() {
+                                  isResending = false;
+                                });
+                                startCooldown();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content:
+                                        Text('OTP resent to the order creator'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (dialogContext.mounted) {
+                                setDialogState(() => isResending = false);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to resend OTP: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                    icon: isResending
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.refresh, size: 16),
+                    label: Text(
+                      resendCooldown > 0
+                          ? 'Resend in ${resendCooldown}s'
+                          : isResending
+                              ? 'Resending…'
+                              : 'Resend OTP to creator',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isSubmitting
+                              ? null
+                              : () {
+                                  cooldownTimer?.cancel();
+                                  FocusScope.of(dialogContext).unfocus();
+                                  Navigator.pop(dialogContext);
+                                },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            side: BorderSide(color: Colors.grey[300]!),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Cancel',
+                              style: TextStyle(color: Colors.black54)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  final otp = otpController.text.trim();
+                                  if (otp.length != 6) {
+                                    setDialogState(() => errorText =
+                                        'Please enter a valid 6-digit OTP');
+                                    return;
                                   }
-                                } catch (e) {
-                                  setDialogState(() {
-                                    isSubmitting = false;
-                                    errorText =
-                                        'Invalid OTP. Please try again.';
-                                  });
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[700],
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                                  setDialogState(() => isSubmitting = true);
+                                  try {
+                                    if (widget.onCompleteOrderWithOtp != null) {
+                                      await widget.onCompleteOrderWithOtp!(
+                                          _order.id, otp);
+                                    } else {
+                                      await _trackingService
+                                          .verifyOtpAndComplete(_order.id, otp);
+                                    }
+                                    cooldownTimer?.cancel();
+                                    if (mounted) {
+                                      FocusScope.of(dialogContext).unfocus();
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        if (dialogContext.mounted) {
+                                          Navigator.pop(dialogContext);
+                                        }
+                                      });
+                                      setState(() {
+                                        _order = _order.copyWith(
+                                            status: 'delivered');
+                                      });
+                                      _fetchOrderDetails();
+                                    }
+                                  } catch (e) {
+                                    setDialogState(() {
+                                      isSubmitting = false;
+                                      errorText =
+                                          'Invalid OTP. Please try again.';
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[700],
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: isSubmitting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('Confirm Delivery',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
                         ),
-                        child: isSubmitting
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Text('Confirm Delivery',
-                                style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -1304,7 +1717,6 @@ class _TravellerOrderDetailScreenState
     final steps = [
       ('Order Confirmed', 'Order accepted'),
       ('Picked Up', 'Package collected'),
-      ('In Transit', 'En-route to destination'),
       ('Arrived', 'At destination'),
       ('Delivered', 'Delivery complete'),
     ];

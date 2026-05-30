@@ -138,6 +138,26 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
     );
   }
 
+  Future<void> _showSuccessDialog(String orderOwner) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Request Sent'),
+          content: Text('Your trip request has been sent to $orderOwner successfully.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _submitRequest() async {
     if (isSubmitting) return;
 
@@ -205,6 +225,8 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
 
         if (response != null) {
           FocusManager.instance.primaryFocus?.unfocus();
+          if (!mounted) return;
+          await _showSuccessDialog(widget.order.userName);
           if (!mounted) return;
           widget.onSuccess(response.tripRequestId, widget.order.userName);
         } else {
@@ -330,10 +352,7 @@ class _SendTripRequestPageState extends State<SendTripRequestPage> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text(
           'Send Trip Request',
           style: TextStyle(

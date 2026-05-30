@@ -21,14 +21,19 @@ class ApiResponse<T> {
   final String? error;
   final int? statusCode;
   final String? endpoint;
-  final bool userNotFound; // Flag for user not found
+  final bool userNotFound;
+  final dynamic details;
 
-  ApiResponse.success(this.data, {this.statusCode, this.endpoint})
+  ApiResponse.success(this.data, {this.statusCode, this.endpoint, this.details})
       : success = true,
         error = null,
         userNotFound = false;
 
-  ApiResponse.error(this.error, {this.statusCode, this.endpoint, this.userNotFound = false})
+  ApiResponse.error(this.error,
+      {this.statusCode,
+      this.endpoint,
+      this.userNotFound = false,
+      this.details})
       : success = false,
         data = null;
 }
@@ -39,10 +44,9 @@ class ApiService {
   final Map<String, String> defaultHeaders = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-Tunnel-Skip-AntiCsrf-Check': '1', // Required for MS Dev Tunnels
+    'X-Tunnel-Skip-AntiCsrf-Check': '1', 
   };
 
-  // Helper to build the full endpoint URL
   String buildUrl(String endpoint) {
     if (endpoint.startsWith('http')) return endpoint;
     final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
@@ -50,25 +54,15 @@ class ApiService {
     return '$cleanBase$cleanEndpoint';
   }
 
-  // Helper method to check if response indicates user doesn't exist
   bool _isUserNotFoundError(int statusCode, dynamic responseBody) {
-    if (statusCode == 404) return true;
-
     if (responseBody is Map<String, dynamic>) {
-      final message = responseBody['message']?.toString().toLowerCase() ?? '';
-      final error = responseBody['error']?.toString().toLowerCase() ?? '';
-
+      final message = (responseBody['message'] ?? responseBody['error'] ?? '').toString().toLowerCase();
       return message.contains('user does not exist') ||
-          message.contains('user not found') ||
-          message.contains('not found') ||
-          error.contains('user does not exist') ||
-          error.contains('user not found');
+             message.contains('user not found');
     }
-
     return false;
   }
 
-  // Generic GET request
   Future<ApiResponse<T>> get<T>(
       String endpoint, {
         Map<String, String>? headers,
@@ -78,33 +72,18 @@ class ApiService {
       }) async {
     try {
       final url = buildUrlWithQuery(endpoint, queryParameters);
-      print('┌─────────────────────────────────────');
-      print('│ 📡 GET REQUEST');
-      print('├─────────────────────────────────────');
-      print('│ URL: $url');
-      print('│ Headers: ${{...defaultHeaders, ...?headers}}');
-      if (queryParameters != null && queryParameters.isNotEmpty) {
-        print('│ Query Params: $queryParameters');
-      }
-      print('└─────────────────────────────────────');
-
       final response = await http.get(
         Uri.parse(url),
         headers: {...defaultHeaders, ...?headers},
       );
-
       return _processResponse(response, endpoint, parser);
     } on SocketException {
-      print('❌ Network error - check your connection');
       return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
-    } catch (e, stackTrace) {
-      print('❌ GET Exception: $e');
-      print('Stack Trace: $stackTrace');
+    } catch (e) {
       return ApiResponse.error('Request failed: $e', endpoint: endpoint);
     }
   }
 
-  // Generic POST request
   Future<ApiResponse<T>> post<T>(
       String endpoint, {
         dynamic body,
@@ -116,37 +95,19 @@ class ApiService {
     try {
       final url = buildUrlWithQuery(endpoint, queryParameters);
       final encodedBody = body != null ? jsonEncode(body) : null;
-
-      print('┌─────────────────────────────────────');
-      print('│ 📡 POST REQUEST');
-      print('├─────────────────────────────────────');
-      print('│ URL: $url');
-      print('│ Headers: ${{...defaultHeaders, ...?headers}}');
-      if (queryParameters != null && queryParameters.isNotEmpty) {
-        print('│ Query Params: $queryParameters');
-      }
-      print('│ Body: ${body ?? 'null'}');
-      print('│ Encoded Body: ${encodedBody ?? 'null'}');
-      print('└─────────────────────────────────────');
-
       final response = await http.post(
         Uri.parse(url),
         headers: {...defaultHeaders, ...?headers},
         body: encodedBody,
       );
-
       return _processResponse(response, endpoint, parser);
     } on SocketException {
-      print('❌ Network error - check your connection');
       return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
-    } catch (e, stackTrace) {
-      print('❌ POST Exception: $e');
-      print('Stack Trace: $stackTrace');
+    } catch (e) {
       return ApiResponse.error('Request failed: $e', endpoint: endpoint);
     }
   }
 
-  // Generic Multipart POST request
   Future<ApiResponse<T>> postMultipart<T>(
       String endpoint, {
         Map<String, String>? fields,
@@ -158,13 +119,10 @@ class ApiService {
       final url = buildUrl(endpoint);
       final request = http.MultipartRequest('POST', Uri.parse(url));
 
-      // Add default headers first
       request.headers.addAll(defaultHeaders);
-
       if (headers != null) {
         request.headers.addAll(headers);
       }
-      // Add Accept header if not present
       if (!request.headers.containsKey('Accept')) {
         request.headers['Accept'] = 'application/json';
       }
@@ -177,28 +135,17 @@ class ApiService {
         request.files.addAll(files);
       }
 
-      print('┌─────────────────────────────────────');
-      print('│ 📡 MULTIPART POST REQUEST');
-      print('├─────────────────────────────────────');
-      print('│ URL: $url');
-      print('│ Fields: $fields');
-      print('│ Files: ${files?.map((f) => f.field).toList()}');
-      print('└─────────────────────────────────────');
-
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
       return _processResponse(response, endpoint, parser);
     } on SocketException {
-      print('❌ Network error - check your connection');
       return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
     } catch (e) {
-      print('❌ MULTIPART POST Exception: $e');
       return ApiResponse.error('Request failed: $e', endpoint: endpoint);
     }
   }
 
-  // Generic PUT request
   Future<ApiResponse<T>> put<T>(
       String endpoint, {
         dynamic body,
@@ -210,37 +157,19 @@ class ApiService {
     try {
       final url = buildUrlWithQuery(endpoint, queryParameters);
       final encodedBody = body != null ? jsonEncode(body) : null;
-
-      print('┌─────────────────────────────────────');
-      print('│ 📡 PUT REQUEST');
-      print('├─────────────────────────────────────');
-      print('│ URL: $url');
-      print('│ Headers: ${{...defaultHeaders, ...?headers}}');
-      if (queryParameters != null && queryParameters.isNotEmpty) {
-        print('│ Query Params: $queryParameters');
-      }
-      print('│ Body: ${body ?? 'null'}');
-      print('│ Encoded Body: ${encodedBody ?? 'null'}');
-      print('└─────────────────────────────────────');
-
       final response = await http.put(
         Uri.parse(url),
         headers: {...defaultHeaders, ...?headers},
         body: encodedBody,
       );
-
       return _processResponse(response, endpoint, parser);
     } on SocketException {
-      print('❌ Network error - check your connection');
       return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
-    } catch (e, stackTrace) {
-      print('❌ PUT Exception: $e');
-      print('Stack Trace: $stackTrace');
+    } catch (e) {
       return ApiResponse.error('Request failed: $e', endpoint: endpoint);
     }
   }
 
-  // Generic DELETE request
   Future<ApiResponse<T>> delete<T>(
       String endpoint, {
         Map<String, String>? headers,
@@ -250,37 +179,19 @@ class ApiService {
       }) async {
     try {
       final url = buildUrlWithQuery(endpoint, queryParameters);
-
-      print('┌─────────────────────────────────────');
-      print('│ 📡 DELETE REQUEST');
-      print('├─────────────────────────────────────');
-      print('│ URL: $url');
-      print('│ Headers: ${{...defaultHeaders, ...?headers}}');
-      if (queryParameters != null && queryParameters.isNotEmpty) {
-        print('│ Query Params: $queryParameters');
-      }
-      print('└─────────────────────────────────────');
-
       final response = await http.delete(
         Uri.parse(url),
         headers: {...defaultHeaders, ...?headers},
       );
-
       return _processResponse(response, endpoint, parser);
     } on SocketException {
-      print('❌ Network error - check your connection');
       return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
-    } catch (e, stackTrace) {
-      print('❌ DELETE Exception: $e');
-      print('Stack Trace: $stackTrace');
+    } catch (e) {
       return ApiResponse.error('Request failed: $e', endpoint: endpoint);
     }
   }
 
-  String buildUrlWithQuery(
-      String endpoint,
-      Map<String, dynamic>? params,
-      ) {
+  String buildUrlWithQuery(String endpoint, Map<String, dynamic>? params) {
     String url = buildUrl(endpoint);
     if (params != null && params.isNotEmpty) {
       final List<String> queryParts = [];
@@ -304,71 +215,46 @@ class ApiService {
       T Function(dynamic)? parser,
       ) {
     final statusCode = response.statusCode;
-    print('┌─────────────────────────────────────');
-    print('│ 📥 RESPONSE');
-    print('├─────────────────────────────────────');
-    print('│ Endpoint: $endpoint');
-    print('│ Status Code: $statusCode');
-    print('│ Response Headers: ${response.headers}');
-    print('│ Response Body Length: ${response.body.length} bytes');
-    print('│ Response Body: ${response.body.isEmpty ? 'EMPTY' : response.body}');
-    print('└─────────────────────────────────────');
+    dynamic responseBody;
+    final rawBody = response.body;
 
-    final responseBody = response.body.isNotEmpty ? jsonDecode(response.body) : null;
+    if (rawBody.isNotEmpty) {
+      try {
+        responseBody = jsonDecode(rawBody);
+      } catch (_) {
+        responseBody = rawBody;
+      }
+    }
 
     if (statusCode >= 200 && statusCode < 300) {
-      print('✅ SUCCESS - Status: $statusCode');
       try {
         final parsed = parser != null ? parser(responseBody) : responseBody;
-        print('✅ Data parsed successfully');
         return ApiResponse.success(parsed, statusCode: statusCode, endpoint: endpoint);
-      } catch (e, stackTrace) {
-        print('❌ Parser Exception: $e');
-        print('Stack Trace: $stackTrace');
-        return ApiResponse.error('Failed to parse response: $e', statusCode: statusCode, endpoint: endpoint);
+      } catch (e) {
+        final errorDetails = rawBody.isNotEmpty ? rawBody : responseBody;
+        return ApiResponse.error(
+          'Failed to parse response: $e',
+          statusCode: statusCode,
+          endpoint: endpoint,
+          details: errorDetails,
+        );
       }
     } else {
-      print('❌ ERROR - Status: $statusCode');
-
       final userNotFound = _isUserNotFoundError(statusCode, responseBody);
-
       final errorMsg = responseBody is Map && responseBody['message'] != null
           ? responseBody['message'].toString()
-          : 'Request failed: HTTP $statusCode';
-
-      print('❌ Error Message: $errorMsg');
-      if (responseBody is Map) {
-        print('❌ Error Details: $responseBody');
-      }
-
-      switch (statusCode) {
-        case 400:
-          print('⚠️ BAD REQUEST - Check if all required fields are present and valid');
-          break;
-        case 401:
-          print('⚠️ UNAUTHORIZED - Authentication required or invalid token');
-          break;
-        case 403:
-          print('⚠️ FORBIDDEN - KYC not approved or insufficient permissions');
-          break;
-        case 404:
-          print('⚠️ NOT FOUND - Resource does not exist');
-          if (userNotFound) {
-            print('🚨 USER DOES NOT EXIST - Will trigger logout');
-          }
-          break;
-        case 500:
-          print('⚠️ INTERNAL SERVER ERROR - Backend issue');
-          break;
-        default:
-          print('⚠️ UNKNOWN ERROR - Status code: $statusCode');
-      }
+          : (responseBody is Map && responseBody['error'] != null
+              ? responseBody['error'].toString()
+              : rawBody.isNotEmpty
+                  ? rawBody
+                  : 'Request failed: HTTP $statusCode');
 
       return ApiResponse.error(
         errorMsg,
         statusCode: statusCode,
         endpoint: endpoint,
         userNotFound: userNotFound,
+        details: responseBody is String ? responseBody : rawBody,
       );
     }
   }

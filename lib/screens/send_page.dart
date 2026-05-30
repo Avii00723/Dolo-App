@@ -514,6 +514,11 @@ class _SendPageState extends State<SendPage> {
       return;
     }
 
+    if (destinationPosition == null) {
+      _showSnackBar('Destination location not properly selected', Colors.orange);
+      return;
+    }
+
     if (_departureDate == null || _departureTime == null || _departureDateTime == null) {
       _showSnackBar('Please select departure date and time', Colors.orange);
       return;
@@ -548,6 +553,21 @@ class _SendPageState extends State<SendPage> {
           .map((s) => s.text)
           .toList();
 
+      final stopoversLatitudes = _stopovers
+          .where((s) => s.position != null)
+          .map((s) => s.position!.latitude)
+          .toList();
+      final stopoversLongitudes = _stopovers
+          .where((s) => s.position != null)
+          .map((s) => s.position!.longitude)
+          .toList();
+
+      print('🔎 search orders: userId=$currentUserId from=$_fromText to=$_toText vehicle=$selectedVehicle');
+      print('   origin coords=${originPosition!.latitude},${originPosition!.longitude}');
+      print('   destination coords=${destinationPosition!.latitude},${destinationPosition!.longitude}');
+      print('   departure=${_departureDate!}T${_departureTime!} pickup=${_departureDate!}T${_departureTime!} delivery=${_selectedDate!}T${_selectedTime!}');
+      print('   stopovers=$stopoversStr stopoversLat=$stopoversLatitudes stopoversLng=$stopoversLongitudes');
+
       final orders = await _orderService.searchOrders(
         origin: _fromText,
         destination: _toText,
@@ -559,10 +579,15 @@ class _SendPageState extends State<SendPage> {
         deliveryTime: _selectedTime!,
         originLatitude: originPosition!.latitude,
         originLongitude: originPosition!.longitude,
+        destinationLatitude: destinationPosition!.latitude,
+        destinationLongitude: destinationPosition!.longitude,
         vehicle: selectedVehicle!,
         userId: currentUserId!,
         stopovers: stopoversStr.isNotEmpty ? stopoversStr : null,
+        stopoversLatitude: stopoversLatitudes.isNotEmpty ? stopoversLatitudes : null,
+        stopoversLongitude: stopoversLongitudes.isNotEmpty ? stopoversLongitudes : null,
       );
+      print('✅ searchOrders call completed, received ${orders.length} orders');
 
       if (!mounted) return;
 
@@ -701,18 +726,16 @@ class _SendPageState extends State<SendPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black87),
-            onPressed: () => _isLocationViewFocused
-                ? _hideLocationView()
-                : Navigator.pop(context),
-          ),
-          Text(
-            'Travel Details',
-            style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface),
+
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              'Travel Details',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface),
+            ),
           ),
           const SizedBox(width: 48),
         ],

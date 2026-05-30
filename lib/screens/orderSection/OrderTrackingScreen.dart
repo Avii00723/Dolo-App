@@ -41,7 +41,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   // Tracking state
   String _trackingStatus = 'pending';
   int _trackingStage =
-      0; // 0=confirmed, 1=picked_up, 2=in_transit, 3=arrived, 4=delivered
+  0; // 0=confirmed, 1=picked_up, 2=in_transit, 3=arrived, 4=delivered
   double _progressPercentage = 0.0;
   bool _isDelivered = false;
   bool _isUpdatingStatus = false;
@@ -183,9 +183,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         _trackingStage = _statusToStage(_trackingStatus);
       }
 
-      // Order creator sees their OTP once order is at stage 3 (arrived)
+      // Order creator sees their OTP once order is at stage 3 (arrived).
+      // Prefer the REST API value (_orderOtp already set); fall back to Firestore.
       if (!widget.isTraveller && _trackingStage >= 3) {
-        _orderOtp = data['delivery_otp'] as String?;
+        if (_orderOtp == null || _orderOtp!.trim().isEmpty) {
+          _orderOtp = data['delivery_otp'] as String?;
+        }
+        // Also trigger a REST fetch in the background to get the authoritative OTP.
+        _fetchOrderOtpIfNeeded();
       }
 
       if (data['delivery_person_location'] != null) {
@@ -216,6 +221,31 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       _trackingStage = _statusToStage(_trackingStatus);
       _isDelivered = _trackingStatus == 'delivered';
     });
+
+    // Proactively fetch OTP for the sender when the traveller has arrived.
+    if (!widget.isTraveller && _trackingStage >= 3) {
+      _fetchOrderOtpIfNeeded();
+    }
+  }
+
+  bool _isFetchingOtp = false;
+
+  /// Fetches the authoritative OTP from the REST API and updates [_orderOtp].
+  /// Called lazily when the sender's view reaches stage 3 (arrived).
+  Future<void> _fetchOrderOtpIfNeeded() async {
+    if (_isFetchingOtp) return;
+    _isFetchingOtp = true;
+    try {
+      final otpData = await _trackingService.getOrderOtp(widget.orderId);
+      final apiOtp = otpData?['otp']?.toString().trim();
+      if (apiOtp != null && apiOtp.isNotEmpty && mounted) {
+        setState(() => _orderOtp = apiOtp);
+      }
+    } catch (e) {
+      debugPrint('Error fetching OTP from API: $e');
+    } finally {
+      _isFetchingOtp = false;
+    }
   }
 
   void _updateMarkers() {
@@ -469,7 +499,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       builder: (context) => RatingFeedbackDialog(
         orderId: widget.orderId,
         displayName:
-            widget.orderData['delivery_person_name'] ?? 'Delivery Person',
+        widget.orderData['delivery_person_name'] ?? 'Delivery Person',
         isTraveller: widget.isTraveller,
         travellerId: _resolveTravellerIdFromOrderData(),
         onSubmitted: _onRatingSubmitted,
@@ -544,7 +574,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
+                const BorderRadius.vertical(top: Radius.circular(20)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.1),
@@ -618,7 +648,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
     final primary = Theme.of(context).colorScheme.primary;
     final inactive =
-        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2);
+    Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2);
 
     return Row(
       children: List.generate(stages.length, (i) {
@@ -645,9 +675,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         color: isActive
                             ? Colors.white
                             : Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.35),
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.35),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -656,13 +686,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight:
-                            isActive ? FontWeight.w700 : FontWeight.w400,
+                        isActive ? FontWeight.w700 : FontWeight.w400,
                         color: isActive
                             ? primary
                             : Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.4),
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.4),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -719,13 +749,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         onPressed: _isUpdatingStatus ? null : _updateStatus,
         icon: _isUpdatingStatus
             ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        )
             : Icon(_getNextStatusIcon()),
         label: Text(
           _isUpdatingStatus ? 'Updating…' : _getNextStatusLabel(),
@@ -735,7 +765,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 2,
         ),
       ),
@@ -757,7 +787,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 2,
         ),
       ),
@@ -829,7 +859,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             Icons.info_outline,
             size: 16,
             color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -1078,7 +1108,7 @@ class CompleteOrderBottomSheet extends StatefulWidget {
 
 class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
   final List<TextEditingController> _otpControllers =
-      List.generate(6, (_) => TextEditingController());
+  List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
   bool _isVerifying = false;
   String? _errorMessage;
@@ -1223,12 +1253,12 @@ class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            BorderSide(color: Theme.of(context).dividerColor),
+                        BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            BorderSide(color: Theme.of(context).dividerColor),
+                        BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -1257,7 +1287,7 @@ class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
               const SizedBox(height: 12),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
@@ -1288,14 +1318,14 @@ class _CompleteOrderBottomSheetState extends State<CompleteOrderBottomSheet> {
                 onPressed: _isVerifying ? null : _verifyAndComplete,
                 icon: _isVerifying
                     ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor:
+                    AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
                     : const Icon(Icons.check_circle_outline),
                 label: Text(
                   _isVerifying ? 'Verifying…' : 'Confirm Delivery',
@@ -1391,9 +1421,9 @@ class OtpDisplayDialog extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         color: d == '-'
                             ? Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.2)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.2)
                             : primary,
                       ),
                     ),
@@ -1440,7 +1470,7 @@ class OtpDisplayDialog extends StatelessWidget {
                 ),
                 child: const Text('Got it',
                     style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
               ),
             ),
           ],

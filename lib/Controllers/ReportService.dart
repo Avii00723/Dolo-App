@@ -1,14 +1,15 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../Constants/ApiService.dart';
 import '../Controllers/AuthService.dart';
 import '../Models/ReportModel.dart';
 
 class ReportService {
-  static final ApiService _apiService = ApiService();
+  final ApiService _apiService = ApiService();
 
   // POST /reports/create-report
-  static Future<Map<String, dynamic>> createReport({
+  Future<Map<String, dynamic>> createReport({
     required String reportedUserId,
     required String orderId,
     required String category,
@@ -56,18 +57,22 @@ class ReportService {
       if (response.success) {
         return {'success': true, 'message': 'Report submitted successfully'};
       } else {
+        if (response.userNotFound) {
+          await AuthService.clearUserSession();
+        }
         return {
           'success': false,
           'message': response.error ?? 'Failed to submit report',
         };
       }
     } catch (e) {
+      debugPrint('❌ Report creation error: $e');
       return {'success': false, 'message': 'Something went wrong. Please try again.'};
     }
   }
 
   // GET /reports/my-reports?userId=...
-  static Future<Map<String, dynamic>> getMyReports() async {
+  Future<Map<String, dynamic>> getMyReports() async {
     try {
       final userId = await AuthService.getUserId();
 
@@ -80,13 +85,16 @@ class ReportService {
         queryParameters: {'userId': userId},
         parser: (data) {
           final List<dynamic> rawList = data['reports'] ?? data['data'] ?? [];
-          return rawList.map((r) => ReportModel.fromJson(r)).toList();
+          return rawList.map((r) => ReportModel.fromJson(r as Map<String, dynamic>)).toList();
         },
       );
 
       if (response.success) {
         return {'success': true, 'reports': response.data ?? []};
       } else {
+        if (response.userNotFound) {
+          await AuthService.clearUserSession();
+        }
         return {
           'success': false,
           'message': response.error ?? 'Failed to fetch reports',
@@ -94,6 +102,7 @@ class ReportService {
         };
       }
     } catch (e) {
+      debugPrint('❌ Error fetching reports: $e');
       return {'success': false, 'message': 'Something went wrong.', 'reports': []};
     }
   }

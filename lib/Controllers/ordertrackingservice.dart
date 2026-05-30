@@ -13,8 +13,12 @@ class OrderTrackingService {
   Future<Map<String, dynamic>?> getTrackingHistory(String orderId) async {
     final endpoint = '/order-tracking/track/${Uri.encodeComponent(orderId)}';
     try {
+      final userHashedId = await AuthService.getUserId();
       final response = await _api.get(
         endpoint,
+        queryParameters: {
+          if (userHashedId != null) 'userHashedId': userHashedId,
+        },
         parser: (json) => json,
       );
 
@@ -91,13 +95,12 @@ class OrderTrackingService {
       case 'picked':
       case 'picked_up':
         return 1;
+      case 'arrived':
       case 'in-transit':
       case 'in_transit':
         return 2;
-      case 'arrived':
-        return 3;
       case 'delivered':
-        return 4;
+        return 3;
       case 'pending':
       default:
         return 0;
@@ -105,35 +108,46 @@ class OrderTrackingService {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // POST /order-tracking/track
-  // Stage values: 1 = confirmed, 2 = picked, 3 = arrived
+  // PUT /order-tracking/track/{orderHashedId}
+  // Stage values:
+  // 1 = confirmed
+  // 2 = pickup confirmation requested (sender confirmation gates "picked up")
+  // 3 = arrived (generates OTP)
+  // Stage 4 is delivered and must go through OTP verification.
   // ─────────────────────────────────────────────────────────────
 
   /// Update order tracking to a given stage.
   Future<bool> updateTrackingStage(String orderId, int stage) async {
-    const endpoint = '/order-tracking/track';
+    final endpoint = '/order-tracking/track/${Uri.encodeComponent(orderId)}';
 
-    // Unified endpoint supports only 1 -> 2 -> 3.
-    // Stage 4 must go through OTP verification.
-    if (stage == 4) {
-      throw Exception(
-          'Stage 4 (Delivered) must be handled via OTP verification.');
-    }
-    if (stage < 1 || stage > 3) {
-      throw Exception('Invalid tracking stage. Use stages 1, 2, or 3 only.');
+    // Allow stages 1..4. Stage 4 (delivered) is typically gated by OTP,
+    // but some callers may update it directly so accept it here.
+    if (stage < 1 || stage > 4) {
+      throw Exception('Invalid tracking stage. Use stages 1–4 only.');
     }
 
     try {
-      final response = await _api.post(
+      final userHashedId = await AuthService.getUserId();
+      if (userHashedId == null || userHashedId.isEmpty) {
+        throw Exception('User authentication required to update status');
+      }
+
+      final response = await _api.put(
         endpoint,
         body: {
-          'orderHashedId': orderId,
           'stage': stage,
+          'userHashedId': userHashedId,
         },
         parser: (json) => json,
       );
 
+      // Log response for debugging
+      try {
+        print('🔁 UPDATE TRACKING RESPONSE (stage $stage): ${response.data}');
+      } catch (_) {}
+
       if (!response.success) {
+        print('❌ UPDATE TRACKING FAILED: ${response.error}; details: ${response.details}');
         throw Exception(
             response.error ?? 'Failed to update tracking stage to $stage');
       }
@@ -153,14 +167,17 @@ class OrderTrackingService {
   /// Verify the OTP and mark order as delivered (stage 4).
   Future<bool> verifyOtpAndComplete(String orderId, String otp) async {
     const endpoint = '/order-tracking/track/verify-otp';
-    final otpToVerify = otp.trim().isEmpty ? developmentDeliveryOtp : otp.trim();
+    final otpToVerify =
+        otp.trim().isEmpty ? developmentDeliveryOtp : otp.trim();
 
     try {
+      final userHashedId = await AuthService.getUserId();
       final response = await _api.post(
         endpoint,
         body: {
           'orderHashedId': orderId,
           'otp': otpToVerify,
+          if (userHashedId != null) 'userHashedId': userHashedId,
         },
         parser: (json) => json,
       );
@@ -172,6 +189,61 @@ class OrderTrackingService {
       return true;
     } catch (e) {
       print('❌ OTP VERIFY EXCEPTION: $e');
+      rethrow;
+    }
+  }
+
+  /// Resends the delivery OTP for an order.
+  Future<bool> resendOtp(String orderId) async {
+    const endpoint = '/order-tracking/track/resend-otp';
+    try {
+      final response = await _api.post(
+        endpoint,
+        body: {'orderHashedId': orderId},
+        parser: (json) => json,
+      );
+      if (!response.success) {
+        throw Exception(response.error ?? 'Failed to resend OTP');
+      }
+      return true;
+    } catch (e) {
+      print('❌ RESEND OTP EXCEPTION: $e');
+      rethrow;
+    }
+  }
+
+  /// Confirm or reject a traveller pickup request.
+  Future<bool> confirmPickup({
+    required String orderHashedId,
+    required bool confirmed,
+    String? userHashedId,
+  }) async {
+    const endpoint = '/order-tracking/track/confirm-pickup';
+
+    try {
+      final currentUserHashedId = userHashedId ?? await AuthService.getUserId();
+      if (currentUserHashedId == null || currentUserHashedId.isEmpty) {
+        throw Exception('User not authenticated');
+      }
+
+      final response = await _api.post(
+        endpoint,
+        body: {
+          'orderHashedId': orderHashedId,
+          'confirmed': confirmed,
+          'userHashedId': currentUserHashedId,
+        },
+        parser: (json) => json,
+      );
+
+      if (!response.success) {
+        throw Exception(
+            response.error ?? 'Failed to update pickup confirmation');
+      }
+
+      return true;
+    } catch (e) {
+      print('❌ PICKUP CONFIRMATION EXCEPTION: $e');
       rethrow;
     }
   }
@@ -211,13 +283,16 @@ class OrderTrackingService {
   // ─────────────────────────────────────────────────────────────
 
   /// Fetches the current OTP for an order.
-  /// Returns a map with keys: `otp` (String), `expires_at` (String ISO-8601).
   Future<Map<String, dynamic>?> getOrderOtp(String orderHashedId) async {
     final endpoint =
         '/order-tracking/track/${Uri.encodeComponent(orderHashedId)}/otp';
     try {
+      final userHashedId = await AuthService.getUserId();
       final response = await _api.get(
         endpoint,
+        queryParameters: {
+          if (userHashedId != null) 'userHashedId': userHashedId,
+        },
         parser: (json) => json,
       );
       if (response.success) {
@@ -235,7 +310,8 @@ class OrderTrackingService {
   // Returns latest active order tracking for homepage
   // ─────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>?> getHomeTracking(String userHashedId) async {
-    final endpoint = '/orders/home-tracking/${Uri.encodeComponent(userHashedId)}';
+    final endpoint =
+        '/orders/home-tracking/${Uri.encodeComponent(userHashedId)}';
     try {
       final response = await _api.get(
         endpoint,
@@ -250,7 +326,9 @@ class OrderTrackingService {
   }
 
   // Convenience helpers aligned with documentation
-  Future<bool> markAsConfirmed(String orderId) => updateTrackingStage(orderId, 1);
-  Future<bool> markAsPickedUp(String orderId) => updateTrackingStage(orderId, 2);
+  Future<bool> markAsConfirmed(String orderId) =>
+      updateTrackingStage(orderId, 1);
+  Future<bool> markAsPickedUp(String orderId) =>
+      updateTrackingStage(orderId, 2);
   Future<bool> markAsArrived(String orderId) => updateTrackingStage(orderId, 3);
 }

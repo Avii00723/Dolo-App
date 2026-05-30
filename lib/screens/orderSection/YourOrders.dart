@@ -1,6 +1,4 @@
-// YourOrders Page - Redesigned to match new UI design
-// Features: "Packages sent" | "Trips posted" toggle tabs, card list
-
+// YourOrders Page - Full UI Restored with fixes for "User not found" error
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../Controllers/OrderService.dart';
@@ -14,11 +12,8 @@ import '../../screens/orderSection/OrderCard.dart';
 import '../../screens/orderSection/OrderTrackingScreen.dart';
 import '../../widgets/NotificationBellIcon.dart';
 import 'TravellerCard.dart';
-import '../CustomRouteMapScreen.dart';
 
 class OrderDisplay {
-  // Compatibility getter: some UI widgets expect `order.travelerName`.
-  // In this app, the most relevant available name for the card is `userName`.
   String? get travelerName => userName;
 
   final String id;
@@ -51,9 +46,10 @@ class OrderDisplay {
   final List<String>? preferenceTransport;
   final bool? isUrgent;
   final String? createdAt;
-  final String? otp; // Added otp field
+  final String? otp;
   final String? myRatingStatus;
   final String? otherUserRatingStatus;
+  final String? pickupConfirmationStatus;
 
   OrderDisplay({
     required this.id,
@@ -86,9 +82,10 @@ class OrderDisplay {
     this.preferenceTransport,
     this.isUrgent,
     this.createdAt,
-    this.otp, // Added to constructor
+    this.otp,
     this.myRatingStatus,
     this.otherUserRatingStatus,
+    this.pickupConfirmationStatus,
   });
 
   OrderDisplay copyWith({
@@ -100,6 +97,7 @@ class OrderDisplay {
     String? otp,
     String? myRatingStatus,
     String? otherUserRatingStatus,
+    String? pickupConfirmationStatus,
   }) {
     return OrderDisplay(
       id: id,
@@ -134,8 +132,8 @@ class OrderDisplay {
       createdAt: createdAt,
       otp: otp ?? this.otp,
       myRatingStatus: myRatingStatus ?? this.myRatingStatus,
-      otherUserRatingStatus:
-          otherUserRatingStatus ?? this.otherUserRatingStatus,
+      otherUserRatingStatus: otherUserRatingStatus ?? this.otherUserRatingStatus,
+      pickupConfirmationStatus: pickupConfirmationStatus ?? this.pickupConfirmationStatus,
     );
   }
 }
@@ -178,15 +176,13 @@ class YourOrdersPage extends StatefulWidget {
   State<YourOrdersPage> createState() => _YourOrdersPageState();
 }
 
-class _YourOrdersPageState extends State<YourOrdersPage>
-    with WidgetsBindingObserver {
+class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObserver {
   final OrderService _orderService = OrderService();
   final TripRequestService _tripRequestService = TripRequestService();
   final OrderTrackingService _trackingService = OrderTrackingService();
   String? currentUserId;
   Timer? _refreshTimer;
 
-  // 0 = Packages sent, 1 = Trips posted
   int _selectedTab = 0;
 
   List<OrderDisplay> myOrders = [];
@@ -201,7 +197,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     WidgetsBinding.instance.addObserver(this);
     _selectedTab = widget.initialTabIndex.clamp(0, 1).toInt();
     _initializeUser();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (currentUserId != null && mounted) {
         _loadAllData(silent: true);
       }
@@ -219,30 +215,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   Future<void> _initializeUser() async {
     try {
       final userId = await AuthService.getUserId();
-      if (userId == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please log in again'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-      setState(() {
-        currentUserId = userId;
-      });
+      if (userId == null) return;
+      setState(() => currentUserId = userId);
       await _loadAllData();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading user data: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint('Error: $e');
     }
   }
 
@@ -267,62 +244,51 @@ class _YourOrdersPageState extends State<YourOrdersPage>
 
     try {
       final orders = await _orderService.getMyOrders(currentUserId!);
-      final List<OrderDisplay> displayOrders = [];
-      for (var order in orders) {
-        displayOrders.add(OrderDisplay(
-          id: order.id,
-          userId: currentUserId!,
-          userName: 'You',
-          senderInitial: 'Y',
-          origin: order.origin,
-          destination: order.destination,
-          date: order.deliveryDate,
-          deliveryTime: order.deliveryTime,
-          itemDescription: order.itemDescription,
-          weight: order.weight,
-          status: order.status,
-          originLatitude: order.originLatitude,
-          originLongitude: order.originLongitude,
-          destinationLatitude: order.destinationLatitude,
-          destinationLongitude: order.destinationLongitude,
-          orderType: 'send',
-          estimatedDistance: order.distanceKm,
-          expectedPrice: order.expectedPrice ?? order.calculatedPrice?.toInt(),
-          notes: order.specialInstructions,
-          imageUrl: order.imageUrl,
-          category: order.category,
-          preferenceTransport: order.preferenceTransport,
-          isUrgent: order.isUrgent,
-          createdAt: order.createdAt,
-          otp: order.deliveryOtp, // Map OTP from model
-        ));
-      }
+      final List<OrderDisplay> displayOrders = orders.map((order) => OrderDisplay(
+        id: order.id,
+        userId: currentUserId!,
+        userName: 'You',
+        senderInitial: 'Y',
+        origin: order.origin,
+        destination: order.destination,
+        date: order.deliveryDate,
+        deliveryTime: order.deliveryTime,
+        itemDescription: order.itemDescription,
+        weight: order.weight,
+        status: order.status,
+        originLatitude: order.originLatitude,
+        originLongitude: order.originLongitude,
+        destinationLatitude: order.destinationLatitude,
+        destinationLongitude: order.destinationLongitude,
+        orderType: 'send',
+        estimatedDistance: order.distanceKm,
+        expectedPrice: order.expectedPrice ?? order.calculatedPrice?.toInt(),
+        notes: order.specialInstructions,
+        imageUrl: order.imageUrl,
+        category: order.category,
+        preferenceTransport: order.preferenceTransport,
+        isUrgent: order.isUrgent,
+        createdAt: order.createdAt,
+        otp: order.deliveryOtp,
+      )).toList();
 
       final acceptedRequestsByOrder = orders.isNotEmpty
-          ? (await _loadTripRequestsForOrders(
-                  orders.map((o) => o.id).toList())) ??
-              <String, TripRequest>{}
-          : <String, TripRequest>{};
+          ? (await _loadTripRequestsForOrders(orders.map((o) => o.id).toList())) ?? {}
+          : {};
 
       final namedOrders = displayOrders.map((order) {
         final acceptedRequest = acceptedRequestsByOrder[order.id];
-        // For Sender view, the traveler is the counterpart
         final travellerName = acceptedRequest?.counterpartName?.trim() ?? acceptedRequest?.travelerName?.trim();
         return acceptedRequest == null
             ? order
             : order.copyWith(
-                userName: travellerName?.isNotEmpty == true
-                    ? travellerName
-                    : acceptedRequest.travelerId,
-                senderInitial: travellerName?.isNotEmpty == true 
-                    ? travellerName![0].toUpperCase() 
-                    : acceptedRequest.travelerId.substring(0, 1).toUpperCase(),
-                matchedTravellerId: acceptedRequest.travelerId,
-              );
+          userName: travellerName?.isNotEmpty == true ? travellerName : acceptedRequest.travelerId,
+          senderInitial: travellerName?.isNotEmpty == true ? travellerName![0].toUpperCase() : 'T',
+          matchedTravellerId: acceptedRequest.travelerId,
+        );
       }).toList();
 
-      final trackedOrders =
-          _prioritizeFocusedOrder(await _applyTrackingStatus(namedOrders));
+      final trackedOrders = _prioritizeFocusedOrder(await _applyTrackingStatus(namedOrders));
 
       if (mounted) {
         setState(() {
@@ -331,60 +297,41 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoadingMyOrders = false;
-          myOrders = [];
-        });
-      }
+      if (mounted) setState(() => isLoadingMyOrders = false);
     }
   }
 
-  Future<Map<String, TripRequest>?> _loadTripRequestsForOrders(
-      List<String> orderIds) async {
+  Future<Map<String, TripRequest>?> _loadTripRequestsForOrders(List<String> orderIds) async {
     if (currentUserId == null) return null;
     try {
-      final allRequests =
-      await _tripRequestService.getTripRequestsForMyOrders(currentUserId!);
+      final allRequests = await _tripRequestService.getTripRequestsForMyOrders(currentUserId!);
       Map<String, List<TripRequestDisplay>> requestsByOrder = {};
       Map<String, TripRequest> acceptedRequestsByOrder = {};
 
       for (var request in allRequests) {
-        final requestStatus = request.status.toLowerCase();
-        if (requestStatus == 'accepted' && orderIds.contains(request.orderId)) {
+        final status = request.status.toLowerCase();
+        if (status == 'accepted' && orderIds.contains(request.orderId)) {
           acceptedRequestsByOrder[request.orderId] = request;
         }
 
-        if (requestStatus == 'pending' && orderIds.contains(request.orderId)) {
+        if (status == 'pending' && orderIds.contains(request.orderId)) {
           final displayRequest = TripRequestDisplay(
             id: request.id,
             orderId: request.orderId,
             travellerId: request.travelerId,
-            travellerName: request.counterpartName?.trim().isNotEmpty == true
-                ? request.counterpartName!
-                : (request.travelerName?.trim().isNotEmpty == true ? request.travelerName! : request.travelerId),
+            travellerName: request.counterpartName?.trim() ?? request.travelerName?.trim() ?? 'Traveller',
             vehicleInfo: request.vehicleInfo,
             departureDatetime: request.departureDatetime,
             travelDate: request.travelDate,
             status: request.status,
           );
-
-          if (requestsByOrder.containsKey(request.orderId)) {
-            requestsByOrder[request.orderId]!.add(displayRequest);
-          } else {
-            requestsByOrder[request.orderId] = [displayRequest];
-          }
+          requestsByOrder.putIfAbsent(request.orderId, () => []).add(displayRequest);
         }
       }
 
-      if (mounted) {
-        setState(() {
-          tripRequestsByOrder = requestsByOrder;
-        });
-      }
+      if (mounted) setState(() => tripRequestsByOrder = requestsByOrder);
       return acceptedRequestsByOrder;
     } catch (e) {
-      debugPrint('❌ Error loading trip requests: $e');
       return null;
     }
   }
@@ -394,26 +341,20 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     if (!silent) setState(() => isLoadingMyRequests = true);
 
     try {
-      final tripRequests =
-      await _tripRequestService.getMyTripRequests(currentUserId!);
+      final tripRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
       final List<OrderDisplay> displayOrders = [];
       final Set<String> processedOrderIds = {};
 
       for (var request in tripRequests) {
         if (processedOrderIds.contains(request.orderId)) continue;
         processedOrderIds.add(request.orderId);
-        // For a traveler view, counterpart is the order creator
-        final orderCreatorName = request.orderCreatorName?.trim() ?? request.counterpartName?.trim();
+        final orderCreatorName = request.orderCreatorName?.trim() ?? request.counterpartName?.trim() ?? 'Order Creator';
 
         displayOrders.add(OrderDisplay(
           id: request.orderId,
-          userId: request.orderId,
-          userName: orderCreatorName?.isNotEmpty == true
-              ? orderCreatorName!
-              : 'Order Creator',
-          senderInitial: orderCreatorName?.isNotEmpty == true
-              ? orderCreatorName![0].toUpperCase()
-              : 'O',
+          userId: currentUserId!,
+          userName: orderCreatorName,
+          senderInitial: orderCreatorName.isNotEmpty ? orderCreatorName[0].toUpperCase() : 'O',
           origin: request.source,
           destination: request.destination,
           date: request.travelDate,
@@ -422,14 +363,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           status: request.status,
           orderType: 'receive',
           requestStatus: request.status,
-          notes:
-          '${request.vehicleInfo} • Departure: ${request.departureDatetime} • Delivery: ${request.travelDate}',
           tripRequestId: request.id,
         ));
       }
 
-      final trackedOrders =
-          _prioritizeFocusedOrder(await _applyTrackingStatus(displayOrders));
+      final trackedOrders = _prioritizeFocusedOrder(await _applyTrackingStatus(displayOrders));
 
       if (mounted) {
         setState(() {
@@ -438,170 +376,168 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoadingMyRequests = false;
-          myRequestedOrders = [];
-        });
-      }
+      if (mounted) setState(() => isLoadingMyRequests = false);
     }
   }
 
-  // ── ACTION HANDLERS ──
+  Future<List<OrderDisplay>> _applyTrackingStatus(List<OrderDisplay> orders) async {
+    return Future.wait(orders.map((order) async {
+      final status = order.status.toLowerCase();
+      if (status == 'cancelled' || status == 'rejected') return order;
 
-  bool _isTrackingStatus(String? status) {
-    final s = status?.toLowerCase().trim();
-    if (s == null || s.isEmpty) return false;
-    return const {
-      'order confirmed',
-      'confirmed',
-      'picked up',
-      'picked_up',
-      'in transit',
-      'in-transit',
-      'in_transit',
-      'delivered',
-    }.contains(s);
+      // Fetch both order details and OTP in parallel.
+      final results = await Future.wait([
+        _trackingService.getOrderDetails(order.id),
+        _trackingService.getOrderOtp(order.id).catchError((_) => null),
+      ]);
+
+      final details = results[0] as Map<String, dynamic>?;
+      final otpData = results[1] as Map<String, dynamic>?;
+
+      if (details == null) return order;
+
+      final apiOrder = details['order'] as Map<String, dynamic>?;
+      final currentStage = OrderTrackingService.currentStageFromHistory(details);
+      final apiStatus = currentStage == null
+          ? (apiOrder?['status']?.toString())
+          : OrderTrackingService.statusFromStage(currentStage);
+
+      // Prefer the dedicated OTP endpoint, fall back to order fields.
+      final String? resolvedOtp = _cleanOtp(otpData?['otp'])
+          ?? _cleanOtp(apiOrder?['delivery_otp'])
+          ?? _cleanOtp(apiOrder?['otp'])
+          ?? order.otp;
+
+      return order.copyWith(
+        status: apiStatus ?? order.status,
+        otp: resolvedOtp,
+        myRatingStatus: apiOrder?['my_rating_status']?.toString()
+            ?? details['my_rating_status']?.toString(),
+        pickupConfirmationStatus:
+        apiOrder?['pickup_confirmation_status']?.toString()
+            ?? details['pickup_confirmation_status']?.toString(),
+      );
+    }));
   }
 
-  void _viewRoute(OrderDisplay order) {
-    final status = order.status.toLowerCase().trim();
-    final isTracking = _isTrackingStatus(status);
+  String? _cleanOtp(dynamic raw) {
+    final v = raw?.toString().trim();
+    return (v == null || v.isEmpty || v == 'null') ? null : v;
+  }
 
-    // When order is pending, go to Order Details UI.
-    // When order is confirmed/picked up/in-transit/delivered, go to Order Tracking UI.
-    if (isTracking) {
-      // Note: OrderTrackingScreen expects:
-      // - isTraveller=true when the current user is the delivery person.
-      // In `YourOrders.dart` (packages sent), the current user is the sender.
+  /// Opens the detail card for an order — always shows the full tracking UI
+  /// (OTP, confirm pickup, timeline, status buttons) appropriate to the user's role.
+  void _openCard(OrderDisplay order) {
+    if (_selectedTab == 1) {
+      // Traveller view
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => OrderTrackingScreen(
-            orderId: order.id,
-            orderData: {
-              // Keep this map flexible; OrderTrackingScreen reads many optional keys.
-              'origin': order.origin,
-              'destination': order.destination,
-              'origin_latitude': order.originLatitude,
-              'origin_longitude': order.originLongitude,
-              'destination_latitude': order.destinationLatitude,
-              'destination_longitude': order.destinationLongitude,
-              'pickup_coordinates': {
-                'latitude': order.originLatitude,
-                'longitude': order.originLongitude,
-              },
-              'dropoff_coordinates': {
-                'latitude': order.destinationLatitude,
-                'longitude': order.destinationLongitude,
-              },
-              'status': order.status,
-              'order_type': order.orderType,
-              'traveller_id': order.matchedTravellerId,
-              'otp': order.otp,
-            },
-            isTraveller: false,
+          builder: (_) => TravellerOrderDetailScreen(
+            order: order,
+            onUpdateStatus: _updateTravellerStatus,
+            onCompleteOrderWithOtp: _completeTravellerOrderWithOtp,
+            onWithdrawRequest: _withdrawTripRequest,
+            onConfirmPickup: _confirmPickup,
           ),
         ),
-      );
-      return;
+      ).then((_) => _loadAllData(silent: true));
+    } else {
+      // Sender view
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OrderDetailScreen(
+            order: order,
+            tripRequests: tripRequestsByOrder[order.id],
+            onAcceptRequest: _acceptTripRequest,
+            onDeclineRequest: _declineTripRequest,
+            onTrackOrder: () => _openTrackingMap(order),
+            onMarkReceived: () => _markOrderReceived(order),
+            onCompleteOrder: () => _completeOrder(order),
+            onUpdateOrder: _updateOrder,
+            onDeleteOrder: _deleteOrder,
+            onCompleteOrderWithOtp: _completeTravellerOrderWithOtp,
+            onConfirmPickup: _confirmPickup,
+          ),
+        ),
+      ).then((_) => _loadAllData(silent: true));
     }
+  }
 
+  /// Opens the map-based tracking screen (used by the "Track on Map" button).
+  void _openTrackingMap(OrderDisplay order) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => OrderDetailScreen(
-          order: order,
-          tripRequests: tripRequestsByOrder[order.id],
-          onAcceptRequest: _acceptTripRequest,
-          onDeclineRequest: _declineTripRequest,
-          onTrackOrder: () => _viewRoute(order),
-          onMarkReceived: () => _markOrderReceived(order),
-          onCompleteOrder: () => _completeOrder(order),
-          onUpdateOrder: _updateOrder,
-          onDeleteOrder: _deleteOrder,
-          onCompleteOrderWithOtp: (orderId, otp) =>
-              _completeTravellerOrderWithOtp(orderId, otp),
-          onUpdateStatus: _updateTravellerStatus,
+        builder: (_) => OrderTrackingScreen(
+          orderId: order.id,
+          orderData: {
+            'origin': order.origin,
+            'destination': order.destination,
+            'origin_latitude': order.originLatitude,
+            'origin_longitude': order.originLongitude,
+            'destination_latitude': order.destinationLatitude,
+            'destination_longitude': order.destinationLongitude,
+            'status': order.status,
+            'order_type': order.orderType,
+            'otp': order.otp,
+          },
+          isTraveller: _selectedTab == 1,
         ),
       ),
     );
   }
 
+  /// Legacy alias kept so existing tap handlers in cards still compile.
+  void _viewRoute(OrderDisplay order) => _openTrackingMap(order);
 
-
-  Future<void> _acceptTripRequest(
-      TripRequestDisplay request, String orderId) async {
+  Future<void> _acceptTripRequest(TripRequestDisplay request, String orderId) async {
     if (currentUserId == null) return;
     try {
-      final acceptReq = TripRequestAcceptRequest(
+      final response = await _tripRequestService.acceptTripRequest(TripRequestAcceptRequest(
         orderCreatorId: currentUserId!,
         tripRequestId: request.id,
-        negotiatedPrice: 0, // In UI, you might want to ask for this
-      );
-
-      final response = await _tripRequestService.acceptTripRequest(acceptReq);
+        negotiatedPrice: 0,
+      ));
       if (response != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message), backgroundColor: Colors.green),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response.message), backgroundColor: Colors.green));
         _loadAllData();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
-  Future<void> _declineTripRequest(
-      TripRequestDisplay request, String orderId) async {
+  Future<void> _declineTripRequest(TripRequestDisplay request, String orderId) async {
     if (currentUserId == null) return;
     try {
-      final declineReq = TripRequestDeclineRequest(
+      final response = await _tripRequestService.declineTripRequest(TripRequestDeclineRequest(
         orderCreatorHashedId: currentUserId!,
         tripRequestId: request.id,
-      );
-
-      final response = await _tripRequestService.declineTripRequest(declineReq);
+      ));
       if (response != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message), backgroundColor: Colors.orange),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response.message), backgroundColor: Colors.orange));
         _loadAllData();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
   Future<void> _withdrawTripRequest(String tripRequestId) async {
     if (currentUserId == null) return;
     try {
-      final withdrawReq = TripRequestWithdrawRequest(
+      final response = await _tripRequestService.withdrawTripRequest(TripRequestWithdrawRequest(
         travelerHashedId: currentUserId!,
         tripRequestHashedId: tripRequestId,
-      );
-
-      final response = await _tripRequestService.withdrawTripRequest(withdrawReq);
+      ));
       if (response != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message), backgroundColor: Colors.orange),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response.message), backgroundColor: Colors.orange));
         _loadAllData();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -609,24 +545,18 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     try {
       final success = await _tripRequestService.deleteTripRequest(tripRequestId);
       if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip request deleted'), backgroundColor: Colors.blue),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Trip request deleted'), backgroundColor: Colors.blue));
         _loadAllData();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
   Future<void> _updateOrder(OrderDisplay updatedOrder) async {
     if (currentUserId == null) return;
     try {
-      final updateReq = OrderModels.OrderUpdateRequest(
+      final response = await _orderService.updateOrder(updatedOrder.id, OrderModels.OrderUpdateRequest(
         userHashedId: currentUserId!,
         itemDescription: updatedOrder.itemDescription,
         origin: updatedOrder.origin,
@@ -638,21 +568,13 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         deliveryDate: updatedOrder.date,
         weight: updatedOrder.weight,
         specialInstructions: updatedOrder.notes,
-      );
-
-      final response = await _orderService.updateOrder(updatedOrder.id, updateReq);
+      ));
       if (response != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order updated successfully'), backgroundColor: Colors.green),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order updated successfully'), backgroundColor: Colors.green));
         _loadAllData();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating order: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -661,17 +583,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     try {
       final success = await _orderService.deleteOrder(orderId, currentUserId!);
       if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order deleted'), backgroundColor: Colors.blue),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order deleted'), backgroundColor: Colors.blue));
         _loadAllData();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting order: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -680,17 +596,11 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     try {
       final success = await _orderService.completeOrder(order.id, currentUserId!);
       if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order marked as received'), backgroundColor: Colors.green),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order marked as received'), backgroundColor: Colors.green));
         _loadAllData();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -699,44 +609,50 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     try {
       final success = await _orderService.completeOrder(order.id, currentUserId!);
       if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order completed successfully'), backgroundColor: Colors.green),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order completed successfully'), backgroundColor: Colors.green));
         _loadAllData();
       }
     } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _updateTravellerStatus(String orderId, int stage) async {
+    try {
+      print('YourOrders: updating tracking stage $stage for $orderId');
+      await _trackingService.updateTrackingStage(orderId, stage);
+      print('YourOrders: updateTrackingStage completed for $orderId (stage $stage)');
+      _loadAllData(silent: true);
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
         );
       }
     }
   }
 
-  Future<void> _updateTravellerStatus(String orderId, int stage) async {
-    await _trackingService.updateTrackingStage(orderId, stage);
-    _loadAllData(silent: true);
-  }
-
   Future<void> _completeTravellerOrderWithOtp(String orderId, String otp) async {
-    await _trackingService.verifyOtpAndComplete(orderId, otp);
+    try {
+      await _trackingService.verifyOtpAndComplete(orderId, otp);
+      _loadAllData(silent: true);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _confirmPickup(String orderId, bool confirmed) async {
+    await _trackingService.confirmPickup(
+      orderHashedId: orderId,
+      confirmed: confirmed,
+      userHashedId: currentUserId,
+    );
     _loadAllData(silent: true);
-  }
-
-  String? _readStatus(Map<String, dynamic>? source, String key) {
-    final value = source?[key]?.toString().trim().toLowerCase();
-    return value == null || value.isEmpty || value == 'null' ? null : value;
-  }
-
-  String? _readText(Map<String, dynamic>? source, String key) {
-    final value = source?[key]?.toString().trim();
-    return value == null || value.isEmpty || value == 'null' ? null : value;
   }
 
   List<OrderDisplay> _prioritizeFocusedOrder(List<OrderDisplay> orders) {
     final focusOrderId = widget.focusOrderId?.trim().toLowerCase();
     if (focusOrderId == null || focusOrderId.isEmpty) return orders;
-
     final sorted = List<OrderDisplay>.from(orders);
     sorted.sort((a, b) {
       final aMatches = a.id.trim().toLowerCase() == focusOrderId;
@@ -747,50 +663,10 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     return sorted;
   }
 
-  Future<List<OrderDisplay>> _applyTrackingStatus(
-      List<OrderDisplay> orders) async {
-    return Future.wait(orders.map((order) async {
-      final details = await _trackingService.getOrderDetails(order.id);
-      final otpDetails = await _trackingService.getOrderOtp(order.id);
-      final apiOrder = details?['order'] is Map
-          ? Map<String, dynamic>.from(details!['order'] as Map)
-          : null;
-      final currentStage = OrderTrackingService.currentStageFromHistory(details);
-      final status = currentStage == null
-          ? (_readStatus(apiOrder, 'status') ??
-              await _trackingService.getCurrentStatus(order.id))
-          : OrderTrackingService.statusFromStage(currentStage);
-
-      return order.copyWith(
-        status: status ?? order.status,
-        otp: _readText(otpDetails, 'otp') ??
-            _readText(apiOrder, 'otp') ??
-            _readText(apiOrder, 'delivery_otp') ??
-            order.otp,
-        requestStatus:
-            order.requestStatus == null ? null : status ?? order.requestStatus,
-        myRatingStatus: _readStatus(apiOrder, 'my_rating_status') ??
-            _readStatus(details, 'my_rating_status'),
-        otherUserRatingStatus:
-            _readStatus(apiOrder, 'other_user_rating_status') ??
-                _readStatus(details, 'other_user_rating_status'),
-      );
-    }));
-  }
-
-  void _openInbox() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const InboxScreen()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (currentUserId == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -798,39 +674,19 @@ class _YourOrdersPageState extends State<YourOrdersPage>
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        title: const Text(
-          'Your Orders',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        centerTitle: false,
+        title: const Text('Your Orders', style: TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.w800)),
         actions: [
-          NotificationBellIcon(
-            onNotificationHandled: () => _loadAllData(),
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.6)),
-            onPressed: () => _loadAllData(),
-          ),
-          IconButton(
-            icon: Icon(Icons.inbox_outlined, color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.6)),
-            onPressed: _openInbox,
-          ),
+          NotificationBellIcon(onNotificationHandled: () => _loadAllData()),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: () => _loadAllData()),
+          IconButton(icon: const Icon(Icons.inbox_outlined), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxScreen()))),
         ],
       ),
       body: Column(
         children: [
-          // ── Toggle Tabs ──
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            padding: const EdgeInsets.all(16),
             child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(30),
-              ),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(30)),
               padding: const EdgeInsets.all(4),
               child: Row(
                 children: [
@@ -840,13 +696,7 @@ class _YourOrdersPageState extends State<YourOrdersPage>
               ),
             ),
           ),
-
-          // ── Tab Content ──
-          Expanded(
-            child: _selectedTab == 0
-                ? _buildMyOrdersTab()
-                : _buildMyRequestedOrdersTab(),
-          ),
+          Expanded(child: _selectedTab == 0 ? _buildMyOrdersTab() : _buildMyRequestedOrdersTab()),
         ],
       ),
     );
@@ -857,40 +707,18 @@ class _YourOrdersPageState extends State<YourOrdersPage>
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _selectedTab = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+        child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(26),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-          ),
+          decoration: BoxDecoration(color: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : Colors.transparent, borderRadius: BorderRadius.circular(26)),
+          child: Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500)),
         ),
       ),
     );
   }
 
   Widget _buildMyOrdersTab() {
-    if (isLoadingMyOrders && myOrders.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (myOrders.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.inventory_2_outlined,
-        title: 'No Packages Sent Yet',
-        subtitle: 'Create your first order to get started',
-        onAction: () => _loadMyOrders(),
-      );
-    }
+    if (isLoadingMyOrders && myOrders.isEmpty) return const Center(child: CircularProgressIndicator());
+    if (myOrders.isEmpty) return _buildEmptyState(icon: Icons.inventory_2_outlined, title: 'No Packages Sent Yet', subtitle: 'Create your first order to get started', onAction: () => _loadMyOrders());
 
     return RefreshIndicator(
       onRefresh: () => _loadMyOrders(),
@@ -899,18 +727,18 @@ class _YourOrdersPageState extends State<YourOrdersPage>
         itemCount: myOrders.length,
         itemBuilder: (context, index) {
           final order = myOrders[index];
-          final requests = tripRequestsByOrder[order.id] ?? [];
           return ModernSenderOrderCard(
             order: order,
-            tripRequests: requests,
+            tripRequests: tripRequestsByOrder[order.id] ?? [],
             onAcceptRequest: _acceptTripRequest,
             onDeclineRequest: _declineTripRequest,
-            onTrackOrder: () => _viewRoute(order),
+            onTrackOrder: () => _openCard(order),
             onMarkReceived: () => _markOrderReceived(order),
             onCompleteOrder: () => _completeOrder(order),
             onUpdateOrder: _updateOrder,
             onDeleteOrder: _deleteOrder,
-            onUpdateStatus: _updateTravellerStatus,
+            onCompleteOrderWithOtp: _completeTravellerOrderWithOtp,
+            onConfirmPickup: _confirmPickup,
           );
         },
       ),
@@ -918,18 +746,8 @@ class _YourOrdersPageState extends State<YourOrdersPage>
   }
 
   Widget _buildMyRequestedOrdersTab() {
-    if (isLoadingMyRequests && myRequestedOrders.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (myRequestedOrders.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.delivery_dining_outlined,
-        title: 'No Trips Posted Yet',
-        subtitle: 'Your trip requests will appear here',
-        onAction: () => _loadMyRequestedOrders(),
-      );
-    }
+    if (isLoadingMyRequests && myRequestedOrders.isEmpty) return const Center(child: CircularProgressIndicator());
+    if (myRequestedOrders.isEmpty) return _buildEmptyState(icon: Icons.delivery_dining_outlined, title: 'No Trips Posted Yet', subtitle: 'Your trip requests will appear here', onAction: () => _loadMyRequestedOrders());
 
     return RefreshIndicator(
       onRefresh: () => _loadMyRequestedOrders(),
@@ -940,77 +758,32 @@ class _YourOrdersPageState extends State<YourOrdersPage>
           final order = myRequestedOrders[index];
           return ModernTravellerOrderCard(
             order: order,
-            onTrackOrder: () => _viewRoute(order),
+            onTrackOrder: () => _openCard(order),
             onWithdrawRequest: _withdrawTripRequest,
             onDeleteRequest: _deleteTripRequest,
             onUpdateStatus: _updateTravellerStatus,
             onCompleteOrderWithOtp: _completeTravellerOrderWithOtp,
+            onConfirmPickup: _confirmPickup,
           );
         },
       ),
     );
   }
 
-  Widget _buildEmptyState({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onAction,
-  }) {
+  Widget _buildEmptyState({required IconData icon, required String title, required String subtitle, required VoidCallback onAction}) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Icon(icon, size: 40, color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.3)),
-            ),
+            Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))]), child: Icon(icon, size: 40, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3))),
             const SizedBox(height: 24),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: Colors.black87,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800), textAlign: TextAlign.center),
             const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.5)),
-              textAlign: TextAlign.center,
-            ),
+            Text(subtitle, style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)), textAlign: TextAlign.center),
             const SizedBox(height: 28),
-            ElevatedButton.icon(
-              onPressed: onAction,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Refresh'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding:
-                const EdgeInsets.symmetric(horizontal: 28, vertical: 13),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-            ),
+            ElevatedButton.icon(onPressed: onAction, icon: const Icon(Icons.refresh, size: 18), label: const Text('Refresh'), style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0)),
           ],
         ),
       ),

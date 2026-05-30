@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../Constants/ApiConstants.dart';
@@ -33,79 +34,104 @@ class SupportService {
       if (result.success) {
         return {'success': true, 'data': result.data};
       } else {
+        if (result.userNotFound) {
+          await AuthService.clearUserSession();
+        }
         return {
           'success': false,
           'error': result.error ?? 'Failed to create ticket'
         };
       }
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      debugPrint('❌ Create ticket error: $e');
+      return {'success': false, 'error': 'Something went wrong. Please try again.'};
     }
   }
 
   Future<Map<String, List<SupportTicket>>> getMyTickets() async {
-    final userId = await AuthService.getUserId();
-    if (userId == null) {
+    try {
+      final userId = await AuthService.getUserId();
+      if (userId == null) {
+        return {
+          'ongoing': <SupportTicket>[],
+          'previous': <SupportTicket>[],
+        };
+      }
+
+      final response = await _api.get<Map<String, List<SupportTicket>>>(
+        ApiConstants.getMySupportTickets,
+        queryParameters: {'userId': userId},
+        parser: (json) {
+          if (json is! Map<String, dynamic>) {
+            return {
+              'ongoing': <SupportTicket>[],
+              'previous': <SupportTicket>[],
+            };
+          }
+
+          final ongoingRaw = json['ongoing'] as List?;
+          final ongoing = ongoingRaw
+                  ?.map((e) => SupportTicket.fromJson(e as Map<String, dynamic>))
+                  .toList() ??
+              <SupportTicket>[];
+
+          final previousRaw = json['previous'] as List?;
+          final previous = previousRaw
+                  ?.map((e) => SupportTicket.fromJson(e as Map<String, dynamic>))
+                  .toList() ??
+              <SupportTicket>[];
+
+          return {'ongoing': ongoing, 'previous': previous};
+        },
+      );
+
+      if (response.userNotFound) {
+        await AuthService.clearUserSession();
+      }
+
+      return response.data ??
+          {
+            'ongoing': <SupportTicket>[],
+            'previous': <SupportTicket>[],
+          };
+    } catch (e) {
+      debugPrint('❌ Error fetching tickets: $e');
       return {
         'ongoing': <SupportTicket>[],
         'previous': <SupportTicket>[],
       };
     }
-
-    final response = await _api.get<Map<String, List<SupportTicket>>>(
-      ApiConstants.getMySupportTickets,
-      queryParameters: {'userId': userId},
-      parser: (json) {
-        if (json is! Map<String, dynamic>) {
-          return {
-            'ongoing': <SupportTicket>[],
-            'previous': <SupportTicket>[],
-          };
-        }
-
-        final ongoingRaw = json['ongoing'] as List?;
-        final ongoing = ongoingRaw
-                ?.map((e) => SupportTicket.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            <SupportTicket>[];
-
-        final previousRaw = json['previous'] as List?;
-        final previous = previousRaw
-                ?.map((e) => SupportTicket.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            <SupportTicket>[];
-
-        return {'ongoing': ongoing, 'previous': previous};
-      },
-    );
-
-    return response.data ??
-        {
-          'ongoing': <SupportTicket>[],
-          'previous': <SupportTicket>[],
-        };
   }
 
   Future<List<SupportMessage>> getTicketMessages(String ticketId) async {
-    final userId = await AuthService.getUserId();
-    if (userId == null) return <SupportMessage>[];
+    try {
+      final userId = await AuthService.getUserId();
+      if (userId == null) return <SupportMessage>[];
 
-    final response = await _api.get<List<SupportMessage>>(
-      '${ApiConstants.getSupportMessages}/$ticketId',
-      parser: (json) {
-        if (json is! Map<String, dynamic>) return <SupportMessage>[];
-        
-        final messagesRaw = json['messages'] as List?;
-        final messages = messagesRaw
-                ?.map((e) => SupportMessage.fromJson(
-                    e as Map<String, dynamic>, userId))
-                .toList() ??
-            <SupportMessage>[];
-        return messages;
-      },
-    );
+      final response = await _api.get<List<SupportMessage>>(
+        '${ApiConstants.getSupportMessages}/$ticketId',
+        parser: (json) {
+          if (json is! Map<String, dynamic>) return <SupportMessage>[];
+          
+          final messagesRaw = json['messages'] as List?;
+          final messages = messagesRaw
+                  ?.map((e) => SupportMessage.fromJson(
+                      e as Map<String, dynamic>, userId))
+                  .toList() ??
+              <SupportMessage>[];
+          return messages;
+        },
+      );
 
-    return response.data ?? <SupportMessage>[];
+      if (response.userNotFound) {
+        await AuthService.clearUserSession();
+      }
+
+      return response.data ?? <SupportMessage>[];
+    } catch (e) {
+      debugPrint('❌ Error fetching ticket messages: $e');
+      return <SupportMessage>[];
+    }
   }
 
   Future<Map<String, dynamic>> sendSupportMessage({
@@ -113,10 +139,10 @@ class SupportService {
     required String message,
     File? attachment,
   }) async {
-    final userId = await AuthService.getUserId();
-    if (userId == null) return {'success': false, 'error': 'User not logged in'};
-
     try {
+      final userId = await AuthService.getUserId();
+      if (userId == null) return {'success': false, 'error': 'User not logged in'};
+
       final result = await _api.postMultipart<Map<String, dynamic>>(
         ApiConstants.sendSupportMessage,
         fields: {
@@ -138,13 +164,17 @@ class SupportService {
       if (result.success) {
         return {'success': true, 'data': result.data};
       } else {
+        if (result.userNotFound) {
+          await AuthService.clearUserSession();
+        }
         return {
           'success': false,
           'error': result.error ?? 'Failed to send message'
         };
       }
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      debugPrint('❌ Send support message error: $e');
+      return {'success': false, 'error': 'Something went wrong. Please try again.'};
     }
   }
 }

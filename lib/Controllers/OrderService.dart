@@ -143,9 +143,13 @@ class OrderService {
     required String deliveryTime,
     required double originLatitude,
     required double originLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
     required String vehicle,
     required String userId,
     List<String>? stopovers,
+    List<double>? stopoversLatitude,
+    List<double>? stopoversLongitude,
   }) async {
     String departureDatetime = '${departureDate}T$departureTime';
     String pickupDatetime = '${pickupDate}T$pickupTime';
@@ -160,12 +164,21 @@ class OrderService {
         'delivery_datetime': deliveryDatetime,
         'origin_latitude': originLatitude.toString(),
         'origin_longitude': originLongitude.toString(),
+        'destination_latitude': destinationLatitude.toString(),
+        'destination_longitude': destinationLongitude.toString(),
         'vehicle': vehicle,
         'userId': userId,
       };
 
+      print('🔎 searchOrders request params: $queryParams');
       if (stopovers != null && stopovers.isNotEmpty) {
         queryParams['stopovers'] = stopovers;
+      }
+      if (stopoversLatitude != null && stopoversLatitude.isNotEmpty) {
+        queryParams['stopovers_latitude'] = stopoversLatitude;
+      }
+      if (stopoversLongitude != null && stopoversLongitude.isNotEmpty) {
+        queryParams['stopovers_longitude'] = stopoversLongitude;
       }
 
       final response = await _api.get(
@@ -179,8 +192,15 @@ class OrderService {
         },
       );
 
-      return response.success ? (response.data as List<Order>) : [];
+      if (!response.success) {
+        print('❌ searchOrders failed: ${response.error} (code=${response.statusCode}) endpoint=${response.endpoint} details=${response.details}');
+        return [];
+      }
+      final resultOrders = response.data as List<Order>;
+      print('✅ searchOrders returned ${resultOrders.length} orders');
+      return resultOrders;
     } catch (e) {
+      print('❌ searchOrders exception: $e');
       return [];
     }
   }

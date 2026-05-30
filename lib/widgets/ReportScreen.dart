@@ -34,7 +34,7 @@ class ReportScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           ...ReportCategories.all.map(
-                (cat) => _CategoryTile(
+            (cat) => _CategoryTile(
               label: cat.label,
               onTap: () => Navigator.push(
                 context,
@@ -75,6 +75,7 @@ class ReportStep2Screen extends StatefulWidget {
 
 class _ReportStep2ScreenState extends State<ReportStep2Screen> {
   final _descriptionController = TextEditingController();
+  final _reportService = ReportService(); // Instantiate the service
   ReportSubReason? _selectedSubReason;
   File? _attachment;
   bool _isSubmitting = false;
@@ -114,7 +115,8 @@ class _ReportStep2ScreenState extends State<ReportStep2Screen> {
 
     setState(() => _isSubmitting = true);
 
-    final result = await ReportService.createReport(
+    // Call the instance method
+    final result = await _reportService.createReport(
       reportedUserId: widget.reportedUserId,
       orderId: widget.orderId,
       category: widget.category.key,
@@ -177,10 +179,10 @@ class _ReportStep2ScreenState extends State<ReportStep2Screen> {
               items: widget.category.subReasons
                   .map(
                     (sr) => DropdownMenuItem(
-                  value: sr,
-                  child: Text(sr.label),
-                ),
-              )
+                      value: sr,
+                      child: Text(sr.label),
+                    ),
+                  )
                   .toList(),
               onChanged: (val) => setState(() => _selectedSubReason = val),
             ),
@@ -265,39 +267,39 @@ class ReportSubmittedScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               child: attachment != null
                   ? Image.file(
-                attachment!,
-                width: 160,
-                height: 160,
-                fit: BoxFit.cover,
-              )
+                      attachment!,
+                      width: 160,
+                      height: 160,
+                      fit: BoxFit.cover,
+                    )
                   : Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.image_outlined,
-                      size: 40,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Image',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                      width: 160,
+                      height: 160,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.image_outlined,
+                            size: 40,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Image',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -394,7 +396,7 @@ class _ReportAppBar extends StatelessWidget implements PreferredSizeWidget {
         preferredSize: const Size.fromHeight(4),
         child: LinearProgressIndicator(
           value: step / 2,
-          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           color: Theme.of(context).colorScheme.primary,
           minHeight: 4,
         ),
@@ -519,7 +521,7 @@ class _AttachmentPicker extends StatelessWidget {
             style: BorderStyle.solid,
           ),
           borderRadius: BorderRadius.circular(12),
-          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.4),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.4),
         ),
         child: Row(
           children: [
@@ -558,14 +560,14 @@ class _SubmitButton extends StatelessWidget {
         ),
         child: isSubmitting
             ? const SizedBox(
-          height: 20,
-          width: 20,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-        )
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
             : const Text(
-          'Submit Report',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+                'Submit Report',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
       ),
     );
   }
