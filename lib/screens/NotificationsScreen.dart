@@ -8,7 +8,6 @@ import '../Controllers/DeviceTokenService.dart';
 import '../Controllers/SocketService.dart';
 import 'Inbox Section/indoxscreen.dart';
 import 'Inbox Section/ChatScreen.dart';
-import 'orderSection/OrderTrackingScreen.dart';
 import 'orderSection/RatingFeedbackDialog.dart';
 import 'orderSection/YourOrders.dart';
 
@@ -252,50 +251,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
 
-    var loadingDialogOpen = false;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-    loadingDialogOpen = true;
-
-    try {
-      final orderDetails = await _orderTrackingService.getOrderDetails(orderId);
-      if (mounted && loadingDialogOpen) {
-        Navigator.pop(context);
-        loadingDialogOpen = false;
-      }
-
-      if (orderDetails == null) {
-        if (mounted) {
-          _openOrdersScreen(
-            _ordersTabFromNotification(notification) ?? 0,
-          );
-        }
-        return;
-      }
-
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => OrderTrackingScreen(
-            orderId: orderId,
-            orderData: orderDetails,
-            isTraveller: _isTravellerNotification(notification),
-          ),
+    // Navigate to YourOrdersPage focused on this order
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => YourOrdersPage(
+          initialTabIndex: _isTravellerNotification(notification) ? 1 : 0,
+          focusOrderId: orderId,
         ),
-      );
-    } catch (e) {
-      if (mounted && loadingDialogOpen) Navigator.pop(context);
-      debugPrint('Error navigating to tracking: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to open order tracking')),
-        );
-      }
-    }
+      ),
+    );
   }
 
   Future<void> _openRatingDialog(NotificationModel notification) async {
@@ -725,6 +691,55 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  Future<void> _markAllNotificationsRead() async {
+    final unreadIds = _notifications
+        .where((notification) => !notification.isRead)
+        .map((notification) => notification.hashedId)
+        .toList();
+
+    if (unreadIds.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All notifications are already read')),
+      );
+      return;
+    }
+
+    final result = await NotificationService.markAllAsRead(unreadIds);
+
+    if (!mounted) return;
+    if (result['success'] == true) {
+      setState(() {
+        _notifications = _notifications
+            .map((notification) => notification.isRead
+                ? notification
+                : NotificationModel(
+                    id: notification.id,
+                    hashedId: notification.hashedId,
+                    userId: notification.userId,
+                    actorUserId: notification.actorUserId,
+                    type: notification.type,
+                    title: notification.title,
+                    body: notification.body,
+                    data: notification.data,
+                    isRead: true,
+                    createdAt: notification.createdAt,
+                  ))
+            .toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All notifications marked as read')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['error']?.toString() ?? 'Unable to mark all read'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -747,6 +762,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         centerTitle: false,
         actions: [
+          IconButton(
+            icon: Icon(Icons.mark_email_read,
+                color: Theme.of(context).colorScheme.onSurface),
+            onPressed: _markAllNotificationsRead,
+            tooltip: 'Mark all read',
+          ),
           IconButton(
             icon: Icon(Icons.refresh,
                 color: Theme.of(context).colorScheme.onSurface),

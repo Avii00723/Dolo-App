@@ -60,6 +60,15 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   void switchToCreateTab() => _switchTab(_tabCreate);
   void switchToSearchTab() => _switchTab(_tabSearch);
 
+  void _swapSearchCreateTab() {
+    final currentIndex = _motionTabBarController?.index;
+    if (currentIndex == _tabSearch) {
+      _switchTab(_tabCreate);
+    } else if (currentIndex == _tabCreate) {
+      _switchTab(_tabSearch);
+    }
+  }
+
   void _switchTab(int index) {
     if (_motionTabBarController == null) return;
     setState(() => _motionTabBarController!.index = index);
@@ -68,26 +77,26 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   // ── Pages ────────────────────────────────────────────────────────
   // Built lazily so callbacks are always fresh.
   List<Widget> get _pages => [
-    // Tab 0 – Home: pass tab-switch callbacks so the home screen
-    // can navigate to Create / Search / Orders / Inbox from its buttons.
-    ModernHomeScreen(
-      onGoToCreate: switchToCreateTab,
-      onGoToSearch: switchToSearchTab,
-      onGoToOrders: switchToOrdersTab,
-    ),
+        // Tab 0 – Home: pass tab-switch callbacks so the home screen
+        // can navigate to Create / Search / Orders / Inbox from its buttons.
+        ModernHomeScreen(
+          onGoToCreate: switchToCreateTab,
+          onGoToSearch: switchToSearchTab,
+          onGoToOrders: switchToOrdersTab,
+        ),
 
-    // Tab 1 – Search
-    const SendPage(),
+        // Tab 1 – Search
+        const SendPage(),
 
-    // Tab 2 – Create
-    CreateOrderPage(onOrderCreated: switchToOrdersTab),
+        // Tab 2 – Create
+        CreateOrderPage(onOrderCreated: switchToOrdersTab),
 
-    // Tab 3 – Orders
-    const YourOrdersPage(),
+        // Tab 3 – Orders
+        const YourOrdersPage(),
 
-    // Tab 4 – Inbox
-    const InboxScreen(),
-  ];
+        // Tab 4 – Inbox
+        const InboxScreen(),
+      ];
 
   // ── Tutorial ─────────────────────────────────────────────────────
   Future<void> _checkAndShowTutorial() async {
@@ -156,16 +165,25 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   // ── Build ────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final currentIndex = _motionTabBarController?.index ?? _tabHome;
+    final canSwapMode =
+        currentIndex == _tabSearch || currentIndex == _tabCreate;
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-
       body: TabBarView(
         physics: const NeverScrollableScrollPhysics(),
         controller: _motionTabBarController,
         children: _pages,
       ),
-
+      floatingActionButton: canSwapMode
+          ? FloatingActionButton.extended(
+              onPressed: _swapSearchCreateTab,
+              icon: const Icon(Icons.swap_horiz),
+              label: Text(currentIndex == _tabSearch ? 'Create' : 'Search'),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),

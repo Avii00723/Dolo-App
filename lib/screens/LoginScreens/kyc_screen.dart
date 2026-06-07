@@ -10,6 +10,7 @@ class KycUploadScreen extends StatefulWidget {
   final String? fullName;
   final String? email;
   final String? phone;
+  final bool redirectToHomeOnSkip;
 
   const KycUploadScreen({
     Key? key,
@@ -17,6 +18,7 @@ class KycUploadScreen extends StatefulWidget {
     this.fullName,
     this.email,
     this.phone,
+    this.redirectToHomeOnSkip = false,
   }) : super(key: key);
 
   @override
@@ -91,7 +93,15 @@ class _KycUploadScreenState extends State<KycUploadScreen> {
   }
 
   void _skipKyc() {
-    Navigator.of(context).pop();
+    if (widget.redirectToHomeOnSkip) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomePageWithNav()),
+        (route) => false,
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(false);
   }
 
   // Pick file (image or PDF)

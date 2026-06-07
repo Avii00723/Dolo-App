@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../Controllers/ordertrackingservice.dart';
 import '../../theme/app_theme.dart';
 import '../SupportSection/SupportScreen.dart';
+import 'package:dolo/screens/Inbox Section/ChatScreen.dart';
 import 'RatingFeedbackDialog.dart';
 import 'YourOrders.dart';
 
@@ -79,11 +80,18 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
           as String?;
   String? get _apiDeliveryDate => _apiOrder?['delivery_date'] as String?;
 
+  bool get _isPending => widget.order.status.toLowerCase().trim() == 'pending';
+
   String get _travellerName =>
       widget.order.travelerName ??
       _apiOrder?['traveller_name'] ??
       _orderDetails?['traveller_name'] ??
       'Traveller';
+
+  String _getChatIdForOrder(OrderDisplay order) {
+    return order.id;
+  }
+
   String? get _travellerProfileImageUrl =>
       _apiOrder?['traveller_profile_image_url'] ??
       _orderDetails?['traveller_profile_image_url'];
@@ -354,8 +362,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                               _formatDisplayDate(widget.order.date),
                               style: TextStyle(
                                 fontSize: 11,
-                                color: colorScheme.onSurface
-                                    .withValues(alpha: 0.62),
+                                color: colorScheme.onSurface.withOpacity(0.62),
                               ),
                             ),
                             if (widget.order.deliveryTime != null) ...[
@@ -364,8 +371,8 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                                 _formatDisplayDate(widget.order.deliveryTime!),
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: colorScheme.onSurface
-                                      .withValues(alpha: 0.62),
+                                  color:
+                                      colorScheme.onSurface.withOpacity(0.62),
                                 ),
                               ),
                             ],
@@ -399,12 +406,12 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
 
               // ── Traveler Info (if matched) ──
               if (widget.order.matchedTravellerId != null ||
-                  widget.order.status != 'pending') ...[
+                  widget.order.status.toLowerCase().trim() != 'pending') ...[
                 Text(
                   'Traveler',
                   style: TextStyle(
                     fontSize: 11,
-                    color: colorScheme.onSurface.withValues(alpha: 0.55),
+                    color: colorScheme.onSurface.withOpacity(0.55),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -428,7 +435,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.order.userName != 'You'
+                            widget.order.userName.toLowerCase().trim() != 'you'
                                 ? widget.order.userName
                                 : 'Matched Traveler',
                             style: TextStyle(
@@ -445,8 +452,8 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                                 'Verified',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: colorScheme.onSurface
-                                      .withValues(alpha: 0.55),
+                                  color:
+                                      colorScheme.onSurface.withOpacity(0.55),
                                 ),
                               ),
                               const SizedBox(width: 4),
@@ -465,7 +472,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                   'Traveler',
                   style: TextStyle(
                     fontSize: 11,
-                    color: colorScheme.onSurface.withValues(alpha: 0.55),
+                    color: colorScheme.onSurface.withOpacity(0.55),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -474,7 +481,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.paleYellow.withValues(alpha: 0.75),
+                    color: AppColors.paleYellow.withOpacity(0.75),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: AppColors.sage),
                   ),
@@ -518,7 +525,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                           color: Theme.of(context)
                               .colorScheme
                               .onSurface
-                              .withValues(alpha: 0.55)),
+                              .withOpacity(0.55)),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -531,7 +538,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withValues(alpha: 0.65),
+                                .withOpacity(0.65),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -544,7 +551,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withValues(alpha: 0.45)),
+                                .withOpacity(0.45)),
                         const SizedBox(width: 4),
                         Text(
                           _formatDisplayDate(_apiPickupDate!),
@@ -553,7 +560,7 @@ class _ModernSenderOrderCardState extends State<ModernSenderOrderCard> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withValues(alpha: 0.55),
+                                .withOpacity(0.55),
                           ),
                         ),
                       ],
@@ -802,6 +809,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         (confirmation == null || confirmation == 'pending');
   }
 
+  // Whether the display status is pending
+  bool get _isPending => _displayStatus.toLowerCase().trim() == 'pending';
+
+  // Chat id helper for order detail screen
+  String _getChatIdForOrder(OrderDisplay order) => order.id;
+
   String? _readOtp(Map<String, dynamic>? source) {
     final raw = source?['otp'] ?? source?['delivery_otp'];
     final value = raw?.toString().trim();
@@ -852,6 +865,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   void _showRatingDialog() {
+    final explicitTravellerId = _order.matchedTravellerId?.trim();
+    final fallbackTravellerId =
+        _apiOrder?['traveller_hashed_id']?.toString().trim() ??
+            _apiOrder?['traveler_hashed_id']?.toString().trim() ??
+            _apiOrder?['traveller_id']?.toString().trim() ??
+            _apiOrder?['traveler_id']?.toString().trim() ??
+            _orderDetails?['traveller_hashed_id']?.toString().trim() ??
+            _orderDetails?['traveler_hashed_id']?.toString().trim() ??
+            _orderDetails?['traveller_id']?.toString().trim() ??
+            _orderDetails?['traveler_id']?.toString().trim();
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -859,7 +883,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         orderId: _order.id,
         isTraveller: false, // Sender rating traveller
         displayName: _travellerName.isNotEmpty ? _travellerName : 'Traveller',
-        travellerId: _order.matchedTravellerId,
+        travellerId: explicitTravellerId?.isNotEmpty == true
+            ? explicitTravellerId
+            : fallbackTravellerId,
         orderDetails: _orderDetails,
         onSubmitted: _onRatingSubmitted,
       ),
@@ -1205,47 +1231,48 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             )
           : null,
       body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Route Section ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                children: [
-                  Column(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.black87,
-                          border: Border.all(color: Colors.black87, width: 2),
-                        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // ── Route Section ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              children: [
+                Column(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black87,
+                        border: Border.all(color: Colors.black87, width: 2),
                       ),
-                      Container(
-                        width: 2,
-                        height: 32,
-                        color: Colors.grey[300],
-                        margin: const EdgeInsets.symmetric(vertical: 4),
+                    ),
+                    Container(
+                      width: 2,
+                      height: 32,
+                      color: Colors.grey[300],
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                    ),
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(3),
+                        color: Colors.black87,
                       ),
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(3),
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         order.origin,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -1254,6 +1281,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                       Text(
                         _formatDisplayDate(order.date),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -1262,6 +1291,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       const SizedBox(height: 10),
                       Text(
                         order.destination,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -1272,6 +1303,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         order.deliveryTime != null
                             ? _formatDisplayDate(order.deliveryTime!)
                             : _formatDisplayDate(order.date),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -1279,472 +1312,469 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-
-            const Divider(height: 1, color: Color(0xFFEEEEEE)),
-
-            // ── Track Package Section ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined,
-                          size: 20, color: Colors.black87),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'Track Package',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                      if (orderOtp != null && orderOtp.isNotEmpty) ...[
-                        const SizedBox(width: 12),
-                        Text(
-                          'OTP: $orderOtp',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTrackingTimeline(progressStep),
-                ],
-              ),
-            ),
-
-            const Divider(height: 1, color: Color(0xFFEEEEEE)),
-
-            // ── Package Detail Section ──
-            InkWell(
-              onTap: () => setState(
-                  () => _packageDetailExpanded = !_packageDetailExpanded),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.inventory_2_outlined,
-                            size: 20, color: Colors.black87),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'Package Detail',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          _packageDetailExpanded
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                          color: Colors.black54,
-                        ),
-                      ],
-                    ),
-
-                    // Always visible: Order ID + Urgent
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Text(
-                          'Order ID',
-                          style:
-                              TextStyle(fontSize: 12, color: Colors.grey[600]),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '#${order.id}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (order.isUrgent == true)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.red[600],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text(
-                              'Urgent',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    // Expanded Details
-                    if (_packageDetailExpanded) ...[
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildPackageDetailItem(
-                              'Package Type',
-                              order.category ?? order.itemDescription,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildPackageDetailItem(
-                              'Package Weight',
-                              order.weight,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (order.actualWeight != null ||
-                          (order.customCategory?.isNotEmpty == true)) ...[
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildPackageDetailItem(
-                                'Actual Weight',
-                                order.actualWeight != null
-                                    ? order.actualWeight.toString()
-                                    : 'Not specified',
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildPackageDetailItem(
-                                'Custom Category',
-                                order.customCategory?.isNotEmpty == true
-                                    ? order.customCategory!
-                                    : 'Not specified',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (order.imageUrl != null &&
-                          order.imageUrl!.isNotEmpty) ...[
-                        const SizedBox(height: 14),
-                        const Text(
-                          'Package Image',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.black54,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            order.imageUrl!,
-                            height: 120,
-                            width: 120,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(Icons.image_not_supported,
-                                  color: Colors.grey[400]),
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (order.notes != null && order.notes!.isNotEmpty) ...[
-                        const SizedBox(height: 14),
-                        _buildPackageDetailItem(
-                            'Special Instructions', order.notes!),
-                      ],
-                    ],
-                  ],
                 ),
-              ),
+              ],
             ),
+          ),
 
-            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
 
-            // ── Travel Detail Section ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.directions_car_outlined,
-                          size: 20, color: Colors.black87),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Travel Detail',
+          // ── Track Package Section ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined,
+                        size: 20, color: Colors.black87),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Track Package',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: Colors.black,
                         ),
                       ),
-                      if (_isLoadingDetails) ...[
-                        const SizedBox(width: 8),
-                        const SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: _buildFlightDetailItem(
-                              'Vehicle Type', _vehicleType)),
-                      Expanded(
-                          child: _buildFlightDetailItem(
-                              'Vehicle Info', _vehicleInfo)),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: _buildFlightDetailItem(
-                              'Vehicle No.', _vehicleNumber)),
-                      Expanded(
-                        child: _buildFlightDetailItem(
-                          'Departure',
-                          _apiPickupDate != null
-                              ? _formatShortDate(_apiPickupDate!)
-                              : _formatShortDate(order.date),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildFlightDetailItem(
-                          'Delivery Date',
-                          _apiDeliveryDate != null
-                              ? _formatShortDate(_apiDeliveryDate!)
-                              : order.deliveryTime != null
-                                  ? _formatShortDate(order.deliveryTime!)
-                                  : '—',
-                        ),
-                      ),
-                      const Expanded(child: SizedBox.shrink()),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const Divider(height: 1, color: Color(0xFFEEEEEE)),
-
-            const SizedBox(height: 16),
-
-            // ── Sender: Show OTP card when order is 'arrived' ──
-            if (displayStatus == 'arrived') ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.green[200]!),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.lock_open_outlined,
-                              color: Colors.green[700], size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Your Delivery OTP',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.green[800],
-                            ),
-                          ),
-                          if (_isLoadingDetails) ...[
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.green[700]),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // OTP digits with copy-on-tap
-                      GestureDetector(
-                        onTap: () {
-                          final otp = order.otp;
-                          if (otp != null && otp.isNotEmpty) {
-                            Clipboard.setData(ClipboardData(text: otp));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('OTP copied to clipboard'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          }
-                        },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              orderOtp?.isNotEmpty == true
-                                  ? orderOtp!
-                                  : '------',
-                              style: TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.green[800],
-                                letterSpacing: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(Icons.copy_outlined,
-                                size: 18, color: Colors.green[600]),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                    ),
+                    if (orderOtp != null && orderOtp.isNotEmpty) ...[
+                      const SizedBox(width: 12),
                       Text(
-                        'Share this OTP with the traveler to confirm delivery.',
-                        textAlign: TextAlign.center,
-                        style:
-                            TextStyle(fontSize: 12, color: Colors.green[700]),
-                      ),
-                      const SizedBox(height: 14),
-                      // Resend OTP button
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed:
-                              (_isResendingOtp || _resendCooldownSeconds > 0)
-                                  ? null
-                                  : _resendOtp,
-                          icon: _isResendingOtp
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.refresh, size: 16),
-                          label: Text(
-                            _resendCooldownSeconds > 0
-                                ? 'Resend in ${_resendCooldownSeconds}s'
-                                : _isResendingOtp
-                                    ? 'Resending…'
-                                    : 'Resend OTP',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.green[700],
-                            side: BorderSide(color: Colors.green[300]!),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
+                        'OTP: $orderOtp',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // ── Sender: in-transit or other pre-arrival active stages ──
-            if (displayStatus == 'in-transit' ||
-                displayStatus == 'in_transit') ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.local_shipping_outlined,
-                          color: Colors.orange[700], size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Your package is on its way! Confirm arrival once it reaches the destination.',
-                          style: TextStyle(
-                              fontSize: 13, color: Colors.orange[800]),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // ── Pending actions ──
-            if (displayStatus == 'pending') ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    if (widget.tripRequests != null &&
-                        widget.tripRequests!.isNotEmpty) ...[
-                      ...widget.tripRequests!
-                          .map((req) => _buildTripRequestCard(context, req)),
-                      const SizedBox(height: 12),
                     ],
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 20),
+                _buildTrackingTimeline(progressStep),
+              ],
+            ),
+          ),
 
-            // ── Traveller Info ──
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+
+          // ── Package Detail Section ──
+          InkWell(
+            onTap: () => setState(
+                () => _packageDetailExpanded = !_packageDetailExpanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.inventory_2_outlined,
+                          size: 20, color: Colors.black87),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Package Detail',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        _packageDetailExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        color: Colors.black54,
+                      ),
+                    ],
+                  ),
+
+                  // Always visible: Order ID + Urgent
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Text(
+                        'Order ID',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '#${order.id}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (order.isUrgent == true)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.red[600],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Urgent',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  // Expanded Details
+                  if (_packageDetailExpanded) ...[
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildPackageDetailItem(
+                            'Package Type',
+                            order.category ?? order.itemDescription,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildPackageDetailItem(
+                            'Package Weight',
+                            order.weight,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (order.actualWeight != null ||
+                        (order.customCategory?.isNotEmpty == true)) ...[
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildPackageDetailItem(
+                              'Actual Weight',
+                              order.actualWeight != null
+                                  ? order.actualWeight.toString()
+                                  : 'Not specified',
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildPackageDetailItem(
+                              'Custom Category',
+                              order.customCategory?.isNotEmpty == true
+                                  ? order.customCategory!
+                                  : 'Not specified',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (order.imageUrl != null &&
+                        order.imageUrl!.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Package Image',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          order.imageUrl!,
+                          height: 120,
+                          width: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(Icons.image_not_supported,
+                                color: Colors.grey[400]),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (order.notes != null && order.notes!.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      _buildPackageDetailItem(
+                          'Special Instructions', order.notes!),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+
+          // ── Travel Detail Section ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.directions_car_outlined,
+                        size: 20, color: Colors.black87),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Travel Detail',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                    if (_isLoadingDetails) ...[
+                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _buildFlightDetailItem(
+                            'Vehicle Type', _vehicleType)),
+                    Expanded(
+                        child: _buildFlightDetailItem(
+                            'Vehicle Info', _vehicleInfo)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _buildFlightDetailItem(
+                            'Vehicle No.', _vehicleNumber)),
+                    Expanded(
+                      child: _buildFlightDetailItem(
+                        'Departure',
+                        _apiPickupDate != null
+                            ? _formatShortDate(_apiPickupDate!)
+                            : _formatShortDate(order.date),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildFlightDetailItem(
+                        'Delivery Date',
+                        _apiDeliveryDate != null
+                            ? _formatShortDate(_apiDeliveryDate!)
+                            : order.deliveryTime != null
+                                ? _formatShortDate(order.deliveryTime!)
+                                : '—',
+                      ),
+                    ),
+                    const Expanded(child: SizedBox.shrink()),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+
+          const SizedBox(height: 16),
+
+          // ── Sender: Show OTP card when order is 'arrived' ──
+          if (displayStatus == 'arrived') ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.green[200]!),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_open_outlined,
+                            color: Colors.green[700], size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Your Delivery OTP',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.green[800],
+                          ),
+                        ),
+                        if (_isLoadingDetails) ...[
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.green[700]),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // OTP digits with copy-on-tap
+                    GestureDetector(
+                      onTap: () {
+                        final otp = order.otp;
+                        if (otp != null && otp.isNotEmpty) {
+                          Clipboard.setData(ClipboardData(text: otp));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('OTP copied to clipboard'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            orderOtp?.isNotEmpty == true ? orderOtp! : '------',
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.green[800],
+                              letterSpacing: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.copy_outlined,
+                              size: 18, color: Colors.green[600]),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Share this OTP with the traveler to confirm delivery.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.green[700]),
+                    ),
+                    const SizedBox(height: 14),
+                    // Resend OTP button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            (_isResendingOtp || _resendCooldownSeconds > 0)
+                                ? null
+                                : _resendOtp,
+                        icon: _isResendingOtp
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.refresh, size: 16),
+                        label: Text(
+                          _resendCooldownSeconds > 0
+                              ? 'Resend in ${_resendCooldownSeconds}s'
+                              : _isResendingOtp
+                                  ? 'Resending…'
+                                  : 'Resend OTP',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.green[700],
+                          side: BorderSide(color: Colors.green[300]!),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Sender: in-transit or other pre-arrival active stages ──
+          if (displayStatus == 'in-transit' ||
+              displayStatus == 'in_transit') ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.local_shipping_outlined,
+                        color: Colors.orange[700], size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Your package is on its way! Confirm arrival once it reaches the destination.',
+                        style:
+                            TextStyle(fontSize: 13, color: Colors.orange[800]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Pending actions ──
+          if (displayStatus == 'pending') ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  if (widget.tripRequests != null &&
+                      widget.tripRequests!.isNotEmpty) ...[
+                    ...widget.tripRequests!
+                        .map((req) => _buildTripRequestCard(context, req)),
+                    const SizedBox(height: 12),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Traveller Info ──
+          if (!_isPending) ...[
             const Divider(height: 1, color: Color(0xFFEEEEEE)),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -1789,11 +1819,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     icon: const Icon(Icons.chat_bubble_outline,
                         color: Colors.black54),
                     onPressed: () {
-                      // TODO: wire to your existing chat screen / chatId logic
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const SizedBox.shrink(),
+                          builder: (_) => ChatScreen(
+                            chatId: _getChatIdForOrder(order),
+                            orderId: order.id,
+                            otherUserName: _travellerName,
+                          ),
                         ),
                       );
                     },
@@ -1824,10 +1857,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 32),
           ],
-        ),
+        ]),
       ),
     );
   }
@@ -1870,10 +1902,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _buildTrackingTimeline(int activeStep) {
     final steps = [
-      ('Order Confirmed', 'Order accepted'),
-      ('Picked Up', 'Package collected'),
-      ('Arrived', 'At destination'),
-      ('Delivered', 'Delivery complete'),
+      ['Order Confirmed', 'Order accepted'],
+      ['Picked Up', 'Package collected'],
+      ['Arrived', 'At destination'],
+      ['Delivered', 'Delivery complete'],
     ];
 
     return Column(
@@ -1932,29 +1964,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             size: 18, color: Colors.black54),
                         const SizedBox(width: 4),
                       ],
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            steps[i].$1,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight:
-                                  isCurrent ? FontWeight.w700 : FontWeight.w500,
-                              color:
-                                  isActive ? Colors.black87 : Colors.grey[400],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              steps[i][0],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isCurrent
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: isActive
+                                    ? Colors.black87
+                                    : Colors.grey[400],
+                              ),
                             ),
-                          ),
-                          Text(
-                            steps[i].$2,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isActive
-                                  ? Colors.grey[600]
-                                  : Colors.grey[400],
+                            Text(
+                              steps[i][1],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isActive
+                                    ? Colors.grey[600]
+                                    : Colors.grey[400],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -2086,7 +2126,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                       ?.call(widget.order.id, otp);
                                   if (mounted) {
                                     FocusScope.of(dialogContext).unfocus();
-                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
                                       if (dialogContext.mounted) {
                                         Navigator.pop(dialogContext);
                                       }
@@ -2224,12 +2265,55 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final originController = TextEditingController(text: widget.order.origin);
     final destinationController =
         TextEditingController(text: widget.order.destination);
-    final itemDescController =
-        TextEditingController(text: widget.order.itemDescription);
-    final weightController =
-        TextEditingController(text: widget.order.weight.toString());
-    final priceController = TextEditingController(
-        text: widget.order.expectedPrice?.toString() ?? '');
+
+    final categories = [
+      'Electronics',
+      'Clothing',
+      'Documents',
+      'Food',
+      'Fragile',
+      'Household',
+      'Other',
+    ];
+
+    final initialCategory = widget.order.category?.isNotEmpty == true
+        ? widget.order.category!
+        : widget.order.itemDescription;
+    String selectedCategory =
+        !categories.contains(initialCategory) || initialCategory == 'Other'
+            ? 'Other'
+            : initialCategory;
+    final customCategoryController = TextEditingController(
+        text: selectedCategory == 'Other'
+            ? (widget.order.customCategory?.isNotEmpty == true
+                ? widget.order.customCategory!
+                : initialCategory)
+            : widget.order.customCategory ?? '');
+
+    final weightOptions = [
+      '0.5 kg',
+      '1 kg',
+      '2 kg',
+      '3 kg',
+      '5 kg',
+      '10 kg',
+      '15 kg',
+      '20 kg',
+      '25 kg',
+    ];
+    String normalizeWeight(String weight) =>
+        weight.replaceAll(' ', '').toLowerCase();
+    final initialWeight = widget.order.weight.isNotEmpty
+        ? weightOptions.firstWhere(
+            (w) => normalizeWeight(w) == normalizeWeight(widget.order.weight),
+            orElse: () => widget.order.weight,
+          )
+        : weightOptions.first;
+    if (!weightOptions.contains(initialWeight)) {
+      weightOptions.insert(0, initialWeight);
+    }
+    String selectedWeight = initialWeight;
+
     final notesController =
         TextEditingController(text: widget.order.notes ?? '');
     DateTime selectedDate =
@@ -2299,26 +2383,77 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               validator: (v) =>
                                   v?.isEmpty == true ? 'Required' : null),
                           const SizedBox(height: 14),
-                          _editField(itemDescController, 'Item Description',
-                              Icons.inventory_2_outlined,
-                              maxLines: 2),
+                          DropdownButtonFormField<String>(
+                            value: selectedCategory,
+                            decoration: InputDecoration(
+                              labelText: 'Category *',
+                              prefixIcon:
+                                  Icon(Icons.inventory_2_outlined, size: 18),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                    color: Colors.black87, width: 2),
+                              ),
+                              contentPadding: const EdgeInsets.all(12),
+                            ),
+                            items: categories
+                                .map((category) => DropdownMenuItem(
+                                      value: category,
+                                      child: Text(category),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setStateDialog(() {
+                                selectedCategory = value;
+                              });
+                            },
+                            validator: (value) => value == null || value.isEmpty
+                                ? 'Required'
+                                : null,
+                          ),
+                          if (selectedCategory == 'Other') ...[
+                            const SizedBox(height: 14),
+                            _editField(
+                              customCategoryController,
+                              'Custom Category *',
+                              Icons.label_outline,
+                              validator: (v) =>
+                                  v?.trim().isEmpty == true ? 'Required' : null,
+                            ),
+                          ],
                           const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _editField(weightController,
-                                    'Weight (kg) *', Icons.scale,
-                                    keyboardType: TextInputType.number,
-                                    validator: (v) =>
-                                        v?.isEmpty == true ? 'Required' : null),
+                          DropdownButtonFormField<String>(
+                            value: selectedWeight,
+                            decoration: InputDecoration(
+                              labelText: 'Weight *',
+                              prefixIcon: Icon(Icons.scale, size: 18),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                    color: Colors.black87, width: 2),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _editField(priceController, 'Price (₹)',
-                                    Icons.currency_rupee,
-                                    keyboardType: TextInputType.number),
-                              ),
-                            ],
+                              contentPadding: const EdgeInsets.all(12),
+                            ),
+                            items: weightOptions
+                                .map((weight) => DropdownMenuItem(
+                                      value: weight,
+                                      child: Text(weight),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setStateDialog(() {
+                                selectedWeight = value;
+                              });
+                            },
+                            validator: (value) => value == null || value.isEmpty
+                                ? 'Required'
+                                : null,
                           ),
                           const SizedBox(height: 14),
                           _editField(
@@ -2362,17 +2497,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 origin: originController.text.trim(),
                                 destination: destinationController.text.trim(),
                                 date: selectedDate.toIso8601String(),
-                                itemDescription:
-                                    itemDescController.text.trim().isNotEmpty
-                                        ? itemDescController.text.trim()
-                                        : 'Package',
-                                weight: weightController.text.trim().isNotEmpty
-                                    ? '${weightController.text.trim()} kg'
-                                    : '0kg',
+                                itemDescription: selectedCategory == 'Other'
+                                    ? customCategoryController.text.trim()
+                                    : selectedCategory,
+                                weight: selectedWeight,
                                 status: widget.order.status,
-                                expectedPrice: priceController.text.isNotEmpty
-                                    ? int.tryParse(priceController.text)
-                                    : null,
+                                expectedPrice: widget.order.expectedPrice,
                                 notes: notesController.text.trim().isNotEmpty
                                     ? notesController.text.trim()
                                     : null,
@@ -2391,6 +2521,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 matchedTravellerId:
                                     widget.order.matchedTravellerId,
                                 otp: widget.order.otp,
+                                customCategory: selectedCategory == 'Other'
+                                    ? customCategoryController.text.trim()
+                                    : null,
                               );
                               Navigator.pop(context);
                               widget.onUpdateOrder?.call(updated);

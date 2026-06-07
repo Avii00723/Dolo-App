@@ -8,8 +8,10 @@ import '../../Models/OrderModel.dart';
 import '../Controllers/OrderService.dart';
 import '../Controllers/TripRequestService.dart';
 import '../Controllers/AuthService.dart';
+import '../Services/LocationService.dart';
 import 'orderSection/SearchResultPage.dart';
 import 'CustomRouteMapScreen.dart';
+import 'MapLocationPickerScreen.dart';
 
 // =============================================================================
 // DESIGN PRINCIPLE:
@@ -86,17 +88,17 @@ class _PlacesFieldState extends State<_PlacesField> {
   }
 
   Position _makePosition(dynamic prediction) => Position(
-    latitude: double.parse(prediction.lat.toString()),
-    longitude: double.parse(prediction.lng.toString()),
-    timestamp: DateTime.now(),
-    accuracy: 0.0,
-    altitude: 0.0,
-    altitudeAccuracy: 0.0,
-    heading: 0.0,
-    headingAccuracy: 0.0,
-    speed: 0.0,
-    speedAccuracy: 0.0,
-  );
+        latitude: double.parse(prediction.lat.toString()),
+        longitude: double.parse(prediction.lng.toString()),
+        timestamp: DateTime.now(),
+        accuracy: 0.0,
+        altitude: 0.0,
+        altitudeAccuracy: 0.0,
+        heading: 0.0,
+        headingAccuracy: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -211,18 +213,21 @@ class _LocationSearchView extends StatelessWidget {
   final String toText;
   final List<_StopoverData> stopovers;
   final List<GlobalKey<_StopoverRowState>> stopoverKeys;
-  final List<Map<String, String>> recentSearches;
+  final List<Map<String, dynamic>> recentSearches;
   final String? focusedField;
 
   final VoidCallback onDone;
   final VoidCallback onAddStop;
   final VoidCallback onViewRoute; // Added callback
+  final VoidCallback onSwapLocations;
+  final VoidCallback onUseCurrentLocation;
+  final VoidCallback onPickLocationOnMap;
   final void Function(int) onRemoveStop;
   final void Function(String field) onFieldFocused;
   final void Function(String text, Position pos) onFromSelected;
   final void Function(String text, Position pos) onToSelected;
   final void Function(int index, String text, Position pos) onStopoverSelected;
-  final void Function(String city) onRecentSearch;
+  final void Function(Map<String, dynamic> search) onRecentSearch;
 
   const _LocationSearchView({
     super.key,
@@ -235,6 +240,9 @@ class _LocationSearchView extends StatelessWidget {
     required this.onDone,
     required this.onAddStop,
     required this.onViewRoute, // Added parameter
+    required this.onSwapLocations,
+    required this.onUseCurrentLocation,
+    required this.onPickLocationOnMap,
     required this.onRemoveStop,
     required this.onFieldFocused,
     required this.onFromSelected,
@@ -259,6 +267,7 @@ class _LocationSearchView extends StatelessWidget {
                 const SizedBox(height: 20),
                 // FROM — fresh controller+focusnode every mount
                 _PlacesField(
+                  key: ValueKey('from_$fromText'),
                   initialText: fromText,
                   labelText: 'Traveling From',
                   hintText: 'Eg. Mumbai',
@@ -266,8 +275,17 @@ class _LocationSearchView extends StatelessWidget {
                   onLocationSelected: onFromSelected,
                 ),
                 const SizedBox(height: 16),
+                Center(
+                  child: IconButton(
+                    tooltip: 'Swap locations',
+                    icon: const Icon(Icons.swap_vert_circle_outlined),
+                    onPressed: onSwapLocations,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 // TO — fresh controller+focusnode every mount
                 _PlacesField(
+                  key: ValueKey('to_$toText'),
                   initialText: toText,
                   labelText: 'Traveling To',
                   hintText: 'Eg. Delhi',
@@ -287,15 +305,41 @@ class _LocationSearchView extends StatelessWidget {
                   ),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: onAddStop,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add Stops'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                    ),
+                  child: Wrap(
+                    spacing: 8,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed: onUseCurrentLocation,
+                        icon: const Icon(Icons.my_location, size: 18),
+                        label: const Text('Current'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: onPickLocationOnMap,
+                        icon: const Icon(Icons.map_outlined, size: 18),
+                        label: const Text('Map'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: onAddStop,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add Stops'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const Divider(height: 30),
@@ -306,11 +350,14 @@ class _LocationSearchView extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   children: recentSearches.map((s) {
+                    final origin = s['origin']?.toString() ?? '';
+                    final destination = s['destination']?.toString() ?? '';
                     return ListTile(
                       leading: const Icon(Icons.history),
-                      title: Text(s['city']!),
-                      subtitle: Text(s['country']!),
-                      onTap: () => onRecentSearch(s['city']!),
+                      title: Text('$destination - $origin'),
+                      subtitle: const Text('Tap to use this route'),
+                      trailing: const Icon(Icons.north_east, size: 18),
+                      onTap: () => onRecentSearch(s),
                     );
                   }).toList(),
                 ),
@@ -387,9 +434,14 @@ class _SendPageState extends State<SendPage> {
   // ── Vehicle ───────────────────────────────────────────────────────────────
   String? selectedVehicle;
   final List<String> vehicleOptions = [
-    'Car', 'Bike', 'Pickup Truck', 'Truck', 'Bus', 'Train', 'Plane'
+    'Car',
+    'Bike',
+    'Pickup Truck',
+    'Truck',
+    'Bus',
+    'Train',
+    'Plane'
   ];
-
 
   // ── Services ──────────────────────────────────────────────────────────────
   final OrderService _orderService = OrderService();
@@ -403,11 +455,31 @@ class _SendPageState extends State<SendPage> {
   String? _focusedField;
 
   // ── Recent Searches ───────────────────────────────────────────────────────
-  final List<Map<String, String>> _recentSearches = [
-    {'city': 'Delhi', 'country': 'India'},
-    {'city': 'Mumbai', 'country': 'India'},
-    {'city': 'Bangalore', 'country': 'India'},
-    {'city': 'Kolkata', 'country': 'India'},
+  final List<Map<String, dynamic>> _recentSearches = [
+    {
+      'origin': 'Mumbai',
+      'destination': 'Delhi',
+      'originLatitude': 19.0760,
+      'originLongitude': 72.8777,
+      'destinationLatitude': 28.6139,
+      'destinationLongitude': 77.2090,
+    },
+    {
+      'origin': 'Bangalore',
+      'destination': 'Hyderabad',
+      'originLatitude': 12.9716,
+      'originLongitude': 77.5946,
+      'destinationLatitude': 17.3850,
+      'destinationLongitude': 78.4867,
+    },
+    {
+      'origin': 'Kolkata',
+      'destination': 'Mumbai',
+      'originLatitude': 22.5726,
+      'originLongitude': 88.3639,
+      'destinationLatitude': 19.0760,
+      'destinationLongitude': 72.8777,
+    },
   ];
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -485,19 +557,134 @@ class _SendPageState extends State<SendPage> {
 
   // ── Recent search handler ─────────────────────────────────────────────────
 
-  void _onRecentSearch(String city) {
-    final field = _focusedField;
+  Position _positionFromCoordinates(double latitude, double longitude) {
+    return Position(
+      latitude: latitude,
+      longitude: longitude,
+      timestamp: DateTime.now(),
+      accuracy: 0.0,
+      altitude: 0.0,
+      altitudeAccuracy: 0.0,
+      heading: 0.0,
+      headingAccuracy: 0.0,
+      speed: 0.0,
+      speedAccuracy: 0.0,
+    );
+  }
+
+  void _applyLocationToFocusedField(String text, Position position) {
+    final field = _focusedField ?? 'from';
     setState(() {
       if (field == 'from') {
-        _fromText = city;
+        _fromText = text;
+        originPosition = position;
       } else if (field == 'to') {
-        _toText = city;
-      } else if (field != null && field.startsWith('stopover_')) {
+        _toText = text;
+        destinationPosition = position;
+      } else if (field.startsWith('stopover_')) {
         final idx = int.tryParse(field.split('_').last);
         if (idx != null && idx < _stopovers.length) {
-          _stopovers[idx].text = city;
+          _stopovers[idx].text = text;
+          _stopovers[idx].position = position;
         }
       }
+    });
+  }
+
+  void _swapLocations() {
+    setState(() {
+      final fromText = _fromText;
+      final fromPosition = originPosition;
+      _fromText = _toText;
+      originPosition = destinationPosition;
+      _toText = fromText;
+      destinationPosition = fromPosition;
+    });
+  }
+
+  Future<void> _useCurrentLocationForFocusedField() async {
+    final position = await LocationService.getCurrentPosition();
+    if (!mounted) return;
+    if (position == null) {
+      _showSnackBar('Unable to get current location', Colors.orange);
+      return;
+    }
+
+    final address = await LocationService.getAddressFromCoordinates(
+      position.latitude,
+      position.longitude,
+    );
+    if (!mounted) return;
+    _applyLocationToFocusedField(
+      address?.trim().isNotEmpty == true
+          ? address!.trim()
+          : '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}',
+      position,
+    );
+  }
+
+  Future<void> _pickFocusedLocationOnMap() async {
+    final field = _focusedField ?? 'from';
+    Position? initialPosition;
+    String? initialAddress;
+    if (field == 'from') {
+      initialPosition = originPosition;
+      initialAddress = _fromText;
+    } else if (field == 'to') {
+      initialPosition = destinationPosition;
+      initialAddress = _toText;
+    } else if (field.startsWith('stopover_')) {
+      final idx = int.tryParse(field.split('_').last);
+      if (idx != null && idx < _stopovers.length) {
+        initialPosition = _stopovers[idx].position;
+        initialAddress = _stopovers[idx].text;
+      }
+    }
+
+    final result = await Navigator.push<MapLocationResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapLocationPickerScreen(
+          title: field == 'to'
+              ? 'Select end location'
+              : field == 'from'
+                  ? 'Select start location'
+                  : 'Select stopover location',
+          initialLatitude: initialPosition?.latitude,
+          initialLongitude: initialPosition?.longitude,
+          initialAddress: initialAddress,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    _applyLocationToFocusedField(
+      result.address,
+      _positionFromCoordinates(result.latitude, result.longitude),
+    );
+  }
+
+  void _onRecentSearch(Map<String, dynamic> search) {
+    final origin = search['origin']?.toString() ?? '';
+    final destination = search['destination']?.toString() ?? '';
+    final originLat = (search['originLatitude'] as num?)?.toDouble();
+    final originLng = (search['originLongitude'] as num?)?.toDouble();
+    final destinationLat = (search['destinationLatitude'] as num?)?.toDouble();
+    final destinationLng = (search['destinationLongitude'] as num?)?.toDouble();
+    if (originLat == null ||
+        originLng == null ||
+        destinationLat == null ||
+        destinationLng == null) {
+      _showSnackBar('Recent route is missing coordinates', Colors.orange);
+      return;
+    }
+
+    setState(() {
+      _fromText = origin;
+      _toText = destination;
+      originPosition = _positionFromCoordinates(originLat, originLng);
+      destinationPosition =
+          _positionFromCoordinates(destinationLat, destinationLng);
+      _focusedField = 'to';
     });
   }
 
@@ -515,23 +702,29 @@ class _SendPageState extends State<SendPage> {
     }
 
     if (destinationPosition == null) {
-      _showSnackBar('Destination location not properly selected', Colors.orange);
+      _showSnackBar(
+          'Destination location not properly selected', Colors.orange);
       return;
     }
 
-    if (_departureDate == null || _departureTime == null || _departureDateTime == null) {
+    if (_departureDate == null ||
+        _departureTime == null ||
+        _departureDateTime == null) {
       _showSnackBar('Please select departure date and time', Colors.orange);
       return;
     }
 
-    if (_selectedDate == null || _selectedTime == null || _deliveryDateTime == null) {
+    if (_selectedDate == null ||
+        _selectedTime == null ||
+        _deliveryDateTime == null) {
       _showSnackBar('Please select delivery date and time', Colors.orange);
       return;
     }
 
     // Date Validation: Starting date should not be greater than ending date
     if (_deliveryDateTime!.isBefore(_departureDateTime!)) {
-      _showSnackBar('Delivery date cannot be before departure date', Colors.red);
+      _showSnackBar(
+          'Delivery date cannot be before departure date', Colors.red);
       return;
     }
 
@@ -562,11 +755,16 @@ class _SendPageState extends State<SendPage> {
           .map((s) => s.position!.longitude)
           .toList();
 
-      print('🔎 search orders: userId=$currentUserId from=$_fromText to=$_toText vehicle=$selectedVehicle');
-      print('   origin coords=${originPosition!.latitude},${originPosition!.longitude}');
-      print('   destination coords=${destinationPosition!.latitude},${destinationPosition!.longitude}');
-      print('   departure=${_departureDate!}T${_departureTime!} pickup=${_departureDate!}T${_departureTime!} delivery=${_selectedDate!}T${_selectedTime!}');
-      print('   stopovers=$stopoversStr stopoversLat=$stopoversLatitudes stopoversLng=$stopoversLongitudes');
+      print(
+          '🔎 search orders: userId=$currentUserId from=$_fromText to=$_toText vehicle=$selectedVehicle');
+      print(
+          '   origin coords=${originPosition!.latitude},${originPosition!.longitude}');
+      print(
+          '   destination coords=${destinationPosition!.latitude},${destinationPosition!.longitude}');
+      print(
+          '   departure=${_departureDate!}T${_departureTime!} pickup=${_departureDate!}T${_departureTime!} delivery=${_selectedDate!}T${_selectedTime!}');
+      print(
+          '   stopovers=$stopoversStr stopoversLat=$stopoversLatitudes stopoversLng=$stopoversLongitudes');
 
       final orders = await _orderService.searchOrders(
         origin: _fromText,
@@ -584,8 +782,10 @@ class _SendPageState extends State<SendPage> {
         vehicle: selectedVehicle!,
         userId: currentUserId!,
         stopovers: stopoversStr.isNotEmpty ? stopoversStr : null,
-        stopoversLatitude: stopoversLatitudes.isNotEmpty ? stopoversLatitudes : null,
-        stopoversLongitude: stopoversLongitudes.isNotEmpty ? stopoversLongitudes : null,
+        stopoversLatitude:
+            stopoversLatitudes.isNotEmpty ? stopoversLatitudes : null,
+        stopoversLongitude:
+            stopoversLongitudes.isNotEmpty ? stopoversLongitudes : null,
       );
       print('✅ searchOrders call completed, received ${orders.length} orders');
 
@@ -618,18 +818,22 @@ class _SendPageState extends State<SendPage> {
   }
 
   void _viewRouteOnMap() {
-    if (_fromText.isEmpty || _toText.isEmpty || originPosition == null || destinationPosition == null) {
-      _showSnackBar('Please select origin and destination first', Colors.orange);
+    if (_fromText.isEmpty ||
+        _toText.isEmpty ||
+        originPosition == null ||
+        destinationPosition == null) {
+      _showSnackBar(
+          'Please select origin and destination first', Colors.orange);
       return;
     }
 
     final List<Map<String, dynamic>> stopoversData = _stopovers
         .where((s) => s.text.isNotEmpty && s.position != null)
         .map((s) => {
-      'city': s.text,
-      'latitude': s.position!.latitude,
-      'longitude': s.position!.longitude,
-    })
+              'city': s.text,
+              'latitude': s.position!.latitude,
+              'longitude': s.position!.longitude,
+            })
         .toList();
 
     Navigator.push(
@@ -661,60 +865,65 @@ class _SendPageState extends State<SendPage> {
           child: isLoading
               ? const Center(child: CircularProgressIndicator())
               : Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Stack(
                   children: [
-                    // Main form always in tree, hidden while overlay shows
-                    AnimatedOpacity(
-                      opacity: _isLocationViewFocused ? 0.0 : 1.0,
-                      duration: const Duration(milliseconds: 200),
-                      child: IgnorePointer(
-                        ignoring: _isLocationViewFocused,
-                        child: _buildMainForm(),
+                    _buildHeader(),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          // Main form always in tree, hidden while overlay shows
+                          AnimatedOpacity(
+                            opacity: _isLocationViewFocused ? 0.0 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: IgnorePointer(
+                              ignoring: _isLocationViewFocused,
+                              child: _buildMainForm(),
+                            ),
+                          ),
+                          // Location overlay: mounts fresh every time.
+                          // _PlacesField creates new controller+focusnode on each mount.
+                          // _PlacesField disposes them automatically on unmount.
+                          // No stale/disposed objects can ever reach GooglePlaces.
+                          if (_isLocationViewFocused)
+                            _LocationSearchView(
+                              fromText: _fromText,
+                              toText: _toText,
+                              stopovers: _stopovers,
+                              stopoverKeys: _stopoverKeys,
+                              recentSearches: _recentSearches,
+                              focusedField: _focusedField,
+                              onDone: _hideLocationView,
+                              onAddStop: _addStopoverField,
+                              onViewRoute:
+                                  _viewRouteOnMap, // Fixed: Pass navigation callback
+                              onSwapLocations: _swapLocations,
+                              onUseCurrentLocation:
+                                  _useCurrentLocationForFocusedField,
+                              onPickLocationOnMap: _pickFocusedLocationOnMap,
+                              onRemoveStop: _removeStopoverField,
+                              onFieldFocused: (f) =>
+                                  setState(() => _focusedField = f),
+                              onFromSelected: (text, pos) => setState(() {
+                                _fromText = text;
+                                originPosition = pos;
+                              }),
+                              onToSelected: (text, pos) => setState(() {
+                                _toText = text;
+                                destinationPosition = pos;
+                              }),
+                              onStopoverSelected: (i, text, pos) =>
+                                  setState(() {
+                                if (i < _stopovers.length) {
+                                  _stopovers[i].text = text;
+                                  _stopovers[i].position = pos;
+                                }
+                              }),
+                              onRecentSearch: _onRecentSearch,
+                            ),
+                        ],
                       ),
                     ),
-                    // Location overlay: mounts fresh every time.
-                    // _PlacesField creates new controller+focusnode on each mount.
-                    // _PlacesField disposes them automatically on unmount.
-                    // No stale/disposed objects can ever reach GooglePlaces.
-                    if (_isLocationViewFocused)
-                      _LocationSearchView(
-                        fromText: _fromText,
-                        toText: _toText,
-                        stopovers: _stopovers,
-                        stopoverKeys: _stopoverKeys,
-                        recentSearches: _recentSearches,
-                        focusedField: _focusedField,
-                        onDone: _hideLocationView,
-                        onAddStop: _addStopoverField,
-                        onViewRoute: _viewRouteOnMap, // Fixed: Pass navigation callback
-                        onRemoveStop: _removeStopoverField,
-                        onFieldFocused: (f) =>
-                            setState(() => _focusedField = f),
-                        onFromSelected: (text, pos) => setState(() {
-                          _fromText = text;
-                          originPosition = pos;
-                        }),
-                        onToSelected: (text, pos) => setState(() {
-                          _toText = text;
-                          destinationPosition = pos;
-                        }),
-                        onStopoverSelected: (i, text, pos) =>
-                            setState(() {
-                              if (i < _stopovers.length) {
-                                _stopovers[i].text = text;
-                                _stopovers[i].position = pos;
-                              }
-                            }),
-                        onRecentSearch: _onRecentSearch,
-                      ),
                   ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -726,7 +935,6 @@ class _SendPageState extends State<SendPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: Text(
@@ -790,15 +998,17 @@ class _SendPageState extends State<SendPage> {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold),
+                textStyle:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               child: isSearching
                   ? const SizedBox(
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white)),
                     )
                   : const Text('Search Orders'),
             ),
@@ -822,7 +1032,9 @@ class _SendPageState extends State<SendPage> {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
-          keyboardType: label.contains('Phone') ? TextInputType.phone : TextInputType.text,
+          keyboardType: label.contains('Phone')
+              ? TextInputType.phone
+              : TextInputType.text,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon),
@@ -856,8 +1068,7 @@ class _SendPageState extends State<SendPage> {
           onTap: onTap,
           child: Container(
             width: double.infinity,
-            padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(8),
@@ -865,8 +1076,8 @@ class _SendPageState extends State<SendPage> {
             ),
             child: Text(
               value.isEmpty ? 'Tap to enter location' : value,
-              style: TextStyle(
-                  color: value.isEmpty ? Colors.grey : Colors.black),
+              style:
+                  TextStyle(color: value.isEmpty ? Colors.grey : Colors.black),
             ),
           ),
         ),
@@ -877,10 +1088,10 @@ class _SendPageState extends State<SendPage> {
   // ── Date / Time ───────────────────────────────────────────────────────────
 
   Widget _buildDateTimeField(
-      TextEditingController controller,
-      String label,
-      Future<void> Function(BuildContext) onTap,
-      ) {
+    TextEditingController controller,
+    String label,
+    Future<void> Function(BuildContext) onTap,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -890,8 +1101,7 @@ class _SendPageState extends State<SendPage> {
           onTap: () => onTap(context),
           child: Container(
             width: double.infinity,
-            padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(8),
@@ -907,9 +1117,8 @@ class _SendPageState extends State<SendPage> {
                       ? 'dd/mm/yyyy HH:MM'
                       : controller.text,
                   style: TextStyle(
-                      color: controller.text.isEmpty
-                          ? Colors.grey
-                          : Colors.black),
+                      color:
+                          controller.text.isEmpty ? Colors.grey : Colors.black),
                 ),
               ],
             ),
@@ -927,14 +1136,13 @@ class _SendPageState extends State<SendPage> {
         lastDate: DateTime(2101));
     if (date == null || !context.mounted) return;
     final time =
-    await showTimePicker(context: context, initialTime: TimeOfDay.now());
+        await showTimePicker(context: context, initialTime: TimeOfDay.now());
     if (time == null) return;
     final dt =
-    DateTime(date.year, date.month, date.day, time.hour, time.minute);
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
     setState(() {
       _departureDateTime = dt;
-      departureController.text =
-          DateFormat('dd MMM yyyy, hh:mm a').format(dt);
+      departureController.text = DateFormat('dd MMM yyyy, hh:mm a').format(dt);
       _departureDate = DateFormat('yyyy-MM-dd').format(dt);
       _departureTime = DateFormat('HH:mm:ss').format(dt);
     });
@@ -948,14 +1156,13 @@ class _SendPageState extends State<SendPage> {
         lastDate: DateTime(2101));
     if (date == null || !context.mounted) return;
     final time =
-    await showTimePicker(context: context, initialTime: TimeOfDay.now());
+        await showTimePicker(context: context, initialTime: TimeOfDay.now());
     if (time == null) return;
     final dt =
-    DateTime(date.year, date.month, date.day, time.hour, time.minute);
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
     setState(() {
       _deliveryDateTime = dt;
-      deliveryController.text =
-          DateFormat('dd MMM yyyy, hh:mm a').format(dt);
+      deliveryController.text = DateFormat('dd MMM yyyy, hh:mm a').format(dt);
       _selectedDate = DateFormat('yyyy-MM-dd').format(dt);
       _selectedTime = DateFormat('HH:mm:ss').format(dt);
     });
@@ -1020,7 +1227,7 @@ class _SendPageState extends State<SendPage> {
               const SizedBox(height: 12),
               Text(
                 'Airline transport has strict rules on weight, hazardous materials, and packaging.\n'
-                    'Confirm that your item meets these requirements before proceeding.',
+                'Confirm that your item meets these requirements before proceeding.',
                 style: TextStyle(
                   fontSize: 13,
                   color: Colors.grey[700],
@@ -1056,7 +1263,7 @@ class _SendPageState extends State<SendPage> {
 
   void _showSnackBar(String message, Color color) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: color));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 }

@@ -4,7 +4,6 @@ import 'dart:async';
 import '../../Controllers/ordertrackingservice.dart';
 import '../../Controllers/AuthService.dart';
 import '../orderSection/YourOrders.dart';
-import '../orderSection/OrderTrackingScreen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public entry point – drop this anywhere on the home screen
@@ -362,8 +361,8 @@ class _ActiveOrderCard extends StatelessWidget {
                   if (showRatingButton)
                     ElevatedButton(
                       onPressed: () async {
-                        // We push to OrderTrackingScreen which already handles the rating dialog 
-                        // logic internally when status is delivered.
+                        // Navigate to YourOrdersPage which shows the order with rating UI
+                        // logic when status is delivered.
                         await _navigateToTracking(context, isTraveller);
                         onRatingSubmitted();
                       },
@@ -400,18 +399,13 @@ class _ActiveOrderCard extends StatelessWidget {
   }
 
   Future<void> _navigateToTracking(BuildContext context, bool isTraveller) async {
+    // Navigate to YourOrdersPage focused on this order
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => OrderTrackingScreen(
-          orderId: order['order_id'].toString(),
-          orderData: {
-            'origin': order['origin'],
-            'destination': order['destination'],
-            'status': order['status'],
-            'my_role': order['my_role'],
-          },
-          isTraveller: isTraveller,
+        builder: (context) => YourOrdersPage(
+          initialTabIndex: isTraveller ? 1 : 0,
+          focusOrderId: order['order_id'].toString(),
         ),
       ),
     );

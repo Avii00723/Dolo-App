@@ -9,7 +9,6 @@ import '../Inbox Section/indoxscreen.dart';
 import '../../Models/OrderModel.dart' as OrderModels;
 import '../../Models/TripRequestModel.dart';
 import '../../screens/orderSection/OrderCard.dart';
-import '../../screens/orderSection/OrderTrackingScreen.dart';
 import '../../widgets/NotificationBellIcon.dart';
 import 'TravellerCard.dart';
 
@@ -190,6 +189,7 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
   Map<String, List<TripRequestDisplay>> tripRequestsByOrder = {};
   bool isLoadingMyOrders = false;
   bool isLoadingMyRequests = false;
+  String? _backendErrorMessage;
 
   @override
   void initState() {
@@ -244,6 +244,10 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
 
     try {
       final orders = await _orderService.getMyOrders(currentUserId!);
+      
+      // Clear backend error if successful
+      if (mounted) setState(() => _backendErrorMessage = null);
+      
       final List<OrderDisplay> displayOrders = orders.map((order) => OrderDisplay(
         id: order.id,
         userId: currentUserId!,
@@ -296,8 +300,18 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
           isLoadingMyOrders = false;
         });
       }
-    } catch (e) {
-      if (mounted) setState(() => isLoadingMyOrders = false);
+    } on Exception catch (e) {
+      final errorMsg = e.toString();
+      if (errorMsg.contains('BACKEND_DOWN')) {
+        if (mounted) {
+          setState(() {
+            _backendErrorMessage = 'App will resume shortly';
+            isLoadingMyOrders = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => isLoadingMyOrders = false);
+      }
     }
   }
 
@@ -308,9 +322,21 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
       Map<String, List<TripRequestDisplay>> requestsByOrder = {};
       Map<String, TripRequest> acceptedRequestsByOrder = {};
 
+      final acceptedLikeStatuses = {
+        'accepted',
+        'matched',
+        'delivered',
+        'completed',
+        'in_transit',
+        'in-transit',
+        'picked_up',
+        'picked up',
+        'arrived',
+      };
+
       for (var request in allRequests) {
         final status = request.status.toLowerCase();
-        if (status == 'accepted' && orderIds.contains(request.orderId)) {
+        if (acceptedLikeStatuses.contains(status) && orderIds.contains(request.orderId)) {
           acceptedRequestsByOrder[request.orderId] = request;
         }
 
@@ -331,7 +357,13 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
 
       if (mounted) setState(() => tripRequestsByOrder = requestsByOrder);
       return acceptedRequestsByOrder;
-    } catch (e) {
+    } on Exception catch (e) {
+      final errorMsg = e.toString();
+      if (errorMsg.contains('BACKEND_DOWN')) {
+        if (mounted) {
+          setState(() => _backendErrorMessage = 'App will resume shortly');
+        }
+      }
       return null;
     }
   }
@@ -342,6 +374,10 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
 
     try {
       final tripRequests = await _tripRequestService.getMyTripRequests(currentUserId!);
+      
+      // Clear backend error if successful
+      if (mounted) setState(() => _backendErrorMessage = null);
+      
       final List<OrderDisplay> displayOrders = [];
       final Set<String> processedOrderIds = {};
 
@@ -375,8 +411,18 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
           isLoadingMyRequests = false;
         });
       }
-    } catch (e) {
-      if (mounted) setState(() => isLoadingMyRequests = false);
+    } on Exception catch (e) {
+      final errorMsg = e.toString();
+      if (errorMsg.contains('BACKEND_DOWN')) {
+        if (mounted) {
+          setState(() {
+            _backendErrorMessage = 'App will resume shortly';
+            isLoadingMyRequests = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => isLoadingMyRequests = false);
+      }
     }
   }
 
@@ -465,32 +511,11 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
     }
   }
 
-  /// Opens the map-based tracking screen (used by the "Track on Map" button).
-  void _openTrackingMap(OrderDisplay order) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => OrderTrackingScreen(
-          orderId: order.id,
-          orderData: {
-            'origin': order.origin,
-            'destination': order.destination,
-            'origin_latitude': order.originLatitude,
-            'origin_longitude': order.originLongitude,
-            'destination_latitude': order.destinationLatitude,
-            'destination_longitude': order.destinationLongitude,
-            'status': order.status,
-            'order_type': order.orderType,
-            'otp': order.otp,
-          },
-          isTraveller: _selectedTab == 1,
-        ),
-      ),
-    );
-  }
+  /// Opens the detail card for the order using the modern card UI.
+  void _openTrackingMap(OrderDisplay order) => _openCard(order);
 
   /// Legacy alias kept so existing tap handlers in cards still compile.
-  void _viewRoute(OrderDisplay order) => _openTrackingMap(order);
+  void _viewRoute(OrderDisplay order) => _openCard(order);
 
   Future<void> _acceptTripRequest(TripRequestDisplay request, String orderId) async {
     if (currentUserId == null) return;
@@ -683,6 +708,29 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
       ),
       body: Column(
         children: [
+          // Backend down banner
+          if (_backendErrorMessage != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: Colors.orange.shade100,
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _backendErrorMessage!,
+                      style: TextStyle(
+                        color: Colors.orange.shade700,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Container(

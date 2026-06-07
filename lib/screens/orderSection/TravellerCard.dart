@@ -126,6 +126,17 @@ class ModernTravellerOrderCard extends StatelessWidget {
     }
   }
 
+  String get _displayOrderCreatorName {
+    final normalizedName = order.userName.trim();
+    final lowerName = normalizedName.toLowerCase();
+    final isPending =
+        (order.requestStatus ?? order.status).toLowerCase().trim() == 'pending';
+    if (lowerName == 'you' && isPending) {
+      return 'Order Creator';
+    }
+    return normalizedName.isNotEmpty ? normalizedName : 'Order Creator';
+  }
+
   bool get _isDelivered =>
       (order.requestStatus ?? order.status).toLowerCase() == 'delivered';
   bool get _hasCompletedCardRating =>
@@ -163,7 +174,7 @@ class ModernTravellerOrderCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: Colors.black.withOpacity(0.06),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -296,11 +307,11 @@ class ModernTravellerOrderCard extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: (_isPickupRejected ? Colors.red : Colors.amber)
-                        .withValues(alpha: 0.12),
+                        .withOpacity(0.12),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: (_isPickupRejected ? Colors.red : Colors.amber)
-                          .withValues(alpha: 0.35),
+                          .withOpacity(0.35),
                     ),
                   ),
                   child: Row(
@@ -482,6 +493,8 @@ class _TravellerOrderDetailScreenState
     return _order.status.toLowerCase();
   }
 
+  bool get _isPending => _displayStatus == 'pending';
+
   String? get _pickupConfirmationStatus {
     final raw = _apiOrder?['pickup_confirmation_status'] ??
         _orderDetails?['pickup_confirmation_status'] ??
@@ -513,6 +526,18 @@ class _TravellerOrderDetailScreenState
             status == 'picked_up' ||
             status == 'picked up') &&
         _pickupConfirmationStatus == 'rejected';
+  }
+
+  String get _displayOrderCreatorName {
+    final normalizedName = _order.userName.trim();
+    final lowerName = normalizedName.toLowerCase();
+    final isPending =
+        (_order.requestStatus ?? _order.status).toLowerCase().trim() ==
+            'pending';
+    if (lowerName == 'you' && isPending) {
+      return 'Order Creator';
+    }
+    return normalizedName.isNotEmpty ? normalizedName : 'Order Creator';
   }
 
   void _showRatingDialog() {
@@ -851,35 +876,47 @@ class _TravellerOrderDetailScreenState
                     ],
                   ),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        order.origin,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.origin,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _formatDisplayDate(order.date),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        order.destination,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
+                        Text(
+                          _formatDisplayDate(order.date),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
-                      ),
-                      Text(
-                        _formatShortDate(order.date),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
+                        const SizedBox(height: 10),
+                        Text(
+                          order.destination,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
+                        ),
+                        Text(
+                          _formatShortDate(order.date),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1106,79 +1143,82 @@ class _TravellerOrderDetailScreenState
             ),
             const SizedBox(height: 16),
             // ── Action buttons are now in the sticky bottomNavigationBar ──
-            const Divider(height: 1, color: Color(0xFFEEEEEE)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.grey[300],
-                    child: Text(
-                      order.senderInitial,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+            if (!_isPending) ...[
+              const Divider(height: 1, color: Color(0xFFEEEEEE)),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Colors.grey[300],
+                      child: Text(
+                        order.senderInitial,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        order.userName,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Text(
-                        'Order Creator',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline,
-                        color: Colors.black54),
-                    onPressed: () {
-                      // Navigate to chat between order creator and traveler.
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            chatId: _getChatIdForOrder(order),
-                            orderId: order.id,
-                            otherUserName: order.userName,
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _displayOrderCreatorName,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black87,
                           ),
                         ),
-                      );
-                    },
-                  ),
-                  IconButton(
-                    icon:
-                        const Icon(Icons.call_outlined, color: Colors.black54),
-                    onPressed: () async {
-                      final details =
-                          await _trackingService.getOrderDetails(order.id);
-                      final rawPhone = details?['order']?['user_phone'] ??
-                          details?['order']?['phone'];
-                      final phone = rawPhone?.toString();
-                      if (phone == null || phone.trim().isEmpty) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Phone number not available')),
+                        Text(
+                          'Order Creator',
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[500]),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline,
+                          color: Colors.black54),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              chatId: _getChatIdForOrder(order),
+                              orderId: order.id,
+                              otherUserName: _displayOrderCreatorName,
+                            ),
+                          ),
                         );
-                        return;
-                      }
-                      await _launchPhoneCall(phone);
-                    },
-                  ),
-                ],
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.call_outlined,
+                          color: Colors.black54),
+                      onPressed: () async {
+                        final details =
+                            await _trackingService.getOrderDetails(order.id);
+                        final rawPhone = details?['order']?['user_phone'] ??
+                            details?['order']?['phone'];
+                        final phone = rawPhone?.toString();
+                        if (phone == null || phone.trim().isEmpty) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Phone number not available')),
+                          );
+                          return;
+                        }
+                        await _launchPhoneCall(phone);
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
+            ],
           ],
         ),
       ),
@@ -1274,12 +1314,14 @@ class _TravellerOrderDetailScreenState
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _isUpdatingStatus ? null : () => _retryPickupConfirmation(),
+            onPressed:
+                _isUpdatingStatus ? null : () => _retryPickupConfirmation(),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black87,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(
               _isUpdatingStatus ? 'Retrying...' : 'Retry Pickup Confirmation',
@@ -1310,9 +1352,8 @@ class _TravellerOrderDetailScreenState
                 ? 'tracking'
                 : 'history';
         final rawHistory = updatedDetails[historyKey];
-        final List<dynamic> historyList = rawHistory is List
-            ? List<dynamic>.from(rawHistory)
-            : <dynamic>[];
+        final List<dynamic> historyList =
+            rawHistory is List ? List<dynamic>.from(rawHistory) : <dynamic>[];
         historyList.add(
           {
             'stage': stage,
@@ -1621,7 +1662,8 @@ class _TravellerOrderDetailScreenState
                                     cooldownTimer?.cancel();
                                     if (mounted) {
                                       FocusScope.of(dialogContext).unfocus();
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
                                         if (dialogContext.mounted) {
                                           Navigator.pop(dialogContext);
                                         }
@@ -1715,10 +1757,10 @@ class _TravellerOrderDetailScreenState
 
   Widget _buildTrackingTimeline(int activeStep) {
     final steps = [
-      ('Order Confirmed', 'Order accepted'),
-      ('Picked Up', 'Package collected'),
-      ('Arrived', 'At destination'),
-      ('Delivered', 'Delivery complete'),
+      ['Order Confirmed', 'Order accepted'],
+      ['Picked Up', 'Package collected'],
+      ['Arrived', 'At destination'],
+      ['Delivered', 'Delivery complete'],
     ];
 
     return Column(
@@ -1777,30 +1819,37 @@ class _TravellerOrderDetailScreenState
                             size: 18, color: Colors.black54),
                         const SizedBox(width: 4),
                       ],
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            steps[i].$1,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight:
-                                  isCurrent ? FontWeight.w700 : FontWeight.w500,
-                              color: isActive
-                                  ? Colors.black87
-                                  : (Colors.grey[400] ?? Colors.grey),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              steps[i][0],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isCurrent
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: isActive
+                                    ? Colors.black87
+                                    : (Colors.grey[400] ?? Colors.grey),
+                              ),
                             ),
-                          ),
-                          Text(
-                            steps[i].$2,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isActive
-                                  ? (Colors.grey[600] ?? Colors.grey)
-                                  : (Colors.grey[400] ?? Colors.grey),
+                            Text(
+                              steps[i][1],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isActive
+                                    ? (Colors.grey[600] ?? Colors.grey)
+                                    : (Colors.grey[400] ?? Colors.grey),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),

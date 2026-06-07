@@ -43,6 +43,12 @@ class TripRequestService {
         return [];
       },
     );
+    
+    // Check if backend is down
+    if (!response.success && response.error?.contains('temporarily unavailable') == true) {
+      throw Exception('BACKEND_DOWN: ${response.error}');
+    }
+    
     return response.success ? (response.data as List<TripRequest>) : [];
   }
 
@@ -65,6 +71,11 @@ class TripRequestService {
         return [];
       },
     );
+
+    // Check if backend is down
+    if (!response.success && response.error?.contains('temporarily unavailable') == true) {
+      throw Exception('BACKEND_DOWN: ${response.error}');
+    }
 
     if (response.success) {
       print('✅ Successfully fetched ${(response.data as List).length} trip requests');

@@ -143,11 +143,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
         _socketService.onUserTyping((data) {
           final typingUserId = data['userId'] as String?;
-          debugPrint('🔍 ChatScreen - Typing event received: userId=$typingUserId, currentUserId=$_currentUserId, mounted=$mounted');
+          debugPrint(
+              '🔍 ChatScreen - Typing event received: userId=$typingUserId, currentUserId=$_currentUserId, mounted=$mounted');
 
           if (typingUserId != null && typingUserId != _currentUserId) {
             if (mounted) {
-              debugPrint('✅ ChatScreen - Showing typing indicator for user: $typingUserId');
+              debugPrint(
+                  '✅ ChatScreen - Showing typing indicator for user: $typingUserId');
               setState(() {
                 _isOtherUserTyping = true;
               });
@@ -155,7 +157,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               _typingIndicatorTimer?.cancel();
               _typingIndicatorTimer = Timer(const Duration(seconds: 3), () {
                 if (mounted) {
-                  debugPrint('⏰ ChatScreen - Hiding typing indicator (timeout)');
+                  debugPrint(
+                      '⏰ ChatScreen - Hiding typing indicator (timeout)');
                   setState(() {
                     _isOtherUserTyping = false;
                   });
@@ -201,14 +204,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       TutorialHelper.createTarget(
         key: _messageInputKey,
         title: 'Type Your Message',
-        description: 'Type your message here to communicate with the other user.',
+        description:
+            'Type your message here to communicate with the other user.',
         order: 1,
         align: ContentAlign.top,
       ),
       TutorialHelper.createTarget(
         key: _imagePickerKey,
         title: 'Send Images',
-        description: 'Tap this button to attach images from your gallery or camera.',
+        description:
+            'Tap this button to attach images from your gallery or camera.',
         order: 2,
         align: ContentAlign.top,
       ),
@@ -266,7 +271,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final apiMessages = result['messages'] as List;
         final convertedMessages = apiMessages.map((msg) {
           final messageIdRaw = msg['id'];
-          final messageId = messageIdRaw is int ? messageIdRaw : int.tryParse(messageIdRaw.toString()) ?? 0;
+          final messageId = messageIdRaw is int
+              ? messageIdRaw
+              : int.tryParse(messageIdRaw.toString()) ?? 0;
 
           final senderId = msg['user_id'] ?? msg['sender_id'];
           final senderName = msg['sender_name'] ?? 'Unknown';
@@ -297,22 +304,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             };
           }
 
+          final createdAt = _parseMessageDateTime(msg['created_at']);
+
           return {
             'messageId': messageId,
             'message': messageText,
             'senderId': senderId,
             'senderName': senderName,
-            'timestamp': DateTime.parse(msg['created_at']),
+            'timestamp': createdAt,
             'type': hasMedia ? 'image' : 'text',
             'mediaUrl': hasMedia ? mediaUrl : null,
             'replyToId': replyToId,
             'replyData': replyData,
             'seen': seen,
-            'seenAt': seenAt != null ? DateTime.parse(seenAt) : null,
+            'seenAt': _parseMessageDateTime(seenAt),
           };
         }).toList();
 
-        final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+        final scrollOffset =
+            _scrollController.hasClients ? _scrollController.offset : 0.0;
         final wasAtBottom = scrollOffset < 50;
 
         setState(() {
@@ -322,13 +332,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
           if (convertedMessages.isNotEmpty) {
             final firstOtherMessage = convertedMessages.firstWhere(
-                  (msg) => msg['senderId'] != _currentUserId,
+              (msg) => msg['senderId'] != _currentUserId,
               orElse: () => {},
             );
 
             if (firstOtherMessage.isNotEmpty) {
               bestOtherUserId = firstOtherMessage['senderId'].toString();
-              bestOtherUserName = firstOtherMessage['senderName'] ?? bestOtherUserName;
+              bestOtherUserName =
+                  firstOtherMessage['senderName'] ?? bestOtherUserName;
             }
           }
 
@@ -406,6 +417,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       debugPrint('❌ Exception loading messages: $e');
     } finally {
       _isRefreshing = false;
+    }
+  }
+
+  DateTime? _parseMessageDateTime(dynamic value) {
+    if (value == null) return null;
+
+    try {
+      final rawValue = value.toString().trim();
+      if (rawValue.isEmpty) return null;
+
+      final normalizedValue =
+          rawValue.contains('T') ? rawValue : rawValue.replaceFirst(' ', 'T');
+
+      // Let Dart's DateTime.tryParse handle timezone semantics:
+      // - If the string contains a 'Z' or an explicit offset, it will be
+      //   parsed as UTC and converted to local via `toLocal()` below.
+      // - If the string has no timezone, DateTime.tryParse treats it as local,
+      //   which avoids incorrectly assuming UTC for timezone-less server values.
+      final parsedValue = DateTime.tryParse(normalizedValue);
+
+      return parsedValue?.toLocal();
+    } catch (_) {
+      return null;
     }
   }
 
@@ -554,7 +588,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // NEW METHOD: Navigate to user profile
   void _navigateToUserProfile() {
-    debugPrint('🧭 ChatScreen _navigateToUserProfile() called - chatId=${widget.chatId} orderId=${widget.orderId} otherUserName=${otherUserData['name']} otherUserDataIdRaw=${otherUserData['id']}');
+    debugPrint(
+        '🧭 ChatScreen _navigateToUserProfile() called - chatId=${widget.chatId} orderId=${widget.orderId} otherUserName=${otherUserData['name']} otherUserDataIdRaw=${otherUserData['id']}');
     String? otherUserId = otherUserData['id']?.toString() ?? widget.otherUserId;
 
     if (otherUserId != null) {
@@ -562,11 +597,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         context,
         MaterialPageRoute(
           builder: (context) => UserProfileScreen(
-            userId: otherUserId!,
-            userName: otherUserData['name'] ?? widget.otherUserName ?? 'Unknown User',
+            userId: otherUserId,
+            userName:
+                otherUserData['name'] ?? widget.otherUserName ?? 'Unknown User',
             profileUrl: otherUserData['profileUrl'],
             orderId: widget.orderId,
-            isOrderAccepted: true, // Chat is only accessible after order is accepted
+            isOrderAccepted:
+                true, // Chat is only accessible after order is accepted
           ),
         ),
       );
@@ -617,7 +654,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       systemOverlayStyle: SystemUiOverlayStyle.dark,
       leading: IconButton(
-        icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
+        icon: Icon(Icons.arrow_back,
+            color: Theme.of(context).colorScheme.onSurface),
         onPressed: () => Navigator.pop(context),
       ),
       title: GestureDetector(
@@ -629,7 +667,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Row(
           children: [
             _buildProfileAvatar(
-                otherUserData['name'] ?? widget.otherUserName ?? 'U', false, 40),
+                otherUserData['name'] ?? widget.otherUserName ?? 'U',
+                false,
+                40),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -674,8 +714,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.phone,
-              color: Theme.of(context).colorScheme.onSurface),
+          icon:
+              Icon(Icons.phone, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () async {
             _navigateToUserProfile();
           },
@@ -745,6 +785,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ],
     );
   }
+
   Widget _buildMessagesList() {
     if (messages.isEmpty) {
       return _buildEmptyMessages();
@@ -765,23 +806,93 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           final messageIndex = _isOtherUserTyping ? index - 1 : index;
           final message = messages[messages.length - 1 - messageIndex];
           final isMe = message['senderId'] == _currentUserId;
+          final showDateSeparator = _shouldShowDateSeparator(messageIndex);
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: EnhancedMessageBubble(
-              message: message,
-              isMe: isMe,
-              currentUserId: _currentUserId,
-              onReply: (messageData) => _setReplyMessage(message['messageId'].toString(), messageData),
-              onCopy: _copyMessage,
-              onLaunchUrl: _launchUrl,
-              onDownloadImage: _downloadImage,
-              onAvatarTap: isMe ? null : _navigateToUserProfile,
-            ),
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showDateSeparator) _buildDateSeparator(message['timestamp']),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: EnhancedMessageBubble(
+                  message: message,
+                  isMe: isMe,
+                  currentUserId: _currentUserId,
+                  onReply: (messageData) => _setReplyMessage(
+                      message['messageId'].toString(), messageData),
+                  onCopy: _copyMessage,
+                  onLaunchUrl: _launchUrl,
+                  onDownloadImage: _downloadImage,
+                  onAvatarTap: isMe ? null : _navigateToUserProfile,
+                ),
+              ),
+            ],
           );
         },
       ),
     );
+  }
+
+  bool _shouldShowDateSeparator(int reversedMessageIndex) {
+    final currentMessageIndex = messages.length - 1 - reversedMessageIndex;
+    final currentTimestamp =
+        messages[currentMessageIndex]['timestamp'] as DateTime?;
+    if (currentTimestamp == null) return false;
+
+    if (currentMessageIndex == 0) return true;
+
+    final previousTimestamp =
+        messages[currentMessageIndex - 1]['timestamp'] as DateTime?;
+    return previousTimestamp == null ||
+        !_isSameDay(currentTimestamp, previousTimestamp);
+  }
+
+  bool _isSameDay(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
+  Widget _buildDateSeparator(DateTime? timestamp) {
+    if (timestamp == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 14),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Text(
+            _formatDateSeparator(timestamp),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.55),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDateSeparator(DateTime timestamp) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDay = DateTime(timestamp.year, timestamp.month, timestamp.day);
+    final difference = today.difference(messageDay).inDays;
+
+    if (difference == 0) return 'Today';
+    if (difference == 1) return 'Yesterday';
+    return DateFormat('d MMM yyyy').format(timestamp);
   }
 
   Widget _buildEmptyMessages() {
@@ -799,7 +910,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             child: Icon(
               Icons.chat_bubble_outline,
               size: 40,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.4),
             ),
           ),
           const SizedBox(height: 16),
@@ -808,7 +922,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.65),
             ),
           ),
         ],
@@ -834,7 +951,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.65),
               ),
             ),
             const SizedBox(height: 24),
@@ -858,13 +978,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
 
     final isReplyToMe = replyingToMessage!['senderId'] == _currentUserId;
-    final senderName = isReplyToMe ? 'You' : (replyingToMessage!['senderName'] ?? 'Unknown');
+    final senderName =
+        isReplyToMe ? 'You' : (replyingToMessage!['senderName'] ?? 'Unknown');
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha:0.08),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(
@@ -875,7 +996,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       child: Row(
         children: [
-          Icon(Icons.reply, color: Theme.of(context).colorScheme.primary, size: 16),
+          Icon(Icons.reply,
+              color: Theme.of(context).colorScheme.primary, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -894,7 +1016,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   previewText,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.65),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -903,7 +1028,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), size: 18),
+            icon: Icon(Icons.close,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.5),
+                size: 18),
             onPressed: _clearReply,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -942,7 +1072,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.45),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -997,7 +1130,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         textCapitalization: TextCapitalization.sentences,
                         decoration: InputDecoration(
                           hintText: 'Type a message...',
-                          hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), fontSize: 15),
+                          hintStyle: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.4),
+                              fontSize: 15),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -1009,10 +1147,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     ),
                     IconButton(
                       key: _imagePickerKey,
-                      icon: Icon(Icons.attach_file, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), size: 22),
+                      icon: Icon(Icons.attach_file,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.5),
+                          size: 22),
                       onPressed: _showImagePickerOptions,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints:
+                          const BoxConstraints(minWidth: 40, minHeight: 40),
                     ),
                   ],
                 ),
@@ -1048,18 +1192,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   child: Center(
                     child: _isUploadingImages
                         ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                      ),
-                    )
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
                         : const Icon(
-                      Icons.send,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                            Icons.send,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                   ),
                 ),
               ),
@@ -1075,7 +1219,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          _buildProfileAvatar(otherUserData['name'] ?? widget.otherUserName ?? 'U', false, 32),
+          _buildProfileAvatar(
+              otherUserData['name'] ?? widget.otherUserName ?? 'U', false, 32),
           const SizedBox(width: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1096,7 +1241,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 Text(
                   'Typing',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5),
                     fontSize: 14,
                   ),
                 ),
@@ -1134,7 +1282,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 width: 5,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: value > 0.5 ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                  color: value > 0.5
+                      ? Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.5)
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
               );
@@ -1144,7 +1300,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               width: 5,
               height: 5,
               decoration: BoxDecoration(
-                color: value > 0.5 ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                color: value > 0.5
+                    ? Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5)
+                    : Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
             );
@@ -1169,7 +1333,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         gradient: LinearGradient(
           colors: isMe
               ? [const Color(0xFF2B6390), const Color(0xFF3E83AE)]
-              : [Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2), Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)],
+              : [
+                  Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.2),
+                  Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1193,7 +1363,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     _messageController.clear();
     final imagesToSend = List<File>.from(_selectedImages);
-    final replyToId = replyingToMessageId != null ? int.tryParse(replyingToMessageId!) : null;
+    final replyToId =
+        replyingToMessageId != null ? int.tryParse(replyingToMessageId!) : null;
 
     setState(() {
       _selectedImages.clear();
@@ -1292,7 +1463,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
 
       if (!hasPermission) {
-        _showSnackBar('Storage permission denied. Please enable it in settings.', Colors.red);
+        _showSnackBar(
+            'Storage permission denied. Please enable it in settings.',
+            Colors.red);
         return;
       }
 
@@ -1306,7 +1479,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final response = await http.get(Uri.parse(fullUrl));
 
       if (response.statusCode != 200) {
-        _showSnackBar('Failed to download image (${response.statusCode})', Colors.red);
+        _showSnackBar(
+            'Failed to download image (${response.statusCode})', Colors.red);
         return;
       }
 
@@ -1321,7 +1495,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             if (!await picturesDir.exists()) {
               await picturesDir.create(recursive: true);
             }
-            final fileName = 'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            final fileName =
+                'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
             final filePath = '${picturesDir.path}/$fileName';
             final file = File(filePath);
             await file.writeAsBytes(response.bodyBytes);
@@ -1330,7 +1505,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         } else {
           final directory = Directory('/storage/emulated/0/Download');
           if (await directory.exists()) {
-            final fileName = 'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            final fileName =
+                'dolo_${DateTime.now().millisecondsSinceEpoch}.jpg';
             final filePath = '${directory.path}/$fileName';
             final file = File(filePath);
             await file.writeAsBytes(response.bodyBytes);
@@ -1421,7 +1597,8 @@ class EnhancedMessageBubble extends StatelessWidget {
     return GestureDetector(
       onLongPress: () => _showMessageOptions(context),
       child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMe) ...[
@@ -1462,7 +1639,10 @@ class EnhancedMessageBubble extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.4,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.7),
                       ),
                     ),
                   if (timestamp != null) ...[
@@ -1474,7 +1654,12 @@ class EnhancedMessageBubble extends StatelessWidget {
                           Icon(
                             seen ? Icons.done_all : Icons.done,
                             size: 14,
-                            color: seen ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                            color: seen
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.3),
                           ),
                           const SizedBox(width: 4),
                         ],
@@ -1482,7 +1667,10 @@ class EnhancedMessageBubble extends StatelessWidget {
                           DateFormat('hh:mm a').format(timestamp),
                           style: TextStyle(
                             fontSize: 11,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.45),
                           ),
                         ),
                       ],
@@ -1513,7 +1701,13 @@ class EnhancedMessageBubble extends StatelessWidget {
         gradient: LinearGradient(
           colors: isMe
               ? [const Color(0xFF2B6390), const Color(0xFF3E83AE)]
-              : [Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2), Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)],
+              : [
+                  Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.2),
+                  Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1555,7 +1749,8 @@ class EnhancedMessageBubble extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border(
           left: BorderSide(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
             width: 3,
           ),
         ),
@@ -1568,7 +1763,10 @@ class EnhancedMessageBubble extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 4),
@@ -1576,7 +1774,10 @@ class EnhancedMessageBubble extends StatelessWidget {
             replyText.isNotEmpty ? replyText : '📷 Photo',
             style: TextStyle(
               fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.7),
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -1616,7 +1817,12 @@ class EnhancedMessageBubble extends StatelessWidget {
                 width: 200,
                 color: Theme.of(context).colorScheme.surface,
                 child: Center(
-                  child: Icon(Icons.broken_image, size: 50, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+                  child: Icon(Icons.broken_image,
+                      size: 50,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.4)),
                 ),
               );
             },
@@ -1651,7 +1857,8 @@ class EnhancedMessageBubble extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             ListTile(
-              leading: Icon(Icons.reply, color: Theme.of(context).colorScheme.primary),
+              leading: Icon(Icons.reply,
+                  color: Theme.of(context).colorScheme.primary),
               title: const Text('Reply'),
               onTap: () {
                 Navigator.pop(context);
@@ -1660,7 +1867,11 @@ class EnhancedMessageBubble extends StatelessWidget {
             ),
             if (messageText.isNotEmpty)
               ListTile(
-                leading: Icon(Icons.copy, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                leading: Icon(Icons.copy,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5)),
                 title: const Text('Copy Text'),
                 onTap: () {
                   Navigator.pop(context);

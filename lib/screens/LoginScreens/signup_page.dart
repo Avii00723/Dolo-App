@@ -163,6 +163,7 @@ class _SignupScreenState extends State<SignupScreen> {
               fullName: fullName,
               email: email,
               phone: phone != null ? '+91 $phone' : null,
+              redirectToHomeOnSkip: true,
             ),
           ),
         );
@@ -504,7 +505,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _submitSignup,
+                            onPressed: _isLoading || !_isTermsAccepted ? null : _submitSignup,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Theme.of(context).colorScheme.primary,
                               disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),

@@ -104,4 +104,38 @@ class NotificationService {
       };
     }
   }
+
+  // Mark multiple notifications as read
+  static Future<Map<String, dynamic>> markAllAsRead(List<String> notificationIds) async {
+    if (notificationIds.isEmpty) {
+      return {
+        'success': true,
+        'message': 'No unread notifications',
+      };
+    }
+
+    try {
+      final results = await Future.wait(notificationIds.map((id) => markAsRead(id)));
+      final failed = results.where((result) => result['success'] != true).toList();
+
+      if (failed.isEmpty) {
+        return {
+          'success': true,
+          'message': 'All notifications marked as read',
+        };
+      }
+
+      return {
+        'success': false,
+        'error': 'Some notifications could not be marked as read',
+        'details': failed,
+      };
+    } catch (e) {
+      print('❌ Error marking all notifications as read: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
 }

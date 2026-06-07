@@ -239,9 +239,15 @@ class OrderService {
           return <Order>[];
         },
       );
+      
+      // Check if backend is down
+      if (!response.success && response.error?.contains('temporarily unavailable') == true) {
+        throw Exception('BACKEND_DOWN: ${response.error}');
+      }
+      
       return response.success ? (response.data as List<Order>? ?? []) : [];
     } catch (e) {
-      return [];
+      rethrow;
     }
   }
 }

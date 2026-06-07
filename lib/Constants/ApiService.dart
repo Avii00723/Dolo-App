@@ -78,7 +78,10 @@ class ApiService {
       );
       return _processResponse(response, endpoint, parser);
     } on SocketException {
-      return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
+      return ApiResponse.error(
+        'App is temporarily unavailable. It will resume shortly.',
+        endpoint: endpoint,
+      );
     } catch (e) {
       return ApiResponse.error('Request failed: $e', endpoint: endpoint);
     }
@@ -102,7 +105,10 @@ class ApiService {
       );
       return _processResponse(response, endpoint, parser);
     } on SocketException {
-      return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
+      return ApiResponse.error(
+        'App is temporarily unavailable. It will resume shortly.',
+        endpoint: endpoint,
+      );
     } catch (e) {
       return ApiResponse.error('Request failed: $e', endpoint: endpoint);
     }
@@ -140,7 +146,10 @@ class ApiService {
 
       return _processResponse(response, endpoint, parser);
     } on SocketException {
-      return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
+      return ApiResponse.error(
+        'App is temporarily unavailable. It will resume shortly.',
+        endpoint: endpoint,
+      );
     } catch (e) {
       return ApiResponse.error('Request failed: $e', endpoint: endpoint);
     }
@@ -185,7 +194,10 @@ class ApiService {
       );
       return _processResponse(response, endpoint, parser);
     } on SocketException {
-      return ApiResponse.error('Network error - check your connection', endpoint: endpoint);
+      return ApiResponse.error(
+        'App is temporarily unavailable. It will resume shortly.',
+        endpoint: endpoint,
+      );
     } catch (e) {
       return ApiResponse.error('Request failed: $e', endpoint: endpoint);
     }
@@ -240,6 +252,14 @@ class ApiService {
         );
       }
     } else {
+      if (statusCode >= 500 && statusCode < 600) {
+        return ApiResponse.error(
+          'App is temporarily unavailable. It will resume shortly.',
+          statusCode: statusCode,
+          endpoint: endpoint,
+          details: responseBody is String ? responseBody : rawBody,
+        );
+      }
       final userNotFound = _isUserNotFoundError(statusCode, responseBody);
       final errorMsg = responseBody is Map && responseBody['message'] != null
           ? responseBody['message'].toString()

@@ -11,9 +11,11 @@ import '../../Controllers/AuthService.dart';
 import '../../Controllers/ProfileService.dart';
 import '../../Constants/colorconstant.dart';
 import '../../Constants/ApiConstants.dart';
+import '../../Services/LocationService.dart';
 import '../../Models/OrderModel.dart';
 import '../../Models/LoginModel.dart';
 import '../LoginScreens/kyc_screen.dart';
+import '../MapLocationPickerScreen.dart';
 import '../../Widgets/FloatingNotification.dart';
 
 // =============================================================================
@@ -79,17 +81,17 @@ class _PlacesFieldState extends State<_PlacesField> {
   }
 
   Position _makePosition(dynamic prediction) => Position(
-    latitude: double.parse(prediction.lat.toString()),
-    longitude: double.parse(prediction.lng.toString()),
-    timestamp: DateTime.now(),
-    accuracy: 0.0,
-    altitude: 0.0,
-    altitudeAccuracy: 0.0,
-    heading: 0.0,
-    headingAccuracy: 0.0,
-    speed: 0.0,
-    speedAccuracy: 0.0,
-  );
+        latitude: double.parse(prediction.lat.toString()),
+        longitude: double.parse(prediction.lng.toString()),
+        timestamp: DateTime.now(),
+        accuracy: 0.0,
+        altitude: 0.0,
+        altitudeAccuracy: 0.0,
+        heading: 0.0,
+        headingAccuracy: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +141,7 @@ class _PlacesFieldState extends State<_PlacesField> {
               borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
         ),
       ],
@@ -154,14 +156,17 @@ class _PlacesFieldState extends State<_PlacesField> {
 class _LocationSearchView extends StatelessWidget {
   final String pickupText;
   final String dropText;
-  final List<Map<String, String>> recentSearches;
+  final List<Map<String, dynamic>> recentSearches;
   final String? focusedField;
 
   final VoidCallback onDone;
+  final VoidCallback onSwapLocations;
+  final VoidCallback onUseCurrentLocation;
+  final VoidCallback onPickLocationOnMap;
   final void Function(String field) onFieldFocused;
   final void Function(String text, Position pos) onPickupSelected;
   final void Function(String text, Position pos) onDropSelected;
-  final void Function(String city) onRecentSearch;
+  final void Function(Map<String, dynamic> search) onRecentSearch;
 
   const _LocationSearchView({
     super.key,
@@ -170,6 +175,9 @@ class _LocationSearchView extends StatelessWidget {
     required this.recentSearches,
     required this.focusedField,
     required this.onDone,
+    required this.onSwapLocations,
+    required this.onUseCurrentLocation,
+    required this.onPickLocationOnMap,
     required this.onFieldFocused,
     required this.onPickupSelected,
     required this.onDropSelected,
@@ -192,6 +200,7 @@ class _LocationSearchView extends StatelessWidget {
                 const SizedBox(height: 20),
                 // PICKUP
                 _PlacesField(
+                  key: ValueKey('pickup_$pickupText'),
                   initialText: pickupText,
                   labelText: 'Pickup City',
                   hintText: 'Eg. Mumbai',
@@ -199,13 +208,48 @@ class _LocationSearchView extends StatelessWidget {
                   onLocationSelected: onPickupSelected,
                 ),
                 const SizedBox(height: 16),
+                Center(
+                  child: IconButton(
+                    tooltip: 'Swap pickup and drop',
+                    icon: const Icon(Icons.swap_vert_circle_outlined),
+                    onPressed: onSwapLocations,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 // DROP
                 _PlacesField(
+                  key: ValueKey('drop_$dropText'),
                   initialText: dropText,
                   labelText: 'Drop City',
                   hintText: 'Eg. Delhi',
                   onFocusGained: () => onFieldFocused('drop'),
                   onLocationSelected: onDropSelected,
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    spacing: 8,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed: onUseCurrentLocation,
+                        icon: const Icon(Icons.my_location, size: 18),
+                        label: const Text('Current'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: onPickLocationOnMap,
+                        icon: const Icon(Icons.map_outlined, size: 18),
+                        label: const Text('Map'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const Divider(height: 30),
                 const Text('RECENT SEARCHES',
@@ -215,11 +259,14 @@ class _LocationSearchView extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   children: recentSearches.map((s) {
+                    final origin = s['origin']?.toString() ?? '';
+                    final destination = s['destination']?.toString() ?? '';
                     return ListTile(
                       leading: const Icon(Icons.history),
-                      title: Text(s['city']!),
-                      subtitle: Text(s['country']!),
-                      onTap: () => onRecentSearch(s['city']!),
+                      title: Text('$destination - $origin'),
+                      subtitle: const Text('Tap to use pickup and drop'),
+                      trailing: const Icon(Icons.north_east, size: 18),
+                      onTap: () => onRecentSearch(s),
                     );
                   }).toList(),
                 ),
@@ -292,11 +339,31 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   String? _focusedField;
 
   // ── Recent Searches ────────────────────────────────────────────────────────
-  final List<Map<String, String>> _recentSearches = [
-    {'city': 'Delhi', 'country': 'India'},
-    {'city': 'Mumbai', 'country': 'India'},
-    {'city': 'Bangalore', 'country': 'India'},
-    {'city': 'Kolkata', 'country': 'India'},
+  final List<Map<String, dynamic>> _recentSearches = [
+    {
+      'origin': 'Mumbai',
+      'destination': 'Delhi',
+      'originLatitude': 19.0760,
+      'originLongitude': 72.8777,
+      'destinationLatitude': 28.6139,
+      'destinationLongitude': 77.2090,
+    },
+    {
+      'origin': 'Bangalore',
+      'destination': 'Hyderabad',
+      'originLatitude': 12.9716,
+      'originLongitude': 77.5946,
+      'destinationLatitude': 17.3850,
+      'destinationLongitude': 78.4867,
+    },
+    {
+      'origin': 'Kolkata',
+      'destination': 'Mumbai',
+      'originLatitude': 22.5726,
+      'originLongitude': 88.3639,
+      'destinationLatitude': 19.0760,
+      'destinationLongitude': 72.8777,
+    },
   ];
 
   // ── Order fields ───────────────────────────────────────────────────────────
@@ -322,7 +389,13 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   bool _isLoadingUser = true;
 
   final List<String> _transportModes = [
-    'Car', 'Bike', 'Pickup Truck', 'Truck', 'Bus', 'Train', 'Plane',
+    'Car',
+    'Bike',
+    'Pickup Truck',
+    'Truck',
+    'Bus',
+    'Train',
+    'Plane',
   ];
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -393,20 +466,124 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     setState(() => _isLocationViewFocused = false);
     // Unmount after the slide-out animation finishes.
     Future.delayed(const Duration(milliseconds: 320), () {
-      if (mounted) setState(() {
-        _locationViewMounted = false;
-        _focusedField = null;
-      });
+      if (mounted)
+        setState(() {
+          _locationViewMounted = false;
+          _focusedField = null;
+        });
     });
   }
 
-  void _onRecentSearch(String city) {
+  Position _positionFromCoordinates(double latitude, double longitude) {
+    return Position(
+      latitude: latitude,
+      longitude: longitude,
+      timestamp: DateTime.now(),
+      accuracy: 0.0,
+      altitude: 0.0,
+      altitudeAccuracy: 0.0,
+      heading: 0.0,
+      headingAccuracy: 0.0,
+      speed: 0.0,
+      speedAccuracy: 0.0,
+    );
+  }
+
+  void _applyLocationToFocusedField(String text, Position position) {
     setState(() {
-      if (_focusedField == 'pickup') {
-        _pickupText = city;
-      } else if (_focusedField == 'drop') {
-        _dropText = city;
+      if (_focusedField == 'drop') {
+        _dropText = text;
+        destinationPosition = position;
+      } else {
+        _pickupText = text;
+        originPosition = position;
       }
+    });
+  }
+
+  void _swapLocations() {
+    setState(() {
+      final pickupText = _pickupText;
+      final pickupPosition = originPosition;
+      _pickupText = _dropText;
+      originPosition = destinationPosition;
+      _dropText = pickupText;
+      destinationPosition = pickupPosition;
+    });
+  }
+
+  Future<void> _useCurrentLocationForFocusedField() async {
+    final position = await LocationService.getCurrentPosition();
+    if (!mounted) return;
+    if (position == null) {
+      FloatingNotification.show(context,
+          isSuccess: false,
+          title: 'Location',
+          subtitle: 'Unable to get current location');
+      return;
+    }
+
+    final address = await LocationService.getAddressFromCoordinates(
+      position.latitude,
+      position.longitude,
+    );
+    if (!mounted) return;
+    _applyLocationToFocusedField(
+      address?.trim().isNotEmpty == true
+          ? address!.trim()
+          : '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}',
+      position,
+    );
+  }
+
+  Future<void> _pickFocusedLocationOnMap() async {
+    final isDrop = _focusedField == 'drop';
+    final initialPosition = isDrop ? destinationPosition : originPosition;
+    final initialAddress = isDrop ? _dropText : _pickupText;
+    final result = await Navigator.push<MapLocationResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapLocationPickerScreen(
+          title: isDrop ? 'Select drop location' : 'Select pickup location',
+          confirmLabel: isDrop ? 'Use drop location' : 'Use pickup location',
+          initialLatitude: initialPosition?.latitude,
+          initialLongitude: initialPosition?.longitude,
+          initialAddress: initialAddress,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    _applyLocationToFocusedField(
+      result.address,
+      _positionFromCoordinates(result.latitude, result.longitude),
+    );
+  }
+
+  void _onRecentSearch(Map<String, dynamic> search) {
+    final origin = search['origin']?.toString() ?? '';
+    final destination = search['destination']?.toString() ?? '';
+    final originLat = (search['originLatitude'] as num?)?.toDouble();
+    final originLng = (search['originLongitude'] as num?)?.toDouble();
+    final destinationLat = (search['destinationLatitude'] as num?)?.toDouble();
+    final destinationLng = (search['destinationLongitude'] as num?)?.toDouble();
+    if (originLat == null ||
+        originLng == null ||
+        destinationLat == null ||
+        destinationLng == null) {
+      FloatingNotification.show(context,
+          isSuccess: false,
+          title: 'Location',
+          subtitle: 'Recent route is missing coordinates');
+      return;
+    }
+
+    setState(() {
+      _pickupText = origin;
+      _dropText = destination;
+      originPosition = _positionFromCoordinates(originLat, originLng);
+      destinationPosition =
+          _positionFromCoordinates(destinationLat, destinationLng);
+      _focusedField = 'drop';
     });
   }
 
@@ -445,6 +622,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               isSuccess: false,
               title: 'Required',
               subtitle: 'Please enter drop city');
+          return false;
+        }
+        if (originPosition == null || destinationPosition == null) {
+          FloatingNotification.show(context,
+              isSuccess: false,
+              title: 'Required',
+              subtitle:
+                  'Please select pickup and drop from suggestions or map');
           return false;
         }
         if (_pickupDateTime == null) {
@@ -493,6 +678,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   bool _validateAllFields() {
     if (_pickupText.trim().isEmpty ||
         _dropText.trim().isEmpty ||
+        originPosition == null ||
+        destinationPosition == null ||
         _pickupDateTime == null ||
         _deliveryDateTime == null ||
         _selectedWeightRange == null ||
@@ -546,7 +733,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         category: _selectedMainCategory!.apiValue,
         customCategory: null,
         preferenceTransport:
-        _selectedTransportModes.isNotEmpty ? _selectedTransportModes : null,
+            _selectedTransportModes.isNotEmpty ? _selectedTransportModes : null,
         isUrgent: _isUrgent,
         images: _selectedImages,
         specialInstructions: restrictionsController.text.trim().isEmpty
@@ -657,9 +844,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           userId: userId!,
           fullName: _userProfile?.name,
           email: _userProfile?.email,
-          phone: _userProfile?.phone != null
-              ? '+91 ${_userProfile?.phone}'
-              : null,
+          phone:
+              _userProfile?.phone != null ? '+91 ${_userProfile?.phone}' : null,
         ),
       ),
     );
@@ -681,10 +867,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     );
     if (date != null) {
       final time =
-      await showTimePicker(context: context, initialTime: TimeOfDay.now());
+          await showTimePicker(context: context, initialTime: TimeOfDay.now());
       if (time != null) {
         final dt =
-        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+            DateTime(date.year, date.month, date.day, time.hour, time.minute);
         setState(() {
           if (isPickup) {
             _pickupDateTime = dt;
@@ -692,7 +878,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             _deliveryDateTime = dt;
           }
           controller.text =
-          '${date.day}/${date.month}/${date.year} · ${time.format(context)}';
+              '${date.day}/${date.month}/${date.year} · ${time.format(context)}';
         });
       }
     }
@@ -775,7 +961,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   Widget build(BuildContext context) {
     if (_isLoadingUser) {
       return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body:
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
     if (userId == null) {
@@ -809,18 +996,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         appBar: AppBar(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: () {
-              if (_locationViewMounted) {
-                _hideLocationView();
-              } else if (_currentStep > 0) {
-                _previousStep();
-              } else if (Navigator.canPop(context)) {
-                Navigator.of(context).pop();
-              }
-            },
-          ),
+          automaticallyImplyLeading: false,
           title: const Text('Create Order',
               style: TextStyle(
                   color: Colors.black,
@@ -849,9 +1025,8 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                               style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface)),
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface)),
                           const SizedBox(height: 12),
                           Row(
                             children: [
@@ -859,7 +1034,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                                 child: LinearProgressIndicator(
                                   value: (_currentStep + 1) / _totalSteps,
                                   backgroundColor:
-                                  Theme.of(context).colorScheme.surface,
+                                      Theme.of(context).colorScheme.surface,
                                   valueColor: AlwaysStoppedAnimation<Color>(
                                       Theme.of(context).colorScheme.primary),
                                   minHeight: 4,
@@ -896,12 +1071,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                     // Bottom button
                     SafeArea(
                       child: Container(
-                        padding:
-                        const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
                         margin: const EdgeInsets.only(bottom: 30),
                         decoration: BoxDecoration(
-                          color:
-                          Theme.of(context).scaffoldBackgroundColor,
+                          color: Theme.of(context).scaffoldBackgroundColor,
                           boxShadow: [
                             BoxShadow(
                                 color: Colors.black.withOpacity(0.05),
@@ -916,29 +1089,29 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                             onPressed: _isCreatingOrder
                                 ? null
                                 : (_currentStep == _totalSteps - 1
-                                ? _createOrder
-                                : _nextStep),
+                                    ? _createOrder
+                                    : _nextStep),
                             style: ElevatedButton.styleFrom(
                               backgroundColor:
-                              Theme.of(context).colorScheme.primary,
+                                  Theme.of(context).colorScheme.primary,
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8)),
                               elevation: 0,
                             ),
                             child: _isCreatingOrder
                                 ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2))
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                        color: Colors.white, strokeWidth: 2))
                                 : Text(
-                                _currentStep == _totalSteps - 1
-                                    ? 'POST'
-                                    : 'NEXT',
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white)),
+                                    _currentStep == _totalSteps - 1
+                                        ? 'POST'
+                                        : 'NEXT',
+                                    style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white)),
                           ),
                         ),
                       ),
@@ -954,9 +1127,13 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             // Animates in (slide-up + fade) and out (slide-down + fade).
             if (_locationViewMounted)
               AnimatedSlide(
-                offset: _isLocationViewFocused ? Offset.zero : const Offset(0, 0.06),
+                offset: _isLocationViewFocused
+                    ? Offset.zero
+                    : const Offset(0, 0.06),
                 duration: const Duration(milliseconds: 300),
-                curve: _isLocationViewFocused ? Curves.easeOutCubic : Curves.easeInCubic,
+                curve: _isLocationViewFocused
+                    ? Curves.easeOutCubic
+                    : Curves.easeInCubic,
                 child: AnimatedOpacity(
                   opacity: _isLocationViewFocused ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 260),
@@ -967,6 +1144,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                     recentSearches: _recentSearches,
                     focusedField: _focusedField,
                     onDone: _hideLocationView,
+                    onSwapLocations: _swapLocations,
+                    onUseCurrentLocation: _useCurrentLocationForFocusedField,
+                    onPickLocationOnMap: _pickFocusedLocationOnMap,
                     onFieldFocused: (f) => setState(() => _focusedField = f),
                     onPickupSelected: (text, pos) => setState(() {
                       _pickupText = text;
@@ -1063,8 +1243,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                 Expanded(
                   child: Text(
                     'Mark this order as urgent (additional charges may apply)',
-                    style:
-                    TextStyle(fontSize: 13, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                   ),
                 ),
               ],
@@ -1087,16 +1266,14 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w500)),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
             width: double.infinity,
-            padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
@@ -1112,9 +1289,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                     value.isEmpty ? hint : value,
                     style: TextStyle(
                       fontSize: 14,
-                      color: value.isEmpty
-                          ? Colors.grey[400]
-                          : Colors.black87,
+                      color: value.isEmpty ? Colors.grey[400] : Colors.black87,
                     ),
                   ),
                 ),
@@ -1154,7 +1329,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                   : null,
               items: _transportModes,
               onChanged: (value) => setState(() =>
-              _selectedTransportModes = value != null ? [value] : [])),
+                  _selectedTransportModes = value != null ? [value] : [])),
         ],
       ),
     );
@@ -1169,8 +1344,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Package Photo',
-              style:
-              TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 12),
           GestureDetector(
             onTap: _pickImage,
@@ -1184,41 +1358,40 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               ),
               child: _selectedImages.isEmpty
                   ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12)),
-                    child: Icon(Icons.add_photo_alternate_outlined,
-                        size: 28, color: Colors.grey[400]),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('Upload File',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500)),
-                  Text('Tap to add photo',
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.grey[500])),
-                ],
-              )
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12)),
+                          child: Icon(Icons.add_photo_alternate_outlined,
+                              size: 28, color: Colors.grey[400]),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Upload File',
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w500)),
+                        Text('Tap to add photo',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[500])),
+                      ],
+                    )
                   : GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8),
-                itemCount: _selectedImages.length,
-                itemBuilder: (context, index) => ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(_selectedImages[index],
-                      fit: BoxFit.cover),
-                ),
-              ),
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8),
+                      itemCount: _selectedImages.length,
+                      itemBuilder: (context, index) => ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(_selectedImages[index],
+                            fit: BoxFit.cover),
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 20),
@@ -1248,8 +1421,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w500)),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
@@ -1258,27 +1430,22 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
           maxLines: maxLines,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle:
-            TextStyle(color: Colors.grey[400], fontSize: 14),
-            prefixIcon:
-            Icon(icon, size: 20, color: Colors.grey[600]),
+            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+            prefixIcon: Icon(icon, size: 20, color: Colors.grey[600]),
             filled: true,
             fillColor: Theme.of(context).colorScheme.surface,
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                BorderSide(color: Theme.of(context).dividerColor)),
+                borderSide: BorderSide(color: Theme.of(context).dividerColor)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                BorderSide(color: Theme.of(context).dividerColor)),
+                borderSide: BorderSide(color: Theme.of(context).dividerColor)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 1.5)),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 14),
+                    color: Theme.of(context).colorScheme.primary, width: 1.5)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
         ),
       ],
@@ -1297,37 +1464,31 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w500)),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: value,
           hint: Row(children: [
             Icon(icon, size: 20, color: Colors.grey[600]),
             const SizedBox(width: 12),
-            Text(hint,
-                style:
-                TextStyle(color: Colors.grey[400], fontSize: 14)),
+            Text(hint, style: TextStyle(color: Colors.grey[400], fontSize: 14)),
           ]),
           decoration: InputDecoration(
             filled: true,
             fillColor: Theme.of(context).colorScheme.surface,
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                BorderSide(color: Theme.of(context).dividerColor)),
+                borderSide: BorderSide(color: Theme.of(context).dividerColor)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                BorderSide(color: Theme.of(context).dividerColor)),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 14),
+                borderSide: BorderSide(color: Theme.of(context).dividerColor)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           items: items
               .map((item) => DropdownMenuItem(
-              value: item,
-              child: Text(item,
-                  style: const TextStyle(fontSize: 14))))
+                  value: item,
+                  child: Text(item, style: const TextStyle(fontSize: 14))))
               .toList(),
           onChanged: onChanged,
         ),
@@ -1340,8 +1501,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Package Type',
-            style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w500)),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         DropdownButtonFormField<OrderMainCategory>(
           value: _selectedMainCategory,
@@ -1349,31 +1509,27 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
             Icon(Icons.category, size: 20, color: Colors.grey[600]),
             const SizedBox(width: 12),
             Text('Eg. Furniture',
-                style:
-                TextStyle(color: Colors.grey[400], fontSize: 14)),
+                style: TextStyle(color: Colors.grey[400], fontSize: 14)),
           ]),
           decoration: InputDecoration(
             filled: true,
             fillColor: Theme.of(context).colorScheme.surface,
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                BorderSide(color: Theme.of(context).dividerColor)),
+                borderSide: BorderSide(color: Theme.of(context).dividerColor)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                BorderSide(color: Theme.of(context).dividerColor)),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 14),
+                borderSide: BorderSide(color: Theme.of(context).dividerColor)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           items: orderCategories
               .map((category) => DropdownMenuItem(
-              value: category,
-              child: Text(category.name,
-                  style: const TextStyle(fontSize: 14))))
+                  value: category,
+                  child: Text(category.name,
+                      style: const TextStyle(fontSize: 14))))
               .toList(),
-          onChanged: (value) =>
-              setState(() => _selectedMainCategory = value),
+          onChanged: (value) => setState(() => _selectedMainCategory = value),
         ),
       ],
     );
@@ -1428,8 +1584,7 @@ class _OrderSuccessCardState extends State<_OrderSuccessCard>
         scale: _scale,
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 32),
-          padding:
-          const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
@@ -1485,8 +1640,7 @@ class _OrderSuccessCardState extends State<_OrderSuccessCard>
                     child: OutlinedButton(
                       onPressed: widget.onTrackOrder,
                       style: OutlinedButton.styleFrom(
-                        padding:
-                        const EdgeInsets.symmetric(vertical: 13),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                         side: BorderSide(color: Colors.grey[400]!),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
@@ -1505,8 +1659,7 @@ class _OrderSuccessCardState extends State<_OrderSuccessCard>
                     child: OutlinedButton(
                       onPressed: widget.onReturnHome,
                       style: OutlinedButton.styleFrom(
-                        padding:
-                        const EdgeInsets.symmetric(vertical: 13),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                         side: BorderSide(color: Colors.grey[400]!),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
