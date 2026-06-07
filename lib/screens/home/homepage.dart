@@ -21,6 +21,7 @@ class HomePageWithNav extends StatefulWidget {
 class _HomePageWithNavState extends State<HomePageWithNav>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   MotionTabBarController? _motionTabBarController;
+  late final VoidCallback _tabControllerListener;
   TutorialCoachMark? _tutorialCoachMark;
 
   final GlobalKey _homeButtonKey = GlobalKey();
@@ -40,17 +41,22 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _tabControllerListener = () {
+      if (!mounted) return;
+      setState(() {});
+    };
     _motionTabBarController = MotionTabBarController(
       initialIndex: _tabHome,
       length: 5,
       vsync: this,
-    );
+    )..addListener(_tabControllerListener);
     _checkAndShowTutorial();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _motionTabBarController?.removeListener(_tabControllerListener);
     _motionTabBarController?.dispose();
     super.dispose();
   }
@@ -166,24 +172,13 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   @override
   Widget build(BuildContext context) {
     final currentIndex = _motionTabBarController?.index ?? _tabHome;
-    final canSwapMode =
-        currentIndex == _tabSearch || currentIndex == _tabCreate;
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: TabBarView(
-        physics: const NeverScrollableScrollPhysics(),
         controller: _motionTabBarController,
         children: _pages,
       ),
-      floatingActionButton: canSwapMode
-          ? FloatingActionButton.extended(
-              onPressed: _swapSearchCreateTab,
-              icon: const Icon(Icons.swap_horiz),
-              label: Text(currentIndex == _tabSearch ? 'Create' : 'Search'),
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),
