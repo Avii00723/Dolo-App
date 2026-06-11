@@ -79,17 +79,21 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
   }
 
   Future<void> _loadUserData() async {
-    final userId = await AuthService.getUserId();
-    if (userId != null) {
-      final profileService = ProfileService();
-      final userProfile = await profileService.getUserProfile(userId);
-      if (userProfile != null) {
-        setState(() {
-          _userName = userProfile.name;
-        });
-      }
+  final userId = await AuthService.getUserId();
+  if (!mounted) return;                          // ✅ guard after first await
+
+  if (userId != null) {
+    final profileService = ProfileService();
+    final userProfile = await profileService.getUserProfile(userId);
+    if (!mounted) return;                        // ✅ guard after second await
+
+    if (userProfile != null) {
+      setState(() {
+        _userName = userProfile.name;
+      });
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {

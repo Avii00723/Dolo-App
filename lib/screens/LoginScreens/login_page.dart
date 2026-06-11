@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'OTPScreen.dart';
 import '../../Controllers/LoginService.dart';
+import '../BackendDownScreen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -61,6 +62,12 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
+        if (e.toString().contains('BACKEND_DOWN')) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const BackendDownScreen()),
+          );
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );
@@ -99,7 +106,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -127,7 +137,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5),
                   ),
                 ),
 
@@ -163,17 +176,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       // Phone Number Input with Country Code
                       Container(
                         decoration: BoxDecoration(
-                          border: Border.all(color: Theme.of(context).dividerColor),
+                          border:
+                              Border.all(color: Theme.of(context).dividerColor),
                           borderRadius: BorderRadius.circular(30),
                         ),
                         child: Row(
                           children: [
                             // Country Code Dropdown
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
                               decoration: BoxDecoration(
                                 border: Border(
-                                  right: BorderSide(color: Theme.of(context).dividerColor),
+                                  right: BorderSide(
+                                      color: Theme.of(context).dividerColor),
                                 ),
                               ),
                               child: Row(
@@ -183,7 +199,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: Theme.of(context).colorScheme.onSurface,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
                                     ),
                                   ),
                                 ],
@@ -203,7 +221,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 decoration: InputDecoration(
                                   hintText: 'Phone Number',
                                   hintStyle: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.35),
                                     fontWeight: FontWeight.normal,
                                   ),
                                   border: InputBorder.none,
@@ -231,7 +252,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: isLoading ? null : sendOTP,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF001127),
-                            disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                            disabledBackgroundColor: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.2),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30),
@@ -240,21 +264,22 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           child: isLoading
                               ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
-                            ),
-                          )
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        AlwaysStoppedAnimation(Colors.white),
+                                  ),
+                                )
                               : const Text(
-                            'Get OTP',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
+                                  'Get OTP',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       ),
                     ],

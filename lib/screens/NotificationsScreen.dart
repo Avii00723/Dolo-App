@@ -5,7 +5,6 @@ import '../Models/NotificationModel.dart';
 import '../Controllers/AuthService.dart';
 import '../Controllers/OrderTrackingService.dart';
 import '../Controllers/DeviceTokenService.dart';
-import '../Controllers/SocketService.dart';
 import 'Inbox Section/indoxscreen.dart';
 import 'Inbox Section/ChatScreen.dart';
 import 'orderSection/RatingFeedbackDialog.dart';
@@ -22,7 +21,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<NotificationModel> _notifications = [];
   bool _isLoading = true;
   final OrderTrackingService _orderTrackingService = OrderTrackingService();
-  final SocketService _socketService = SocketService();
   StreamSubscription? _fcmSubscription;
 
   @override
@@ -35,8 +33,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void dispose() {
     _fcmSubscription?.cancel();
-    // Not removing socket listener here to avoid interfering with other screens,
-    // but typically you'd want a dedicated event or a scoped listener.
     super.dispose();
   }
 
@@ -47,19 +43,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       debugPrint('🔔 NotificationsScreen: FCM message received, refreshing...');
       _loadNotifications(silent: true);
     });
-
-    // 2. Listen for Socket.io messages (which often correspond to notifications)
-    try {
-      if (_socketService.isConnected) {
-        _socketService.onReceiveMessage((data) {
-          debugPrint(
-              '🔌 NotificationsScreen: Socket message received, refreshing...');
-          _loadNotifications(silent: true);
-        });
-      }
-    } catch (e) {
-      debugPrint('❌ NotificationsScreen: Error setting up socket listener: $e');
-    }
   }
 
   Future<void> _loadNotifications({bool silent = false}) async {
@@ -88,7 +71,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
       }
     } catch (e) {
-      debugPrint('❌ NotificationsScreen: Error loading notifications: $e');
+      debugPrint('Error loading notifications: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -733,7 +716,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['error']?.toString() ?? 'Unable to mark all read'),
+          content:
+              Text(result['error']?.toString() ?? 'Unable to mark all read'),
           backgroundColor: Colors.red,
         ),
       );

@@ -7,6 +7,7 @@ import '../../Controllers/ChatService.dart';
 import '../../Controllers/SocketService.dart';
 import '../../Controllers/TripRequestService.dart';
 import '../../Controllers/OrderTrackingService.dart';
+import '../../Controllers/UnreadCountService.dart';
 import '../../Models/TripRequestModel.dart';
 import '../../widgets/NotificationBellIcon.dart';
 import '../../Constants/ApiConstants.dart';
@@ -21,7 +22,8 @@ class InboxScreen extends StatefulWidget {
   State<InboxScreen> createState() => _InboxScreenState();
 }
 
-class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStateMixin {
+class _InboxScreenState extends State<InboxScreen>
+    with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> _conversations = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -33,6 +35,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
 
   Map<String, bool> _typingStatus = {};
   Map<String, Timer?> _typingTimers = {};
+  StreamSubscription<Map<String, dynamic>>? _messageSubscription;
+  StreamSubscription<Map<String, dynamic>>? _typingSubscription;
 
   List<TripRequest> _sentRequests = [];
   List<TripRequest> _receivedRequests = [];
@@ -58,6 +62,9 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   void dispose() {
     _tabController.dispose();
     _typingTimers.values.forEach((timer) => timer?.cancel());
+    _messageSubscription?.cancel();
+    _typingSubscription?.cancel();
+    _socketService.releaseConnection();
     super.dispose();
   }
 
@@ -82,7 +89,17 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
 
       if (result['success'] == true) {
         final apiInbox = result['inbox'] as List<dynamic>;
-        final conversations = apiInbox.map((item) => item as Map<String, dynamic>).toList();
+        final conversations =
+            apiInbox.map((item) => item as Map<String, dynamic>).toList();
+
+        // ✅ Sync the global badge counter with real unread counts from the API.
+        // This runs every time the inbox refreshes (on open, after returning
+        // from a chat, after a socket message) so the badge is always accurate.
+        final totalUnread = conversations.fold<int>(
+          0,
+          (sum, chat) => sum + ((chat['unread_count'] as int?) ?? 0),
+        );
+        UnreadCountService.setCount(totalUnread);
 
         setState(() {
           _conversations = conversations;
@@ -116,7 +133,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     });
 
     try {
-      final allRequests = await _tripRequestService.getMyTripRequests(_currentUserId!);
+      final allRequests =
+          await _tripRequestService.getMyTripRequests(_currentUserId!);
 
       if (!mounted) return;
 
@@ -153,12 +171,14 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     try {
       await _socketService.connect();
 
-      if (_socketService.isConnected) {
-        _socketService.onUserTyping((data) {
+      if (_socketService.socket != null) {
+        _typingSubscription = _socketService.onUserTyping((data) {
           final typingUserId = data['userId'] as String?;
           final roomId = data['roomId'] as String?;
 
-          if (typingUserId != null && roomId != null && typingUserId != _currentUserId) {
+          if (typingUserId != null &&
+              roomId != null &&
+              typingUserId != _currentUserId) {
             if (mounted) {
               setState(() {
                 _typingStatus[roomId] = true;
@@ -176,12 +196,13 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           }
         });
 
-        _socketService.onReceiveMessage((data) {
+        _messageSubscription = _socketService.onReceiveMessage((data) {
+          // Reload inbox list and re-sync the unread badge from API.
           _loadInbox();
         });
       }
     } catch (e) {
-      print('❌ Error initializing inbox WebSocket: $e');
+      debugPrint('❌ Error initializing inbox WebSocket: $e');
     }
   }
 
@@ -232,7 +253,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                     'Chats',
                     _tabController.index == 0,
                     _conversations.length,
-                        () {
+                    () {
                       _tabController.animateTo(0);
                       setState(() {});
                     },
@@ -242,9 +263,13 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                   child: _buildTab(
                     'Requests',
                     _tabController.index == 1,
-                    _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length +
-                        _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length,
-                        () {
+                    _sentRequests
+                            .where((r) => r.status.toLowerCase() != 'accepted')
+                            .length +
+                        _receivedRequests
+                            .where((r) => r.status.toLowerCase() != 'accepted')
+                            .length,
+                    () {
                       _tabController.animateTo(1);
                       setState(() {});
                     },
@@ -263,11 +288,23 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                 scrollDirection: Axis.horizontal,
                 children: _filters.map((filter) {
                   final count = filter == 'All'
-                      ? _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length +
-                      _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length
+                      ? _sentRequests
+                              .where(
+                                  (r) => r.status.toLowerCase() != 'accepted')
+                              .length +
+                          _receivedRequests
+                              .where(
+                                  (r) => r.status.toLowerCase() != 'accepted')
+                              .length
                       : filter == 'Request Sent'
-                      ? _sentRequests.where((r) => r.status.toLowerCase() != 'accepted').length
-                      : _receivedRequests.where((r) => r.status.toLowerCase() != 'accepted').length;
+                          ? _sentRequests
+                              .where(
+                                  (r) => r.status.toLowerCase() != 'accepted')
+                              .length
+                          : _receivedRequests
+                              .where(
+                                  (r) => r.status.toLowerCase() != 'accepted')
+                              .length;
 
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -293,7 +330,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildTab(String label, bool isSelected, int count, VoidCallback onTap) {
+  Widget _buildTab(
+      String label, bool isSelected, int count, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -303,12 +341,12 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           borderRadius: BorderRadius.circular(20),
           boxShadow: isSelected
               ? [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ]
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
               : null,
         ),
         child: Row(
@@ -319,7 +357,12 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.45),
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.45),
               ),
             ),
             const SizedBox(width: 6),
@@ -327,7 +370,10 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? Theme.of(context).colorScheme.primary.withValues(alpha:0.1)
+                    ? Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.1)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -336,7 +382,12 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.4),
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.4),
                 ),
               ),
             ),
@@ -357,7 +408,9 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Theme.of(context).colorScheme.primary.withValues(alpha:0.1) : Colors.transparent,
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: Theme.of(context).dividerColor,
@@ -372,14 +425,21 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.5),
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isSelected ? Theme.of(context).cardColor : Theme.of(context).colorScheme.surface,
+                color: isSelected
+                    ? Theme.of(context).cardColor
+                    : Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -387,7 +447,12 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -463,11 +528,21 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.login, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
+          Icon(Icons.login,
+              size: 64,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.3)),
           const SizedBox(height: 16),
           Text(
             'Please log in to continue',
-            style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+            style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.5)),
           ),
         ],
       ),
@@ -479,20 +554,33 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2)),
+          Icon(Icons.chat_bubble_outline,
+              size: 64,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(
             'No Chats Available',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.65),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Start chatting by accepting trip requests',
-            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+            style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.4)),
           ),
         ],
       ),
@@ -504,20 +592,33 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.request_page_outlined, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2)),
+          Icon(Icons.request_page_outlined,
+              size: 64,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(
             'No Trip Requests',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.65),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'No requests to display',
-            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+            style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.4)),
           ),
         ],
       ),
@@ -532,11 +633,11 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           chatId: conversation['chat_id'].toString(),
           orderId: conversation['order_id'].toString(),
           otherUserName: conversation['other_user_name'],
-          otherUserId: conversation['other_user_id']?.toString(), 
-          isOrderAccepted: true, // Enable report logic from chat context
+          otherUserId: conversation['other_user_id']?.toString(),
+          isOrderAccepted: true,
         ),
       ),
-    ).then((_) => _loadInbox());
+    ).then((_) => _loadInbox()); // reload + re-sync badge after returning
   }
 
   Future<void> _acceptRequest(TripRequest request) async {
@@ -544,7 +645,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Accept Trip Request'),
-        content: Text('Accept request from ${request.source} to ${request.destination}?'),
+        content: Text(
+            'Accept request from ${request.source} to ${request.destination}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -566,7 +668,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           negotiatedPrice: 0,
         );
 
-        final response = await _tripRequestService.acceptTripRequest(acceptRequest);
+        final response =
+            await _tripRequestService.acceptTripRequest(acceptRequest);
 
         if (response != null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -595,7 +698,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Decline Trip Request'),
-        content: Text('Decline this request from ${request.source} to ${request.destination}?'),
+        content: Text(
+            'Decline this request from ${request.source} to ${request.destination}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -617,7 +721,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           tripRequestId: request.id,
         );
 
-        final response = await _tripRequestService.declineTripRequest(declineRequest);
+        final response =
+            await _tripRequestService.declineTripRequest(declineRequest);
 
         if (response != null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -646,7 +751,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Withdraw Trip Request'),
-        content: Text('Withdraw your request for ${request.source} to ${request.destination}?'),
+        content: Text(
+            'Withdraw your request for ${request.source} to ${request.destination}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -668,7 +774,8 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
           tripRequestHashedId: request.id,
         );
 
-        final response = await _tripRequestService.withdrawTripRequest(withdrawRequest);
+        final response =
+            await _tripRequestService.withdrawTripRequest(withdrawRequest);
 
         if (response != null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -693,7 +800,7 @@ class _InboxScreenState extends State<InboxScreen> with SingleTickerProviderStat
   }
 }
 
-// Modern Chat Card
+// ── Modern Chat Card ──────────────────────────────────────────────────────────
 class ModernChatCard extends StatelessWidget {
   final Map<String, dynamic> conversation;
   final String currentUserId;
@@ -706,11 +813,32 @@ class ModernChatCard extends StatelessWidget {
     required this.onTap,
   }) : super(key: key);
 
+  String _formatTime(dynamic timestamp) {
+    if (timestamp == null) return '';
+    try {
+      final time = DateTime.parse(timestamp.toString());
+      final now = DateTime.now();
+      final difference = now.difference(time);
+      if (difference.inDays == 0) {
+        return 'Today';
+      } else if (difference.inDays == 1) {
+        return 'Yesterday';
+      } else if (difference.inDays < 7) {
+        return DateFormat('EEEE').format(time);
+      } else {
+        return DateFormat('MMM dd').format(time);
+      }
+    } catch (e) {
+      return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final otherUserName = conversation['other_user_name'] ?? 'Unknown User';
     final lastMessage = conversation['lastMessage'] ?? 'No messages yet';
     final lastMessageTime = conversation['lastMessageTime'];
+    final unreadCount = (conversation['unread_count'] as int?) ?? 0;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -725,8 +853,16 @@ class ModernChatCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 26,
-                  backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
-                  child: Icon(Icons.person, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45), size: 28),
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.12),
+                  child: Icon(Icons.person,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.45),
+                      size: 28),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -751,20 +887,56 @@ class ModernChatCard extends StatelessWidget {
                             _formatTime(lastMessageTime),
                             style: TextStyle(
                               fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.45),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        lastMessage,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              lastMessage,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: unreadCount > 0
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: unreadCount > 0
+                                    ? Theme.of(context).colorScheme.onSurface
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.45),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // ✅ Per-conversation unread badge
+                          if (unreadCount > 0)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '$unreadCount',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
@@ -776,31 +948,9 @@ class ModernChatCard extends StatelessWidget {
       ),
     );
   }
-
-  String _formatTime(dynamic timestamp) {
-    if (timestamp == null) return '';
-
-    try {
-      final time = DateTime.parse(timestamp.toString());
-      final now = DateTime.now();
-      final difference = now.difference(time);
-
-      if (difference.inDays == 0) {
-        return 'Today';
-      } else if (difference.inDays == 1) {
-        return 'Yesterday';
-      } else if (difference.inDays < 7) {
-        return DateFormat('EEEE').format(time);
-      } else {
-        return DateFormat('MMM dd').format(time);
-      }
-    } catch (e) {
-      return '';
-    }
-  }
 }
 
-// Modern Request Card
+// ── Modern Request Card ───────────────────────────────────────────────────────
 class ModernRequestCard extends StatelessWidget {
   final TripRequest request;
   final String currentUserId;
@@ -855,8 +1005,16 @@ class ModernRequestCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
-                child: Icon(Icons.person, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45), size: 22),
+                backgroundColor: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.12),
+                child: Icon(Icons.person,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.45),
+                    size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -864,7 +1022,8 @@ class ModernRequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      request.counterpartName ?? (isReceived ? request.travelerId : request.orderId),
+                      request.counterpartName ??
+                          (isReceived ? request.travelerId : request.orderId),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -872,17 +1031,26 @@ class ModernRequestCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      isReceived ? '↙ Sent you an request' : '↗ You sent an request',
+                      isReceived
+                          ? '↙ Sent you an request'
+                          : '↗ You sent an request',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.45),
                       ),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
+                icon: Icon(Icons.more_vert,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.45)),
                 onPressed: () {},
               ),
             ],
@@ -892,7 +1060,8 @@ class ModernRequestCard extends StatelessWidget {
           // Route information
           Row(
             children: [
-              Icon(Icons.circle, size: 8, color: Theme.of(context).colorScheme.onSurface),
+              Icon(Icons.circle,
+                  size: 8, color: Theme.of(context).colorScheme.onSurface),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -911,11 +1080,21 @@ class ModernRequestCard extends StatelessWidget {
           // Departure info
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
+              Icon(Icons.calendar_today,
+                  size: 14,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.45)),
               const SizedBox(width: 6),
               Text(
                 'Departure',
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.45)),
               ),
             ],
           ),

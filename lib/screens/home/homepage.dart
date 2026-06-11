@@ -8,7 +8,10 @@ import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
 import 'package:motion_tab_bar_v2/motion-tab-controller.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../screens/send_page.dart';
+import '../../Controllers/ChatService.dart';
+import '../../Controllers/SocketService.dart';
 import '../../Controllers/tutorial_service.dart';
+import '../../Controllers/UnreadCountService.dart';
 import '../../widgets/tutorial_helper.dart';
 
 class HomePageWithNav extends StatefulWidget {
@@ -23,6 +26,14 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   MotionTabBarController? _motionTabBarController;
   late final VoidCallback _tabControllerListener;
   TutorialCoachMark? _tutorialCoachMark;
+  final SocketService _socketService = SocketService();
+  StreamSubscription<Map<String, dynamic>>? _messageSubscription;
+
+  // ✅ Cached pages list — built once in initState, never rebuilt.
+  // Prevents ModernHomeScreen (and other tabs) from being destroyed and
+  // recreated on every setState / tab switch, which was the root cause of
+  // the "setState() called after dispose()" crash in _loadUserData.
+  late final List<Widget> _pages;
 
   final GlobalKey _homeButtonKey = GlobalKey();
   final GlobalKey _searchButtonKey = GlobalKey();
@@ -41,24 +52,88 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
     _tabControllerListener = () {
       if (!mounted) return;
       setState(() {});
     };
+
     _motionTabBarController = MotionTabBarController(
       initialIndex: _tabHome,
       length: 5,
       vsync: this,
     )..addListener(_tabControllerListener);
+
+    // ✅ Build pages exactly once — tab-switch helpers are ready by this point.
+    _pages = [
+      // Tab 0 – Home
+      ModernHomeScreen(
+        onGoToCreate: switchToCreateTab,
+        onGoToSearch: switchToSearchTab,
+        onGoToOrders: switchToOrdersTab,
+      ),
+
+      // Tab 1 – Search
+      const SendPage(),
+
+      // Tab 2 – Create
+      CreateOrderPage(onOrderCreated: switchToOrdersTab),
+
+      // Tab 3 – Orders
+      const YourOrdersPage(),
+
+      // Tab 4 – Inbox
+      const InboxScreen(),
+    ];
+
     _checkAndShowTutorial();
+    _initializeChatUnreadListener();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _messageSubscription?.cancel();
+    _socketService.releaseConnection();
     _motionTabBarController?.removeListener(_tabControllerListener);
     _motionTabBarController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeChatUnreadListener() async {
+    try {
+      await _socketService.connect();
+      if (!mounted || _socketService.socket == null) return;
+
+      _messageSubscription = _socketService.onReceiveMessage((data) {
+        _syncUnreadChatCount();
+      });
+
+      await _syncUnreadChatCount();
+    } catch (e) {
+      debugPrint('Error initializing home chat listener: $e');
+    }
+  }
+
+  Future<void> _syncUnreadChatCount() async {
+    try {
+      final result = await ChatService.getInbox();
+      if (!mounted || result['success'] != true) return;
+
+      final inbox = result['inbox'] as List<dynamic>;
+      final totalUnread = inbox.fold<int>(
+        0,
+        (sum, chat) {
+          if (chat is! Map) return sum;
+          final unread = chat['unread_count'];
+          if (unread is int) return sum + unread;
+          return sum + (int.tryParse(unread?.toString() ?? '') ?? 0);
+        },
+      );
+      UnreadCountService.setCount(totalUnread);
+    } catch (e) {
+      debugPrint('Error syncing unread chat count: $e');
+    }
   }
 
   // ── Public tab-switch helpers ────────────────────────────────────
@@ -80,35 +155,12 @@ class _HomePageWithNavState extends State<HomePageWithNav>
     setState(() => _motionTabBarController!.index = index);
   }
 
-  // ── Pages ────────────────────────────────────────────────────────
-  // Built lazily so callbacks are always fresh.
-  List<Widget> get _pages => [
-        // Tab 0 – Home: pass tab-switch callbacks so the home screen
-        // can navigate to Create / Search / Orders / Inbox from its buttons.
-        ModernHomeScreen(
-          onGoToCreate: switchToCreateTab,
-          onGoToSearch: switchToSearchTab,
-          onGoToOrders: switchToOrdersTab,
-        ),
-
-        // Tab 1 – Search
-        const SendPage(),
-
-        // Tab 2 – Create
-        CreateOrderPage(onOrderCreated: switchToOrdersTab),
-
-        // Tab 3 – Orders
-        const YourOrdersPage(),
-
-        // Tab 4 – Inbox
-        const InboxScreen(),
-      ];
-
   // ── Tutorial ─────────────────────────────────────────────────────
   Future<void> _checkAndShowTutorial() async {
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
     final isCompleted = await TutorialService.isHomeTutorialCompleted();
+    if (!mounted) return;
     if (!isCompleted) {
       _showTutorial();
     }
@@ -171,13 +223,12 @@ class _HomePageWithNavState extends State<HomePageWithNav>
   // ── Build ────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final currentIndex = _motionTabBarController?.index ?? _tabHome;
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: TabBarView(
         controller: _motionTabBarController,
-        children: _pages,
+        children: _pages, // ✅ cached field — never rebuilt
       ),
       bottomNavigationBar: SafeArea(
         child: Container(
@@ -193,36 +244,59 @@ class _HomePageWithNavState extends State<HomePageWithNav>
               ),
             ],
           ),
-          child: MotionTabBar(
-            controller: _motionTabBarController,
-            initialSelectedTab: "Home",
-            labels: const ["Home", "Search", "Create", "Orders", "Inbox"],
-            icons: const [
-              Icons.home_outlined,
-              Icons.search,
-              Icons.add,
-              Icons.receipt_long_outlined,
-              Icons.chat_bubble_outline,
-            ],
-            labelAlwaysVisible: true,
-            tabIconColor: Colors.grey,
-            tabIconSize: 24.0,
-            tabIconSelectedSize: 24.0,
-            tabSelectedColor: Theme.of(context).primaryColor,
-            tabIconSelectedColor: Colors.white,
-            tabBarColor: Theme.of(context).cardColor,
-            textStyle: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[700],
-              fontWeight: FontWeight.w500,
-            ),
-            tabBarHeight: 55,
-            onTabItemSelected: (int value) {
-              setState(() {
-                _motionTabBarController!.index = value;
-              });
+          // ✅ ValueListenableBuilder rebuilds only the tab bar when the
+          // unread count changes — the rest of the Scaffold is untouched.
+          child: ValueListenableBuilder<int>(
+            valueListenable: UnreadCountService.unreadCount,
+            builder: (context, unreadCount, _) {
+              return MotionTabBar(
+                controller: _motionTabBarController,
+                initialSelectedTab: "Home",
+                labels: const ["Home", "Search", "Create", "Orders", "Inbox"],
+                icons: const [
+                  Icons.home_outlined,
+                  Icons.search,
+                  Icons.add,
+                  Icons.receipt_long_outlined,
+                  Icons.chat_bubble_outline,
+                ],
+                labelAlwaysVisible: true,
+                tabIconColor: Colors.grey,
+                tabIconSize: 24.0,
+                tabIconSelectedSize: 24.0,
+                tabSelectedColor: Theme.of(context).primaryColor,
+                tabIconSelectedColor: Colors.white,
+                tabBarColor: Theme.of(context).cardColor,
+                textStyle: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w500,
+                ),
+                tabBarHeight: 55,
+                onTabItemSelected: (int value) {
+                  setState(() {
+                    _motionTabBarController!.index = value;
+                  });
+                  // ✅ Clear the badge the moment the user taps Inbox.
+                  // InboxScreen._loadInbox() will re-sync from the API
+                  // and call UnreadCountService.setCount() with real data.
+                  if (value == _tabInbox) {
+                    UnreadCountService.reset();
+                  } else {
+                    _syncUnreadChatCount();
+                  }
+                },
+                // ✅ Show red badge on Inbox tab only when there are unread
+                // messages. All other tabs always get null (no badge).
+                badges: [
+                  null,
+                  null,
+                  null,
+                  null,
+                  unreadCount > 0 ? Text('$unreadCount') : null,
+                ],
+              );
             },
-            badges: const [null, null, null, null, null],
           ),
         ),
       ),

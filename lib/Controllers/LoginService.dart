@@ -19,6 +19,9 @@ class LoginService {
       parser: (json) => LoginResponse.fromJson(json),
       requiresAuth: false,
     );
+    if (_api.isBackendUnavailable(response)) {
+      throw Exception('BACKEND_DOWN: ${response.error}');
+    }
     return response.success ? response.data : null;
   }
 
@@ -33,6 +36,9 @@ class LoginService {
       parser: (json) => VerifyOtpResponse.fromJson(json),
       requiresAuth: false,
     );
+    if (_api.isBackendUnavailable(response)) {
+      throw Exception('BACKEND_DOWN: ${response.error}');
+    }
     return response.success ? response.data : null;
   }
 
@@ -53,7 +59,8 @@ class LoginService {
   }
 
   // Complete Profile (Profile Image)
-  Future<CompleteProfileResponse?> completeProfile(CompleteProfileRequest request) async {
+  Future<CompleteProfileResponse?> completeProfile(
+      CompleteProfileRequest request) async {
     try {
       final response = await _api.post(
         ApiConstants.completeProfile,
@@ -85,7 +92,8 @@ class LoginService {
     return response.success ? response.data : null;
   }
 
-  Future<bool> updateUserProfile(String userId, ProfileUpdateRequest data) async {
+  Future<bool> updateUserProfile(
+      String userId, ProfileUpdateRequest data) async {
     final response = await _api.put(
       '${ApiConstants.updateUserProfile}/$userId',
       body: data.toJson(),
@@ -94,7 +102,8 @@ class LoginService {
   }
 
   // Upload KYC Document
-  Future<KycUploadResponse?> uploadKycDocument(String userId, File document) async {
+  Future<KycUploadResponse?> uploadKycDocument(
+      String userId, File document) async {
     try {
       final url = ApiConstants.uploadKyc;
       debugPrint('=== KYC Upload Started === URL: $url');

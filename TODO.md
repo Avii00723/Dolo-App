@@ -1,4 +1,3 @@
-### Step 3: [COMPLETED] Fixed remaining ApiConstants errors in LocationinputField.dart & BuildLocationAutoComplete.dart&#10;### Step 4: [COMPLETED] All original compilation errors resolved&#10;&#10;Run `flutter analyze` again to confirm."
-
-
+- [ ] Disable Kotlin incremental compilation / daemon cache issues on Android (fix Kotlin daemon "Could not close incremental caches" errors).
+- [ ] Re-run `flutter run --debug` and confirm build succeeds.
 

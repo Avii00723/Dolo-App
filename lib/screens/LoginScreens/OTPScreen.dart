@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../Controllers/LoginService.dart';
 import '../../Controllers/AuthService.dart';
 import '../../Controllers/DeviceTokenService.dart';
+import '../BackendDownScreen.dart';
 import 'signup_page.dart';
 import 'package:dolo/screens/home/homepage.dart';
 
@@ -126,10 +127,19 @@ class _OTPScreenState extends State<OTPScreen> {
           }
         }
       } else {
-        if (mounted) _showSnackBar('Invalid OTP. Please try again.', isError: true);
+        if (mounted)
+          _showSnackBar('Invalid OTP. Please try again.', isError: true);
       }
     } catch (e) {
-      if (mounted) _showSnackBar('Error: ${e.toString()}', isError: true);
+      if (mounted) {
+        if (e.toString().contains('BACKEND_DOWN')) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const BackendDownScreen()),
+          );
+          return;
+        }
+        _showSnackBar('Error: ${e.toString()}', isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -217,12 +227,14 @@ class _OTPScreenState extends State<OTPScreen> {
                 // ── OTP Fields ──────────────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(6, (index) => _OtpBox(
-                    controller: _controllers[index],
-                    focusNode: _focusNodes[index],
-                    enabled: !_isLoading,
-                    onChanged: (v) => _onDigitChanged(v, index),
-                  )),
+                  children: List.generate(
+                      6,
+                      (index) => _OtpBox(
+                            controller: _controllers[index],
+                            focusNode: _focusNodes[index],
+                            enabled: !_isLoading,
+                            onChanged: (v) => _onDigitChanged(v, index),
+                          )),
                 ),
 
                 const SizedBox(height: 36),

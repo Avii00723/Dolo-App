@@ -7,10 +7,13 @@ import '../../Controllers/AuthService.dart';
 import '../../Controllers/ordertrackingservice.dart';
 import '../Inbox Section/indoxscreen.dart';
 import '../../Models/OrderModel.dart' as OrderModels;
+
 import '../../Models/TripRequestModel.dart';
 import '../../screens/orderSection/OrderCard.dart';
 import '../../widgets/NotificationBellIcon.dart';
 import 'TravellerCard.dart';
+import '../BackendDownScreen.dart';
+
 
 class OrderDisplay {
   String? get travelerName => userName;
@@ -706,29 +709,42 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
           IconButton(icon: const Icon(Icons.inbox_outlined), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxScreen()))),
         ],
       ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: Column(
+          children: [
           // Backend down banner
           if (_backendErrorMessage != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: Colors.orange.shade100,
-              child: Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _backendErrorMessage!,
-                      style: TextStyle(
-                        color: Colors.orange.shade700,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+            InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const BackendDownScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                color: Colors.orange.shade100,
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        color: Colors.orange.shade700, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _backendErrorMessage!,
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           Padding(
@@ -747,7 +763,7 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
           Expanded(child: _selectedTab == 0 ? _buildMyOrdersTab() : _buildMyRequestedOrdersTab()),
         ],
       ),
-    );
+      ));
   }
 
   Widget _buildTab(int index, String label) {
@@ -771,7 +787,7 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
     return RefreshIndicator(
       onRefresh: () => _loadMyOrders(),
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 16),
         itemCount: myOrders.length,
         itemBuilder: (context, index) {
           final order = myOrders[index];
@@ -800,7 +816,7 @@ class _YourOrdersPageState extends State<YourOrdersPage> with WidgetsBindingObse
     return RefreshIndicator(
       onRefresh: () => _loadMyRequestedOrders(),
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 16),
         itemCount: myRequestedOrders.length,
         itemBuilder: (context, index) {
           final order = myRequestedOrders[index];

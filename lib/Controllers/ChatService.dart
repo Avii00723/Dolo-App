@@ -128,9 +128,18 @@ class ChatService {
       }
     } catch (e) {
       print('❌ Send Message Exception: $e');
+      final errorText = e.toString().toLowerCase();
+      final isBackendDown = errorText.contains('socketexception') ||
+          errorText.contains('network is unreachable') ||
+          errorText.contains('connection failed') ||
+          errorText.contains('failed to connect') ||
+          errorText.contains('connection refused') ||
+          errorText.contains('timed out') ||
+          errorText.contains('connection timed out');
+
       return {
         'success': false,
-        'error': 'Network error: $e',
+        'error': isBackendDown ? 'BACKEND_DOWN' : 'Network error: $e',
       };
     }
   }

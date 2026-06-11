@@ -1,33 +1,108 @@
 import 'package:dolo/screens/LoginScreens/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:dolo/screens/home/homepage.dart';
-import 'package:dolo/screens/LoginScreens/LoginSignupScreen.dart';
-import 'package:dolo/screens/LoginScreens/signup_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import 'Controllers/AuthService.dart';
 import 'Controllers/DeviceTokenService.dart';
+import 'Controllers/UnreadCountService.dart';
+import 'Constants/ApiService.dart';
 import 'firebase_options.dart';
+import 'screens/BackendDownScreen.dart';
 import 'splash_screen.dart';
 import 'theme/theme_provider.dart';
 import 'theme/app_theme.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-// Background message handler (must be top-level function)
+// ── Local notifications plugin (singleton) ──────────────────────────────────
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+// ── Android notification channel for chat messages ───────────────────────────
+const AndroidNotificationChannel _chatChannel = AndroidNotificationChannel(
+  'chat_messages', // id — must match what your server sends
+  'Chat Messages', // name shown in system settings
+  description: 'Incoming chat messages from other users',
+  importance: Importance.high,
+);
+
+// ── Background message handler (must be a top-level function) ────────────────
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  print('📩 Background message received: ${message.messageId}');
+  debugPrint('📩 Background message received: ${message.messageId}');
+  // Background messages are shown automatically by FCM on Android/iOS.
+  // No UI update needed here — the app is not running in the foreground.
 }
 
+// ── Initialise local notifications ───────────────────────────────────────────
+Future<void> _initLocalNotifications() async {
+  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const iosSettings = DarwinInitializationSettings(
+    requestAlertPermission: false, // already requested via FirebaseMessaging
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
+  const initSettings =
+      InitializationSettings(android: androidSettings, iOS: iosSettings);
+
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+  // Create the Android channel once so heads-up banners work on Android 8+.
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(_chatChannel);
+}
+
+// ── Wire foreground FCM listener ─────────────────────────────────────────────
+void _initForegroundMessageListener() {
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    debugPrint(
+        '📩 Foreground message received: ${message.notification?.title}');
+
+    // 1. Bump the inbox badge so the bottom-nav tab shows a red dot.
+    UnreadCountService.increment();
+
+    // 2. Show a heads-up local notification (FCM suppresses its own UI when
+    //    the app is in the foreground on Android).
+    final notification = message.notification;
+    if (notification != null) {
+      flutterLocalNotificationsPlugin.show(
+        notification.hashCode,
+        notification.title,
+        notification.body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _chatChannel.id,
+            _chatChannel.name,
+            channelDescription: _chatChannel.description,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: const DarwinNotificationDetails(),
+        ),
+      );
+    }
+  });
+}
+
+// ── main ─────────────────────────────────────────────────────────────────────
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Set up background message handler
+  // Background handler must be registered before runApp.
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Local notifications (heads-up banners while app is open).
+  await _initLocalNotifications();
+
+  // Foreground FCM listener — updates badge + shows local notification.
+  _initForegroundMessageListener();
 
   runApp(
     ChangeNotifierProvider(
@@ -37,6 +112,7 @@ void main() async {
   );
 }
 
+// ── App ───────────────────────────────────────────────────────────────────────
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -59,6 +135,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// ── Auth wrapper ──────────────────────────────────────────────────────────────
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -69,6 +146,7 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _isLoading = true;
   bool _isLoggedIn = false;
+  bool _isBackendDown = false;
 
   @override
   void initState() {
@@ -78,29 +156,39 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _checkAuthStatus() async {
     try {
-      // Add a small delay to show the loading animation
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // Check if user is logged in using secure storage
+      final isBackendReachable = await ApiService().isBackendReachable();
+      if (!isBackendReachable) {
+        if (mounted) {
+          setState(() {
+            _isBackendDown = true;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
       final isLoggedIn = await AuthService.isLoggedIn();
       final userData = await AuthService.getCurrentUser();
 
       if (isLoggedIn && userData != null) {
-        print('✅ User is logged in: userId=${userData['userId']}, phone=${userData['phone']}');
-        // Initialize FCM and save device token for push notifications
+        debugPrint(
+            '✅ User is logged in: userId=${userData['userId']}, phone=${userData['phone']}');
         await DeviceTokenService.initialize();
       } else {
-        print('ℹ️ No user session found - showing login screen');
+        debugPrint('ℹ️ No user session found - showing login screen');
       }
 
       if (mounted) {
         setState(() {
           _isLoggedIn = isLoggedIn;
+          _isBackendDown = false;
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('❌ Error checking auth status: $e');
+      debugPrint('❌ Error checking auth status: $e');
       if (mounted) {
         setState(() {
           _isLoggedIn = false;
@@ -112,7 +200,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // Show loading screen while checking auth status
     if (_isLoading) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -120,7 +207,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // App logo or icon
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -135,43 +221,47 @@ class _AuthWrapperState extends State<AuthWrapper> {
               ),
               const SizedBox(height: 24),
               CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).primaryColor),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Loading...',
-                style: TextStyle(
-                  fontSize: 16,
-                ),
-              ),
+              const Text('Loading...', style: TextStyle(fontSize: 16)),
             ],
           ),
         ),
       );
     }
 
-    // ✅ If user is logged in, navigate directly to home page
+    if (_isBackendDown) {
+      return BackendDownScreen(
+        canGoBack: false,
+        onRetry: () {
+          setState(() {
+            _isLoading = true;
+            _isBackendDown = false;
+          });
+          _checkAuthStatus();
+        },
+      );
+    }
+
     if (_isLoggedIn) {
-      // Use WidgetsBinding to ensure navigation happens after build
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const HomePageWithNav(),
-          ),
+          MaterialPageRoute(builder: (context) => const HomePageWithNav()),
         );
       });
-      // Show loading while navigating
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+            valueColor:
+                AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
           ),
         ),
       );
     }
 
-    // ❌ If user is not logged in, show splash/login screen
     return const SplashScreen();
   }
 }

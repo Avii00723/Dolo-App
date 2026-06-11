@@ -57,12 +57,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isRefreshing = false;
   List<File> _selectedImages = [];
   bool _isUploadingImages = false;
-  final Set<int> _unseenMessageIds = {};
+  final Set<String> _unseenMessageIds = {};
 
   // WebSocket typing indicator states
   bool _isOtherUserTyping = false;
   Timer? _typingTimer;
   Timer? _typingIndicatorTimer;
+  StreamSubscription<Map<String, dynamic>>? _messageSubscription;
+  StreamSubscription<Map<String, dynamic>>? _typingSubscription;
 
   // Tutorial keys
   TutorialCoachMark? _tutorialCoachMark;
@@ -132,16 +134,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _initializeWebSocket() async {
     try {
       await _socketService.connect();
+      _socketService.joinChat(widget.chatId);
 
-      if (_socketService.isConnected) {
-        _socketService.joinRoom(widget.chatId);
-
-        _socketService.onReceiveMessage((data) {
+      if (_socketService.socket != null) {
+        _messageSubscription = _socketService.onReceiveMessage((data) {
           debugPrint('📬 Received message via WebSocket: $data');
           _loadMessages(silent: true);
         });
 
-        _socketService.onUserTyping((data) {
+        _typingSubscription = _socketService.onUserTyping((data) {
           final typingUserId = data['userId'] as String?;
           debugPrint(
               '🔍 ChatScreen - Typing event received: userId=$typingUserId, currentUserId=$_currentUserId, mounted=$mounted');
@@ -205,7 +206,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         key: _messageInputKey,
         title: 'Type Your Message',
         description:
-            'Type your message here to communicate with the other user.',
+        'Type your message here to communicate with the other user.',
         order: 1,
         align: ContentAlign.top,
       ),
@@ -213,7 +214,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         key: _imagePickerKey,
         title: 'Send Images',
         description:
-            'Tap this button to attach images from your gallery or camera.',
+        'Tap this button to attach images from your gallery or camera.',
         order: 2,
         align: ContentAlign.top,
       ),
@@ -270,15 +271,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (result['success'] == true) {
         final apiMessages = result['messages'] as List;
         final convertedMessages = apiMessages.map((msg) {
-          final messageIdRaw = msg['id'];
-          final messageId = messageIdRaw is int
-              ? messageIdRaw
-              : int.tryParse(messageIdRaw.toString()) ?? 0;
+          // Message ID is a string (e.g. "NJXBIBTI24URKMZCUES1DMMA"), keep as-is
+          final messageId = msg['id']?.toString() ?? '';
 
           final senderId = msg['user_id'] ?? msg['sender_id'];
           final senderName = msg['sender_name'] ?? 'Unknown';
+          // message may be null when only images are sent
           final messageText = msg['message'] ?? '';
-          final mediaUrl = msg['media_url'] as String?;
+
+          // API returns an "images" array: ["/chat_images/xxx.jpg", ...]
+          final rawImages = msg['images'];
+          List<String> mediaUrls = [];
+          if (rawImages is List) {
+            mediaUrls = rawImages
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList();
+          } else if (rawImages is String && rawImages.trim().isNotEmpty) {
+            // fallback: single string
+            mediaUrls = [rawImages.trim()];
+          }
+          debugPrint('📸 msg id=${msg['id']} images=$rawImages -> mediaUrls=$mediaUrls');
+
+          final mediaUrl = mediaUrls.isNotEmpty ? mediaUrls.first : null;
           final replyToId = msg['reply_to'];
           final replyMessage = msg['reply_message'];
           final replySenderName = msg['reply_sender_name'];
@@ -287,7 +302,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           final seen = (seenValue == 1 || seenValue == true);
           final seenAt = msg['seen_at'];
 
-          final hasMedia = mediaUrl != null && mediaUrl.isNotEmpty;
+          final hasMedia = mediaUrls.isNotEmpty;
 
           if (!seen && senderId != _currentUserId) {
             _unseenMessageIds.add(messageId);
@@ -312,8 +327,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'senderId': senderId,
             'senderName': senderName,
             'timestamp': createdAt,
-            'type': hasMedia ? 'image' : 'text',
+            'type': hasMedia ? (messageText.isNotEmpty ? 'image_with_caption' : 'image') : 'text',
             'mediaUrl': hasMedia ? mediaUrl : null,
+            'mediaUrls': mediaUrls,
             'replyToId': replyToId,
             'replyData': replyData,
             'seen': seen,
@@ -322,7 +338,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         }).toList();
 
         final scrollOffset =
-            _scrollController.hasClients ? _scrollController.offset : 0.0;
+        _scrollController.hasClients ? _scrollController.offset : 0.0;
         final wasAtBottom = scrollOffset < 50;
 
         setState(() {
@@ -332,7 +348,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
           if (convertedMessages.isNotEmpty) {
             final firstOtherMessage = convertedMessages.firstWhere(
-              (msg) => msg['senderId'] != _currentUserId,
+                  (msg) => msg['senderId'] != _currentUserId,
               orElse: () => {},
             );
 
@@ -385,9 +401,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         }
       } else {
         if (!silent) {
+          final errText = result['error']?.toString() ?? '';
+          final errLower = errText.toLowerCase();
+          final isBackendDown =
+              errLower.contains('BACKEND_DOWN'.toLowerCase()) ||
+                  errLower.contains('socketexception'.toLowerCase()) ||
+                  errLower.contains('network is unreachable'.toLowerCase()) ||
+                  errLower.contains('connection failed'.toLowerCase()) ||
+                  errLower.contains('timed out'.toLowerCase());
+
           setState(() {
             isLoading = false;
-            _errorMessage = result['error'] as String?;
+            _errorMessage =
+            isBackendDown ? 'BACKEND_DOWN' : (result['error'] as String?);
             otherUserData = {
               'id': widget.otherUserId,
               'name': widget.otherUserName ?? 'Unknown User',
@@ -428,7 +454,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (rawValue.isEmpty) return null;
 
       final normalizedValue =
-          rawValue.contains('T') ? rawValue : rawValue.replaceFirst(' ', 'T');
+      rawValue.contains('T') ? rawValue : rawValue.replaceFirst(' ', 'T');
 
       // Let Dart's DateTime.tryParse handle timezone semantics:
       // - If the string contains a 'Z' or an explicit offset, it will be
@@ -446,7 +472,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _markVisibleMessagesAsSeen() {
     if (_unseenMessageIds.isEmpty || !_scrollController.hasClients) return;
 
-    final visibleMessageIds = <int>[];
+    final visibleMessageIds = <String>[];
 
     for (int i = 0; i < messages.length; i++) {
       final message = messages[messages.length - 1 - i];
@@ -463,7 +489,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _markMessagesAsSeen(List<int> messageIds) async {
+  Future<void> _markMessagesAsSeen(List<String> messageIds) async {
     try {
       final chatIdInt = int.tryParse(widget.chatId);
       if (chatIdInt == null || _currentUserId == null) return;
@@ -599,11 +625,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           builder: (context) => UserProfileScreen(
             userId: otherUserId,
             userName:
-                otherUserData['name'] ?? widget.otherUserName ?? 'Unknown User',
+            otherUserData['name'] ?? widget.otherUserName ?? 'Unknown User',
             profileUrl: otherUserData['profileUrl'],
             orderId: widget.orderId,
             isOrderAccepted:
-                true, // Chat is only accessible after order is accepted
+            true, // Chat is only accessible after order is accepted
           ),
         ),
       );
@@ -715,7 +741,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       actions: [
         IconButton(
           icon:
-              Icon(Icons.phone, color: Theme.of(context).colorScheme.onSurface),
+          Icon(Icons.phone, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () async {
             _navigateToUserProfile();
           },
@@ -805,7 +831,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
           final messageIndex = _isOtherUserTyping ? index - 1 : index;
           final message = messages[messages.length - 1 - messageIndex];
-          final isMe = message['senderId'] == _currentUserId;
+          final isMe = message['senderId']?.toString() == _currentUserId;
           final showDateSeparator = _shouldShowDateSeparator(messageIndex);
 
           return Column(
@@ -836,13 +862,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _shouldShowDateSeparator(int reversedMessageIndex) {
     final currentMessageIndex = messages.length - 1 - reversedMessageIndex;
     final currentTimestamp =
-        messages[currentMessageIndex]['timestamp'] as DateTime?;
+    messages[currentMessageIndex]['timestamp'] as DateTime?;
     if (currentTimestamp == null) return false;
 
     if (currentMessageIndex == 0) return true;
 
     final previousTimestamp =
-        messages[currentMessageIndex - 1]['timestamp'] as DateTime?;
+    messages[currentMessageIndex - 1]['timestamp'] as DateTime?;
     return previousTimestamp == null ||
         !_isSameDay(currentTimestamp, previousTimestamp);
   }
@@ -973,13 +999,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (replyingToMessage == null) return const SizedBox.shrink();
 
     String previewText = replyingToMessage!['message'] ?? '';
-    if (previewText.isEmpty && replyingToMessage!['type'] == 'image') {
+    if (previewText.isEmpty && (replyingToMessage!['type'] == 'image' || replyingToMessage!['type'] == 'image_with_caption')) {
       previewText = '📷 Image';
     }
 
     final isReplyToMe = replyingToMessage!['senderId'] == _currentUserId;
     final senderName =
-        isReplyToMe ? 'You' : (replyingToMessage!['senderName'] ?? 'Unknown');
+    isReplyToMe ? 'You' : (replyingToMessage!['senderName'] ?? 'Unknown');
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1156,7 +1182,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       onPressed: _showImagePickerOptions,
                       padding: EdgeInsets.zero,
                       constraints:
-                          const BoxConstraints(minWidth: 40, minHeight: 40),
+                      const BoxConstraints(minWidth: 40, minHeight: 40),
                     ),
                   ],
                 ),
@@ -1192,18 +1218,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   child: Center(
                     child: _isUploadingImages
                         ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
-                            ),
-                          )
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
                         : const Icon(
-                            Icons.send,
-                            color: Colors.white,
-                            size: 20,
-                          ),
+                      Icons.send,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
@@ -1284,13 +1310,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 decoration: BoxDecoration(
                   color: value > 0.5
                       ? Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.5)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.5)
                       : Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.3),
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
               );
@@ -1302,13 +1328,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               decoration: BoxDecoration(
                 color: value > 0.5
                     ? Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.5)
                     : Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.3),
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
             );
@@ -1334,12 +1360,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           colors: isMe
               ? [const Color(0xFF2B6390), const Color(0xFF3E83AE)]
               : [
-                  Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.2),
-                  Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
-                ],
+            Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: 0.2),
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1364,7 +1390,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _messageController.clear();
     final imagesToSend = List<File>.from(_selectedImages);
     final replyToId =
-        replyingToMessageId != null ? int.tryParse(replyingToMessageId!) : null;
+    replyingToMessageId != null ? int.tryParse(replyingToMessageId!) : null;
 
     setState(() {
       _selectedImages.clear();
@@ -1472,6 +1498,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       String fullUrl = imageUrl;
       if (!imageUrl.startsWith('http')) {
         fullUrl = '${ApiConstants.imagebaseUrl}$imageUrl';
+        print('⚠️ Image URL did not start with http, prepended base URL: $fullUrl');
       }
 
       debugPrint('📥 Downloading from: $fullUrl');
@@ -1555,10 +1582,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _autoRefreshTimer?.cancel();
     _typingTimer?.cancel();
     _typingIndicatorTimer?.cancel();
+    _messageSubscription?.cancel();
+    _typingSubscription?.cancel();
     _messageController.removeListener(_onTextChanged);
     _messageController.dispose();
     _scrollController.dispose();
-    _socketService.leaveRoom();
+    _socketService.leaveChat();
+    _socketService.releaseConnection();
     super.dispose();
   }
 }
@@ -1593,12 +1623,24 @@ class EnhancedMessageBubble extends StatelessWidget {
     final mediaUrl = message['mediaUrl'];
     final hasReply = message['replyData'] != null;
     final seen = message['seen'] == true;
+    // Sent messages (isMe): dark bubble on the RIGHT
+    const myBubbleColor = Color(0xFF1A3A5C);
+    // Received messages (!isMe): light bubble on the LEFT
+    final otherBubbleColor = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF2C3E50)
+        : const Color(0xFFEDF2F7);
+    final bubbleColor = isMe ? myBubbleColor : otherBubbleColor;
+    final primaryTextColor =
+    isMe ? Colors.white : Theme.of(context).colorScheme.onSurface;
+    final secondaryTextColor = isMe
+        ? Colors.white.withValues(alpha: 0.72)
+        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.48);
 
     return GestureDetector(
       onLongPress: () => _showMessageOptions(context),
       child: Row(
         mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMe) ...[
@@ -1612,18 +1654,28 @@ class EnhancedMessageBubble extends StatelessWidget {
               ),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
+                color: bubbleColor,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
                   bottomLeft: Radius.circular(isMe ? 16 : 4),
                   bottomRight: Radius.circular(isMe ? 4 : 16),
                 ),
+                border: isMe
+                    ? null
+                    : Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.06),
+                  width: 1,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: isMe
+                        ? Colors.black.withValues(alpha: 0.30)
+                        : Colors.black.withValues(alpha: 0.08),
+                    blurRadius: isMe ? 10 : 6,
+                    offset: Offset(isMe ? 2 : 0, 3),
                   ),
                 ],
               ),
@@ -1631,20 +1683,23 @@ class EnhancedMessageBubble extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (hasReply) _buildReplySection(context),
-                  if (messageType == 'image' && mediaUrl != null)
+                  // Show images for both 'image' and 'image_with_caption' types
+                  if ((messageType == 'image' || messageType == 'image_with_caption') &&
+                      mediaUrl != null)
                     _buildImageMessage(context, mediaUrl),
-                  if (messageText.isNotEmpty)
+                  // Caption or plain text — shown below images when both exist
+                  if (messageText.isNotEmpty) ...[
+                    if (messageType == 'image_with_caption')
+                      const SizedBox(height: 6),
                     SelectableText(
                       messageText,
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.4,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.7),
+                        color: primaryTextColor,
                       ),
                     ),
+                  ],
                   if (timestamp != null) ...[
                     const SizedBox(height: 4),
                     Row(
@@ -1655,11 +1710,10 @@ class EnhancedMessageBubble extends StatelessWidget {
                             seen ? Icons.done_all : Icons.done,
                             size: 14,
                             color: seen
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.3),
+                                ? (isMe
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.primary)
+                                : secondaryTextColor,
                           ),
                           const SizedBox(width: 4),
                         ],
@@ -1667,10 +1721,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                           DateFormat('hh:mm a').format(timestamp),
                           style: TextStyle(
                             fontSize: 11,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.45),
+                            color: secondaryTextColor,
                           ),
                         ),
                       ],
@@ -1702,12 +1753,12 @@ class EnhancedMessageBubble extends StatelessWidget {
           colors: isMe
               ? [const Color(0xFF2B6390), const Color(0xFF3E83AE)]
               : [
-                  Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.2),
-                  Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
-                ],
+            Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: 0.2),
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1750,7 +1801,7 @@ class EnhancedMessageBubble extends StatelessWidget {
         border: Border(
           left: BorderSide(
             color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
             width: 3,
           ),
         ),
@@ -1788,47 +1839,106 @@ class EnhancedMessageBubble extends StatelessWidget {
   }
 
   Widget _buildImageMessage(BuildContext context, String mediaUrl) {
-    String fullUrl = mediaUrl;
-    if (!mediaUrl.startsWith('http')) {
-      fullUrl = '${ApiConstants.imagebaseUrl}$mediaUrl';
+    // Collect all URLs for this message (single or multiple)
+    final rawUrls = message['mediaUrls'];
+    final List<String> allUrls;
+    if (rawUrls is List && (rawUrls as List).isNotEmpty) {
+      allUrls = (rawUrls as List).map((e) => e.toString()).toList();
+    } else {
+      allUrls = [mediaUrl];
     }
 
-    return GestureDetector(
-      onTap: () => onLaunchUrl(fullUrl),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            fullUrl,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Container(
-                height: 200,
-                width: 200,
-                color: Theme.of(context).colorScheme.surface,
-                child: const Center(child: CircularProgressIndicator()),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 200,
-                width: 200,
-                color: Theme.of(context).colorScheme.surface,
-                child: Center(
-                  child: Icon(Icons.broken_image,
-                      size: 50,
+    Widget singleImage(String url) {
+      String fullUrl = url.trim();
+      if (!fullUrl.startsWith('http')) {
+        fullUrl = '${ApiConstants.imagebaseUrl}$fullUrl';
+      }
+      return GestureDetector(
+        onTap: () => onLaunchUrl(fullUrl),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          constraints: const BoxConstraints(
+            maxWidth: 220,
+            maxHeight: 260,
+            minWidth: 120,
+            minHeight: 80,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              fullUrl,
+              fit: BoxFit.cover,
+              width: 220,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  height: 160,
+                  width: 220,
+                  color: Theme.of(context).colorScheme.surface,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('❌ Image failed to load: $fullUrl — $error');
+                return Container(
+                  height: 160,
+                  width: 220,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
                       color: Theme.of(context)
                           .colorScheme
                           .onSurface
-                          .withValues(alpha: 0.4)),
-                ),
-              );
-            },
+                          .withValues(alpha: 0.15),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.broken_image,
+                          size: 40,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.4)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Image unavailable',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
-      ),
+      );
+    }
+
+    if (allUrls.length == 1) {
+      return singleImage(allUrls.first);
+    }
+
+    // Multiple images — show in a wrap grid
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: allUrls.map((url) => singleImage(url)).toList(),
     );
   }
 
@@ -1878,7 +1988,7 @@ class EnhancedMessageBubble extends StatelessWidget {
                   onCopy(messageText);
                 },
               ),
-            if (messageType == 'image' && mediaUrl != null)
+            if ((messageType == 'image' || messageType == 'image_with_caption') && mediaUrl != null)
               ListTile(
                 leading: const Icon(Icons.download, color: Colors.green),
                 title: const Text('Download Image'),
